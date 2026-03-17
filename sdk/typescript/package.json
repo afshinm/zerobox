@@ -18,6 +18,7 @@
     "test": "echo 'TODO: setup tests'"
   },
   "devDependencies": {
+    "@types/node": "^25.5.0",
     "typescript": "^5.7"
   },
   "engines": {

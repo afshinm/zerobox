@@ -141,9 +141,8 @@ enum SnapshotCommands {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
-    match cli.command {
-        Commands::Serve => return run_server(&cli.config).await,
-        _ => {}
+    if matches!(cli.command, Commands::Serve) {
+        return run_server(&cli.config).await;
     }
 
     // All non-serve commands use the HTTP client
@@ -180,7 +179,7 @@ async fn main() -> anyhow::Result<()> {
                 if sandboxes.is_empty() {
                     println!("No sandboxes");
                 } else {
-                    println!("{:<20} {:<10} {:<16} {}", "ID", "STATUS", "IP", "CREATED");
+                    println!("{:<20} {:<10} {:<16} CREATED", "ID", "STATUS", "IP");
                     for s in sandboxes {
                         println!(
                             "{:<20} {:<10} {:<16} {}",
@@ -203,9 +202,7 @@ async fn main() -> anyhow::Result<()> {
                     "No command specified. Usage: zerobox exec <id> -- <cmd> [args...]"
                 ));
             }
-            let resp = client
-                .exec_command(&id, &cmd[0], &cmd[1..].to_vec())
-                .await?;
+            let resp = client.exec_command(&id, &cmd[0], &cmd[1..]).await?;
             // Print stdout/stderr
             if let Some(stdout) = resp["stdout"].as_str() {
                 if !stdout.is_empty() {
@@ -304,10 +301,7 @@ async fn main() -> anyhow::Result<()> {
                     if snapshots.is_empty() {
                         println!("No snapshots");
                     } else {
-                        println!(
-                            "{:<20} {:<20} {:<10} {}",
-                            "ID", "SOURCE", "STATUS", "CREATED"
-                        );
+                        println!("{:<20} {:<20} {:<10} CREATED", "ID", "SOURCE", "STATUS");
                         for s in snapshots {
                             println!(
                                 "{:<20} {:<20} {:<10} {}",

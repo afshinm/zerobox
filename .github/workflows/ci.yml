@@ -50,12 +50,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - name: Install & Build
         working-directory: sdk/typescript
-        run: npm ci && npm run build
+        run: pnpm install && pnpm run build
       - name: Lint
         working-directory: sdk/typescript
-        run: npm run lint
+        run: pnpm run lint
       - name: Test
         working-directory: sdk/typescript
-        run: npm test
+        run: pnpm test
