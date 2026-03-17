@@ -1,0 +1,30 @@
+[package]
+name = "zerobox-daemon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Zerobox daemon and CLI - Firecracker sandbox supervisor"
+
+[[bin]]
+name = "zerobox"
+path = "src/main.rs"
+
+[dependencies]
+zerobox-common = { path = "../zerobox-common" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+hyper = { version = "1", features = ["client", "http1"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "tokio"] }
+http-body-util = "0.1"
+base64 = "0.22"

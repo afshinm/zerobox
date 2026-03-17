@@ -1,0 +1,24 @@
+[package]
+name = "zerobox-guest-agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Zerobox guest agent - runs inside Firecracker microVMs"
+
+[[bin]]
+name = "zerobox-agent"
+path = "src/main.rs"
+
+[dependencies]
+zerobox-common = { path = "../zerobox-common" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+nix = { version = "0.29", features = ["process", "signal"] }
+base64 = "0.22"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+tokio-vsock = "0.5"

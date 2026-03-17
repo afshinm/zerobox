@@ -1,0 +1,22 @@
+/target
+**/*.rs.bk
+*.swp
+*.swo
+.DS_Store
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Runtime
+*.log
+*.pid
+
+# Zerobox data
+/data/
