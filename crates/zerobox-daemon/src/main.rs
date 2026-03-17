@@ -18,7 +18,10 @@ use crate::manager::SandboxManager;
 use crate::snapshot::SnapshotManager;
 
 #[derive(Parser)]
-#[command(name = "zerobox", about = "Firecracker sandbox supervisor for AI agents")]
+#[command(
+    name = "zerobox",
+    about = "Firecracker sandbox supervisor for AI agents"
+)]
 struct Cli {
     /// Path to the configuration file
     #[arg(long, global = true, default_value = "/etc/zerobox/config.yaml")]
@@ -148,7 +151,13 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Serve => unreachable!(),
-        Commands::Start { image, vcpus, memory, timeout, port } => {
+        Commands::Start {
+            image,
+            vcpus,
+            memory,
+            timeout,
+            port,
+        } => {
             let resp = client
                 .create_sandbox(image.as_deref(), vcpus, memory, timeout, &port)
                 .await?;
@@ -190,9 +199,13 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Exec { id, cmd } => {
             if cmd.is_empty() {
-                return Err(anyhow::anyhow!("No command specified. Usage: zerobox exec <id> -- <cmd> [args...]"));
+                return Err(anyhow::anyhow!(
+                    "No command specified. Usage: zerobox exec <id> -- <cmd> [args...]"
+                ));
             }
-            let resp = client.exec_command(&id, &cmd[0], &cmd[1..].to_vec()).await?;
+            let resp = client
+                .exec_command(&id, &cmd[0], &cmd[1..].to_vec())
+                .await?;
             // Print stdout/stderr
             if let Some(stdout) = resp["stdout"].as_str() {
                 if !stdout.is_empty() {
@@ -216,10 +229,17 @@ async fn main() -> anyhow::Result<()> {
             let resp = client.get_sandbox(&id).await?;
             let status = resp["status"].as_str().unwrap_or("unknown");
             if status != "running" {
-                return Err(anyhow::anyhow!("Sandbox {} is not running (status: {})", id, status));
+                return Err(anyhow::anyhow!(
+                    "Sandbox {} is not running (status: {})",
+                    id,
+                    status
+                ));
             }
 
-            eprintln!("Connected to sandbox {}. Type commands, Ctrl-D to exit.", id);
+            eprintln!(
+                "Connected to sandbox {}. Type commands, Ctrl-D to exit.",
+                id
+            );
             eprintln!("---");
 
             let stdin = std::io::stdin();
@@ -273,7 +293,10 @@ async fn main() -> anyhow::Result<()> {
             }
             SnapshotCommands::Restore { id, snapshot_id } => {
                 // Restore is not yet implemented in the API
-                println!("Restore not yet implemented (sandbox={}, snapshot={})", id, snapshot_id);
+                println!(
+                    "Restore not yet implemented (sandbox={}, snapshot={})",
+                    id, snapshot_id
+                );
             }
             SnapshotCommands::List => {
                 let resp = client.list_snapshots().await?;
@@ -281,7 +304,10 @@ async fn main() -> anyhow::Result<()> {
                     if snapshots.is_empty() {
                         println!("No snapshots");
                     } else {
-                        println!("{:<20} {:<20} {:<10} {}", "ID", "SOURCE", "STATUS", "CREATED");
+                        println!(
+                            "{:<20} {:<20} {:<10} {}",
+                            "ID", "SOURCE", "STATUS", "CREATED"
+                        );
                         for s in snapshots {
                             println!(
                                 "{:<20} {:<20} {:<10} {}",
@@ -308,11 +334,9 @@ async fn run_server(config_path: &str) -> anyhow::Result<()> {
     let config = config::load(config_path)?;
 
     // Initialize tracing
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(&config.log_level));
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .init();
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.log_level));
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     tracing::info!("Starting zerobox daemon");
 

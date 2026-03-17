@@ -81,7 +81,10 @@ pub async fn remove_port_forward(host_port: u16, guest_ip: &str, guest_port: u16
 pub fn allocate_host_port(range: &str, counter: &AtomicU32) -> Result<u16> {
     let parts: Vec<&str> = range.split('-').collect();
     if parts.len() != 2 {
-        return Err(anyhow!("Invalid port range format: '{}'. Expected 'start-end'.", range));
+        return Err(anyhow!(
+            "Invalid port range format: '{}'. Expected 'start-end'.",
+            range
+        ));
     }
 
     let start: u32 = parts[0]
@@ -102,7 +105,11 @@ pub fn allocate_host_port(range: &str, counter: &AtomicU32) -> Result<u16> {
     let offset = counter.fetch_add(1, Ordering::Relaxed);
     let port = start + offset;
     if port > end {
-        return Err(anyhow!("No more ports available in range {}-{}", start, end));
+        return Err(anyhow!(
+            "No more ports available in range {}-{}",
+            start,
+            end
+        ));
     }
     Ok(port as u16)
 }

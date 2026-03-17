@@ -38,11 +38,7 @@ impl ImageManager {
 
     /// Creates a copy-on-write overlay of the base rootfs for a specific sandbox,
     /// so each sandbox gets its own writable layer.
-    pub async fn create_overlay(
-        &self,
-        base_rootfs: &Path,
-        sandbox_id: &str,
-    ) -> Result<PathBuf> {
+    pub async fn create_overlay(&self, base_rootfs: &Path, sandbox_id: &str) -> Result<PathBuf> {
         overlay::create_overlay(base_rootfs, &self.config.cache_dir, sandbox_id).await
     }
 }

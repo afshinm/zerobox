@@ -43,8 +43,7 @@ impl SnapshotManager {
         let snapshot_id = metadata::generate_snapshot_id();
         let now = chrono::Utc::now().to_rfc3339();
 
-        let snapshot_dir =
-            store::snapshot_dir(&self.config.snapshots.storage_dir, &snapshot_id);
+        let snapshot_dir = store::snapshot_dir(&self.config.snapshots.storage_dir, &snapshot_id);
         tokio::fs::create_dir_all(&snapshot_dir)
             .await
             .map_err(|e| SnapshotError::Internal(e.into()))?;

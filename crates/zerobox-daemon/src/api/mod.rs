@@ -34,10 +34,7 @@ pub fn router(state: AppState) -> Router {
         // Sandbox actions
         .route("/sandboxes/:id/stop", post(sandboxes::stop_sandbox))
         // Command routes
-        .route(
-            "/sandboxes/:id/commands",
-            post(commands::run_command),
-        )
+        .route("/sandboxes/:id/commands", post(commands::run_command))
         .route(
             "/sandboxes/:id/commands/:cmd_id",
             get(commands::get_command),
@@ -51,14 +48,8 @@ pub fn router(state: AppState) -> Router {
             get(commands::stream_logs),
         )
         // File routes
-        .route(
-            "/sandboxes/:id/files/write",
-            post(sandboxes::write_files),
-        )
-        .route(
-            "/sandboxes/:id/files/read",
-            get(sandboxes::read_file),
-        )
+        .route("/sandboxes/:id/files/write", post(sandboxes::write_files))
+        .route("/sandboxes/:id/files/read", get(sandboxes::read_file))
         .route("/sandboxes/:id/mkdir", post(sandboxes::mkdir))
         // Sandbox snapshot and timeout routes
         .route(

@@ -40,7 +40,12 @@ pub async fn create_ext4(dir: &Path, output: &Path, size_mib: u32) -> Result<()>
     tokio::fs::create_dir_all(&mount_point).await?;
 
     let status = Command::new("mount")
-        .args(["-o", "loop", &output.display().to_string(), &mount_point.display().to_string()])
+        .args([
+            "-o",
+            "loop",
+            &output.display().to_string(),
+            &mount_point.display().to_string(),
+        ])
         .status()
         .await
         .map_err(|e| anyhow!("Failed to mount ext4 image: {}", e))?;
@@ -51,7 +56,11 @@ pub async fn create_ext4(dir: &Path, output: &Path, size_mib: u32) -> Result<()>
 
     // Copy contents
     let status = Command::new("cp")
-        .args(["-a", &format!("{}/.", dir.display()), &mount_point.display().to_string()])
+        .args([
+            "-a",
+            &format!("{}/.", dir.display()),
+            &mount_point.display().to_string(),
+        ])
         .status()
         .await
         .map_err(|e| anyhow!("Failed to copy contents to ext4 image: {}", e))?;
@@ -68,7 +77,10 @@ pub async fn create_ext4(dir: &Path, output: &Path, size_mib: u32) -> Result<()>
 
     if let Ok(s) = umount_status {
         if !s.success() {
-            return Err(anyhow!("Failed to unmount ext4 image from {:?}", mount_point));
+            return Err(anyhow!(
+                "Failed to unmount ext4 image from {:?}",
+                mount_point
+            ));
         }
     }
 

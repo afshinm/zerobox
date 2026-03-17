@@ -7,9 +7,9 @@ use serde::Deserialize;
 
 use zerobox_common::types::*;
 
+use super::AppState;
 use crate::manager::SandboxError;
 use crate::snapshot::SnapshotError;
-use super::AppState;
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -131,7 +131,10 @@ pub async fn read_file(
             let body = serde_json::json!({ "content": encoded });
             Ok(Json(body).into_response())
         }
-        None => Err(ApiError::NotFound(format!("File not found: {}", query.path))),
+        None => Err(ApiError::NotFound(format!(
+            "File not found: {}",
+            query.path
+        ))),
     }
 }
 
@@ -160,6 +163,9 @@ pub async fn extend_timeout(
     Path(id): Path<String>,
     Json(req): Json<ExtendTimeoutRequest>,
 ) -> Result<StatusCode, ApiError> {
-    state.sandbox_manager.extend_timeout(&id, req.duration_ms).await?;
+    state
+        .sandbox_manager
+        .extend_timeout(&id, req.duration_ms)
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }

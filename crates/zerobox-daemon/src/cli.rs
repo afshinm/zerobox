@@ -54,8 +54,8 @@ impl DaemonClient {
             return Ok((status, serde_json::json!(null)));
         }
 
-        let json: serde_json::Value =
-            serde_json::from_slice(&body).unwrap_or(serde_json::json!({ "raw": String::from_utf8_lossy(&body).to_string() }));
+        let json: serde_json::Value = serde_json::from_slice(&body)
+            .unwrap_or(serde_json::json!({ "raw": String::from_utf8_lossy(&body).to_string() }));
 
         Ok((status, json))
     }
@@ -167,11 +167,7 @@ impl DaemonClient {
 
     pub async fn create_snapshot(&self, sandbox_id: &str) -> Result<serde_json::Value> {
         let (status, resp) = self
-            .request(
-                "POST",
-                &format!("/sandboxes/{}/snapshot", sandbox_id),
-                None,
-            )
+            .request("POST", &format!("/sandboxes/{}/snapshot", sandbox_id), None)
             .await?;
         if status >= 400 {
             return Err(anyhow!("Error ({}): {}", status, resp));

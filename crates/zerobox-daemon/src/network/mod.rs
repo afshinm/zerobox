@@ -42,7 +42,8 @@ impl NetworkManager {
 
         let mut mappings = Vec::new();
         for &guest_port in ports {
-            let host_port = port_forward::allocate_host_port(&self.config.host_port_range, &self.port_counter)?;
+            let host_port =
+                port_forward::allocate_host_port(&self.config.host_port_range, &self.port_counter)?;
             port_forward::add_port_forward(host_port, guest_ip, guest_port).await?;
             mappings.push((host_port, guest_port));
         }
@@ -60,8 +61,7 @@ impl NetworkManager {
     ) -> Result<()> {
         // Remove port forwarding rules first
         for &(host_port, guest_port) in port_mappings {
-            if let Err(e) =
-                port_forward::remove_port_forward(host_port, guest_ip, guest_port).await
+            if let Err(e) = port_forward::remove_port_forward(host_port, guest_ip, guest_port).await
             {
                 tracing::warn!(
                     sandbox_id,

@@ -30,14 +30,20 @@ pub async fn handle_exec(state: Arc<AgentState>, params: ExecParams) -> Result<s
     let stdout_fut = async {
         let mut buf = String::new();
         if let Some(mut stdout) = child.stdout.take() {
-            stdout.read_to_string(&mut buf).await.context("failed to read stdout")?;
+            stdout
+                .read_to_string(&mut buf)
+                .await
+                .context("failed to read stdout")?;
         }
         Ok::<String, anyhow::Error>(buf)
     };
     let stderr_fut = async {
         let mut buf = String::new();
         if let Some(mut stderr) = child.stderr.take() {
-            stderr.read_to_string(&mut buf).await.context("failed to read stderr")?;
+            stderr
+                .read_to_string(&mut buf)
+                .await
+                .context("failed to read stderr")?;
         }
         Ok::<String, anyhow::Error>(buf)
     };
@@ -104,9 +110,7 @@ pub async fn handle_exec_detached(
         wait_for_detached(bg_state, bg_cmd_id).await;
     });
 
-    let result = ExecDetachedResult {
-        cmd_id,
-    };
+    let result = ExecDetachedResult { cmd_id };
 
     Ok(serde_json::to_value(result)?)
 }
@@ -162,9 +166,7 @@ async fn wait_for_detached(state: Arc<AgentState>, cmd_id: String) {
 /// Kill a running command by its ID.
 pub async fn handle_kill(state: Arc<AgentState>, params: KillParams) -> Result<serde_json::Value> {
     let commands = state.commands.read().await;
-    let entry = commands
-        .get(&params.cmd_id)
-        .context("command not found")?;
+    let entry = commands.get(&params.cmd_id).context("command not found")?;
 
     if !entry.running {
         bail!("command {} is not running", params.cmd_id);
@@ -184,8 +186,7 @@ pub async fn handle_kill(state: Arc<AgentState>, params: KillParams) -> Result<s
 
     info!(cmd_id = %params.cmd_id, ?signal, pid, "sending signal to process");
 
-    signal::kill(Pid::from_raw(pid as i32), signal)
-        .context("failed to send signal")?;
+    signal::kill(Pid::from_raw(pid as i32), signal).context("failed to send signal")?;
 
     // Note: we use a read lock, not write - the background task will update
     // the entry when the process actually exits
@@ -199,9 +200,7 @@ pub async fn handle_get_command(
     params: GetCommandParams,
 ) -> Result<serde_json::Value> {
     let commands = state.commands.read().await;
-    let entry = commands
-        .get(&params.cmd_id)
-        .context("command not found")?;
+    let entry = commands.get(&params.cmd_id).context("command not found")?;
 
     let result = CommandStatusResult {
         cmd_id: params.cmd_id,
@@ -218,9 +217,7 @@ pub async fn handle_stream_logs(
     params: StreamLogsParams,
 ) -> Result<Vec<serde_json::Value>> {
     let commands = state.commands.read().await;
-    let entry = commands
-        .get(&params.cmd_id)
-        .context("command not found")?;
+    let entry = commands.get(&params.cmd_id).context("command not found")?;
 
     let mut entries = Vec::new();
 

@@ -21,7 +21,10 @@ pub async fn get_command(
     State(state): State<AppState>,
     Path((sandbox_id, cmd_id)): Path<(String, String)>,
 ) -> Result<Json<CommandInfo>, ApiError> {
-    let info = state.sandbox_manager.get_command(&sandbox_id, &cmd_id).await?;
+    let info = state
+        .sandbox_manager
+        .get_command(&sandbox_id, &cmd_id)
+        .await?;
     Ok(Json(info))
 }
 
@@ -29,7 +32,10 @@ pub async fn kill_command(
     State(state): State<AppState>,
     Path((sandbox_id, cmd_id)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {
-    state.sandbox_manager.kill_command(&sandbox_id, &cmd_id).await?;
+    state
+        .sandbox_manager
+        .kill_command(&sandbox_id, &cmd_id)
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

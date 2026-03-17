@@ -149,10 +149,7 @@ impl SandboxManager {
         );
 
         if let Err(e) = fc
-            .set_boot_source(
-                &kernel_path,
-                "console=ttyS0 reboot=k panic=1 pci=off",
-            )
+            .set_boot_source(&kernel_path, "console=ttyS0 reboot=k panic=1 pci=off")
             .await
         {
             let _ = fc_process.kill().await;
@@ -259,8 +256,8 @@ impl SandboxManager {
 
         // Prepare rootfs — copy from pre-built image cache into sandbox dir
         let rootfs_path = sandbox_dir.join("rootfs.ext4");
-        let cached_image = PathBuf::from(&self.config.images.cache_dir)
-            .join(format!("{}.ext4", image_name));
+        let cached_image =
+            PathBuf::from(&self.config.images.cache_dir).join(format!("{}.ext4", image_name));
         if cached_image.exists() {
             tokio::fs::copy(&cached_image, &rootfs_path)
                 .await
@@ -529,7 +526,10 @@ impl SandboxManager {
         // Use tracked started_at/cwd if available, otherwise fall back to defaults
         let (started_at, cwd) = match tracked_info {
             Some(ref info) => (info.started_at, info.cwd.clone()),
-            None => (chrono::Utc::now().timestamp_millis() as u64, "/".to_string()),
+            None => (
+                chrono::Utc::now().timestamp_millis() as u64,
+                "/".to_string(),
+            ),
         };
 
         let info = CommandInfo {
@@ -555,11 +555,7 @@ impl SandboxManager {
         Ok(info)
     }
 
-    pub async fn kill_command(
-        &self,
-        sandbox_id: &str,
-        cmd_id: &str,
-    ) -> Result<(), SandboxError> {
+    pub async fn kill_command(&self, sandbox_id: &str, cmd_id: &str) -> Result<(), SandboxError> {
         let vsock_path = {
             let sandboxes = self.sandboxes.read().await;
             let state = sandboxes

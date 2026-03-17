@@ -71,12 +71,12 @@ async fn main() -> Result<()> {
     #[cfg(not(target_os = "linux"))]
     {
         // On non-Linux (e.g. macOS dev), listen on a Unix socket for testing
-        let sock_path =
-            std::env::var("ZEROBOX_AGENT_SOCK").unwrap_or_else(|_| "/tmp/zerobox-agent.sock".into());
+        let sock_path = std::env::var("ZEROBOX_AGENT_SOCK")
+            .unwrap_or_else(|_| "/tmp/zerobox-agent.sock".into());
         info!(path = %sock_path, "vsock not available, listening on unix socket (dev mode)");
         let _ = std::fs::remove_file(&sock_path);
-        let listener = tokio::net::UnixListener::bind(&sock_path)
-            .context("failed to bind unix socket")?;
+        let listener =
+            tokio::net::UnixListener::bind(&sock_path).context("failed to bind unix socket")?;
         loop {
             match listener.accept().await {
                 Ok((stream, _addr)) => {
@@ -240,8 +240,8 @@ where
 async fn dispatch(state: Arc<AgentState>, request: &RpcRequest) -> Result<serde_json::Value> {
     match request.method.as_str() {
         METHOD_EXEC => {
-            let params: ExecParams = serde_json::from_value(request.params.clone())
-                .context("invalid exec params")?;
+            let params: ExecParams =
+                serde_json::from_value(request.params.clone()).context("invalid exec params")?;
             executor::handle_exec(state, params).await
         }
         METHOD_EXEC_DETACHED => {
@@ -250,8 +250,8 @@ async fn dispatch(state: Arc<AgentState>, request: &RpcRequest) -> Result<serde_
             executor::handle_exec_detached(state, params).await
         }
         METHOD_KILL => {
-            let params: KillParams = serde_json::from_value(request.params.clone())
-                .context("invalid kill params")?;
+            let params: KillParams =
+                serde_json::from_value(request.params.clone()).context("invalid kill params")?;
             executor::handle_kill(state, params).await
         }
         METHOD_GET_COMMAND => {
@@ -270,8 +270,8 @@ async fn dispatch(state: Arc<AgentState>, request: &RpcRequest) -> Result<serde_
             files::handle_read_file(state, params).await
         }
         METHOD_MKDIR => {
-            let params: MkdirParams = serde_json::from_value(request.params.clone())
-                .context("invalid mkdir params")?;
+            let params: MkdirParams =
+                serde_json::from_value(request.params.clone()).context("invalid mkdir params")?;
             files::handle_mkdir(state, params).await
         }
         METHOD_HEALTH => health::handle_health(state).await,

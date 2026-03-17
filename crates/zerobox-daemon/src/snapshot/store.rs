@@ -41,16 +41,10 @@ pub async fn load_snapshot_files(snapshot_dir: &Path) -> Result<(PathBuf, PathBu
     let rootfs = snapshot_dir.join("rootfs.ext4");
 
     if tokio::fs::metadata(&vm_state).await.is_err() {
-        return Err(anyhow!(
-            "VM state file not found at {:?}",
-            vm_state
-        ));
+        return Err(anyhow!("VM state file not found at {:?}", vm_state));
     }
     if tokio::fs::metadata(&mem_file).await.is_err() {
-        return Err(anyhow!(
-            "Memory file not found at {:?}",
-            mem_file
-        ));
+        return Err(anyhow!("Memory file not found at {:?}", mem_file));
     }
     if tokio::fs::metadata(&rootfs).await.is_err() {
         return Err(anyhow!("Rootfs not found at {:?}", rootfs));

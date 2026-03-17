@@ -12,11 +12,7 @@ use tokio::process::Command;
 ///   overlays/<sandbox_id>/merged/  - the merged mount point
 ///
 /// Returns the path to the merged directory.
-pub async fn create_overlay(
-    base: &Path,
-    work_dir: &str,
-    sandbox_id: &str,
-) -> Result<PathBuf> {
+pub async fn create_overlay(base: &Path, work_dir: &str, sandbox_id: &str) -> Result<PathBuf> {
     let overlay_base = PathBuf::from(work_dir).join("overlays").join(sandbox_id);
     let upper = overlay_base.join("upper");
     let work = overlay_base.join("work");
@@ -44,7 +40,13 @@ pub async fn create_overlay(
         ])
         .status()
         .await
-        .map_err(|e| anyhow!("Failed to mount overlayfs for sandbox '{}': {}", sandbox_id, e))?;
+        .map_err(|e| {
+            anyhow!(
+                "Failed to mount overlayfs for sandbox '{}': {}",
+                sandbox_id,
+                e
+            )
+        })?;
 
     if !status.success() {
         return Err(anyhow!(
@@ -67,7 +69,13 @@ pub async fn cleanup_overlay(sandbox_id: &str, work_dir: &str) -> Result<()> {
         .arg(merged.display().to_string())
         .status()
         .await
-        .map_err(|e| anyhow!("Failed to unmount overlay for sandbox '{}': {}", sandbox_id, e))?;
+        .map_err(|e| {
+            anyhow!(
+                "Failed to unmount overlay for sandbox '{}': {}",
+                sandbox_id,
+                e
+            )
+        })?;
 
     if !status.success() {
         return Err(anyhow!(
@@ -77,13 +85,15 @@ pub async fn cleanup_overlay(sandbox_id: &str, work_dir: &str) -> Result<()> {
     }
 
     // Remove overlay directories
-    tokio::fs::remove_dir_all(&overlay_base).await.map_err(|e| {
-        anyhow!(
-            "Failed to remove overlay directories for sandbox '{}': {}",
-            sandbox_id,
-            e
-        )
-    })?;
+    tokio::fs::remove_dir_all(&overlay_base)
+        .await
+        .map_err(|e| {
+            anyhow!(
+                "Failed to remove overlay directories for sandbox '{}': {}",
+                sandbox_id,
+                e
+            )
+        })?;
 
     Ok(())
 }

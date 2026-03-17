@@ -67,11 +67,7 @@ impl FirecrackerClient {
 
         if !status.is_success() {
             let body_str = String::from_utf8_lossy(&body);
-            return Err(anyhow!(
-                "Firecracker API error ({}): {}",
-                status,
-                body_str
-            ));
+            return Err(anyhow!("Firecracker API error ({}): {}", status, body_str));
         }
 
         Ok(body)
@@ -117,12 +113,7 @@ impl FirecrackerClient {
     }
 
     /// PUT /vsock
-    pub async fn set_vsock(
-        &self,
-        vsock_id: &str,
-        guest_cid: u32,
-        uds_path: &str,
-    ) -> Result<()> {
+    pub async fn set_vsock(&self, vsock_id: &str, guest_cid: u32, uds_path: &str) -> Result<()> {
         let body = serde_json::json!({
             "vsock_id": vsock_id,
             "guest_cid": guest_cid,
@@ -133,11 +124,7 @@ impl FirecrackerClient {
     }
 
     /// PUT /network-interfaces/{iface_id}
-    pub async fn set_network_interface(
-        &self,
-        iface_id: &str,
-        host_dev_name: &str,
-    ) -> Result<()> {
+    pub async fn set_network_interface(&self, iface_id: &str, host_dev_name: &str) -> Result<()> {
         let body = serde_json::json!({
             "iface_id": iface_id,
             "host_dev_name": host_dev_name,
