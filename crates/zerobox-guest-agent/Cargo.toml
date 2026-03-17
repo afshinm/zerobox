@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Zerobox guest agent - runs inside Firecracker microVMs"
+repository = "https://github.com/afshinm/zerobox"
 
 [[bin]]
 name = "zerobox-agent"

@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Zerobox daemon and CLI - Firecracker sandbox supervisor"
+repository = "https://github.com/afshinm/zerobox"
 
 [[bin]]
 name = "zerobox"
@@ -28,3 +29,20 @@ hyper = { version = "1", features = ["client", "http1"] }
 hyper-util = { version = "0.1", features = ["client-legacy", "tokio"] }
 http-body-util = "0.1"
 base64 = "0.22"
+
+[package.metadata.deb]
+maintainer = "Zerobox Contributors"
+section = "admin"
+priority = "optional"
+depends = "iproute2, iptables"
+assets = [
+    ["target/release/zerobox", "usr/bin/", "755"],
+    ["config.yaml", "etc/zerobox/config.yaml", "640"],
+]
+conf-files = ["/etc/zerobox/config.yaml"]
+systemd-units = { unit-name = "zerobox", enable = true, start = true }
+
+[package.metadata.deb.variants.agent]
+assets = [
+    ["target/release/zerobox-agent", "usr/bin/", "755"],
+]

@@ -1,0 +1,25 @@
+[Unit]
+Description=Zerobox - Firecracker Sandbox Supervisor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/zerobox serve --config /etc/zerobox/config.yaml
+Restart=on-failure
+RestartSec=5s
+StartLimitIntervalSec=300
+StartLimitBurst=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zerobox
+LimitNOFILE=65536
+LimitNPROC=4096
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+[Install]
+WantedBy=multi-user.target
