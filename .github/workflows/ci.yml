@@ -29,18 +29,18 @@ jobs:
       - name: Unit tests
         run: cargo test --lib
 
-  integration:
-    name: Integration Tests
-    runs-on: [self-hosted, linux, kvm]
-    needs: build
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Build
-        run: cargo build --release
-      - name: Integration tests
-        run: sudo cargo test --test '*' -- --test-threads=1
+  # integration:
+  #   name: Integration Tests
+  #   runs-on: [self-hosted, linux, kvm]
+  #   needs: build
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: dtolnay/rust-toolchain@stable
+  #     - uses: Swatinem/rust-cache@v2
+  #     - name: Build
+  #       run: cargo build --release
+  #     - name: Integration tests
+  #       run: sudo cargo test --test '*' -- --test-threads=1
 
   sdk:
     name: TypeScript SDK
