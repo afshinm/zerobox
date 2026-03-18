@@ -4,24 +4,50 @@ set -euo pipefail
 # ============================================================================
 # zerobox setup
 #
-# Installs zerobox and its dependencies. On Linux, configures systemd.
-# On macOS, sets up a Lima VM and runs setup inside it.
-#
-# Binary installation is handled by cargo-dist (generated installer).
-# Systemd + deb packaging is handled by cargo-deb.
-# This script handles the domain-specific parts: Firecracker, kernel, Lima.
-#
 # Usage:
-#   sudo ./setup.sh            # interactive
-#   ZEROBOX_YES=1 sudo ./setup.sh   # non-interactive
+#   sudo ./setup.sh               # install or upgrade if newer
+#   sudo ./setup.sh --dev         # symlink to local build (for development)
+#   sudo ./setup.sh --reinstall   # force reinstall everything
+#   ZEROBOX_YES=1 sudo ./setup.sh # non-interactive
 # ============================================================================
 
 SETUP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/setup" && pwd)"
+
+# Parse flags before sourcing (so SETUP_MODE is set)
+SETUP_MODE="default"
+for arg in "$@"; do
+    case "$arg" in
+        --dev)       SETUP_MODE="dev" ;;
+        --reinstall) SETUP_MODE="reinstall" ;;
+        --yes|-y)    export ZEROBOX_YES=1 ;;
+        --help|-h)
+            cat << 'USAGE'
+Usage: sudo ./setup.sh [OPTIONS]
+
+Options:
+  (default)     Install or upgrade zerobox if a newer build exists
+  --dev         Symlink binary to target/release/ for fast dev iteration
+  --reinstall   Force reinstall everything (keeps config)
+  --yes, -y     Skip confirmation prompts
+  --help, -h    Show this help
+
+Dev workflow:
+  sudo ./setup.sh --dev           # first time: symlink + setup everything
+  cargo build --release           # make changes, rebuild
+  sudo systemctl restart zerobox  # picks up new binary instantly
+
+USAGE
+            exit 0
+            ;;
+    esac
+done
+export SETUP_MODE
 
 source "${SETUP_DIR}/common.sh"
 source "${SETUP_DIR}/detect.sh"
 source "${SETUP_DIR}/firecracker.sh"
 source "${SETUP_DIR}/kernel.sh"
+source "${SETUP_DIR}/rootfs.sh"
 source "${SETUP_DIR}/service.sh"
 source "${SETUP_DIR}/lima.sh"
 
@@ -38,12 +64,48 @@ print_banner() {
 
 BANNER
     printf "    Version:  %s\n" "$ZEROBOX_VERSION"
-    printf "    Platform: %s/%s\n\n" "$(uname -s | tr '[:upper:]' '[:lower:]')" "$(uname -m)"
+    printf "    Platform: %s/%s\n" "$(uname -s | tr '[:upper:]' '[:lower:]')" "$(uname -m)"
+    if [[ "$SETUP_MODE" != "default" ]]; then
+        printf "    Mode:     %s\n" "$SETUP_MODE"
+    fi
+    printf "\n"
 }
 
 # --- Confirmation ----------------------------------------------------------
 
 confirm_linux_install() {
+    if [[ "$SETUP_MODE" == "reinstall" ]]; then
+        cat << 'MSG'
+  Reinstall mode: will force reinstall all components.
+  Config file will NOT be overwritten.
+
+MSG
+        if ! confirm "Proceed with reinstall?"; then
+            printf "\n  Aborted.\n\n"
+            exit 0
+        fi
+        printf "\n"
+        return
+    fi
+
+    if [[ "$SETUP_MODE" == "dev" ]]; then
+        cat << MSG
+  Dev mode: will symlink binaries to local build.
+  After code changes, just run:
+
+    cargo build --release
+    sudo systemctl restart zerobox
+
+MSG
+        if ! confirm "Proceed with dev setup?"; then
+            printf "\n  Aborted.\n\n"
+            exit 0
+        fi
+        printf "\n"
+        return
+    fi
+
+    # Default mode
     cat << MSG
   This will install:
 
@@ -67,7 +129,24 @@ MSG
 # --- Summary ---------------------------------------------------------------
 
 print_summary() {
-    cat << SUMMARY
+    if [[ "$SETUP_MODE" == "dev" ]]; then
+        cat << SUMMARY
+
+  ================================================
+    zerobox ${ZEROBOX_VERSION} (dev mode)
+  ================================================
+
+  Binary:   ${BIN_DIR}/zerobox -> target/release/zerobox
+  Config:   ${CONFIG_DIR}/config.yaml
+  Service:  zerobox.service
+
+  Dev workflow:
+    cargo build --release
+    sudo systemctl restart zerobox
+
+SUMMARY
+    else
+        cat << SUMMARY
 
   ================================================
     zerobox ${ZEROBOX_VERSION} installed
@@ -89,6 +168,7 @@ print_summary() {
     sudo journalctl -u zerobox -f
 
 SUMMARY
+    fi
 }
 
 # --- Main ------------------------------------------------------------------
@@ -110,6 +190,7 @@ main() {
     install_zerobox
     install_firecracker
     install_kernel
+    build_rootfs
     install_config
     install_systemd_service
     start_service

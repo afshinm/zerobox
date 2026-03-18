@@ -164,6 +164,12 @@ async fn main() -> anyhow::Result<()> {
                 .await?;
             let id = resp["sandboxId"].as_str().unwrap_or("unknown");
             let status = resp["status"].as_str().unwrap_or("unknown");
+            if status == "failed" {
+                let reason = resp["error"].as_str().unwrap_or("unknown error");
+                eprintln!("Error: sandbox {} failed to start", id);
+                eprintln!("  {}", reason);
+                std::process::exit(1);
+            }
             println!("{} (status: {})", id, status);
         }
         Commands::Stop { id } => {

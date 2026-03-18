@@ -310,7 +310,7 @@ impl SandboxManager {
 
         // Try to boot the VM. If Firecracker is not available (e.g. macOS),
         // register the sandbox as Failed rather than returning an error.
-        let (fc_process, status) = match self
+        let (fc_process, status, boot_error) = match self
             .boot_vm(
                 &sandbox_id,
                 &sandbox_dir,
@@ -321,14 +321,15 @@ impl SandboxManager {
             )
             .await
         {
-            Ok(proc) => (Some(proc), SandboxStatus::Running),
+            Ok(proc) => (Some(proc), SandboxStatus::Running, None),
             Err(e) => {
+                let reason = format!("{}", e);
                 tracing::warn!(
                     sandbox_id = %sandbox_id,
                     "Failed to boot VM: {}. Sandbox registered as failed.",
-                    e
+                    reason
                 );
-                (None, SandboxStatus::Failed)
+                (None, SandboxStatus::Failed, Some(reason))
             }
         };
 
@@ -339,6 +340,7 @@ impl SandboxManager {
             created_at: now,
             timeout,
             ports: port_map,
+            error: boot_error,
         };
 
         let state = SandboxState {

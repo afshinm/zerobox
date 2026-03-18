@@ -5,6 +5,15 @@ use hyper::Request;
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
 
+/// Extract a human-readable error message from an API JSON response.
+fn api_error(status: u16, resp: &serde_json::Value) -> anyhow::Error {
+    if let Some(msg) = resp["error"].as_str() {
+        anyhow!("{}", msg)
+    } else {
+        anyhow!("HTTP {} — {}", status, resp)
+    }
+}
+
 /// Simple HTTP client for the zerobox daemon API.
 pub struct DaemonClient {
     base_url: String,
@@ -102,7 +111,7 @@ impl DaemonClient {
 
         let (status, resp) = self.request("POST", "/sandboxes", Some(body)).await?;
         if status >= 400 {
-            return Err(anyhow!("Error ({}): {}", status, resp));
+            return Err(api_error(status, &resp));
         }
         Ok(resp)
     }
@@ -127,7 +136,7 @@ impl DaemonClient {
             .request("POST", &format!("/sandboxes/{}/stop", id), None)
             .await?;
         if status >= 400 {
-            return Err(anyhow!("Error ({}): {}", status, resp));
+            return Err(api_error(status, &resp));
         }
         Ok(resp)
     }
@@ -137,7 +146,7 @@ impl DaemonClient {
             .request("DELETE", &format!("/sandboxes/{}", id), None)
             .await?;
         if status >= 400 {
-            return Err(anyhow!("Error ({}): {}", status, resp));
+            return Err(api_error(status, &resp));
         }
         Ok(())
     }
@@ -160,7 +169,7 @@ impl DaemonClient {
             )
             .await?;
         if status >= 400 {
-            return Err(anyhow!("Error ({}): {}", status, resp));
+            return Err(api_error(status, &resp));
         }
         Ok(resp)
     }
@@ -170,7 +179,7 @@ impl DaemonClient {
             .request("POST", &format!("/sandboxes/{}/snapshot", sandbox_id), None)
             .await?;
         if status >= 400 {
-            return Err(anyhow!("Error ({}): {}", status, resp));
+            return Err(api_error(status, &resp));
         }
         Ok(resp)
     }
@@ -185,7 +194,7 @@ impl DaemonClient {
             .request("DELETE", &format!("/snapshots/{}", id), None)
             .await?;
         if status >= 400 {
-            return Err(anyhow!("Error ({}): {}", status, resp));
+            return Err(api_error(status, &resp));
         }
         Ok(())
     }

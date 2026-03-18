@@ -6,6 +6,9 @@ FIRECRACKER_VERSION="${FIRECRACKER_VERSION:-v1.10.1}"
 ZEROBOX_USER="${ZEROBOX_USER:-zerobox}"
 ZEROBOX_YES="${ZEROBOX_YES:-0}"
 
+# Modes: default, dev, reinstall (set by setup.sh arg parsing)
+SETUP_MODE="${SETUP_MODE:-default}"
+
 BIN_DIR="/usr/local/bin"
 CONFIG_DIR="/etc/zerobox"
 DATA_DIR="/var/lib/zerobox"
@@ -31,4 +34,16 @@ confirm() {
         [yY]|[yY][eE][sS]) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+# Check if file A is newer than file B
+is_newer() {
+    local src="$1" dst="$2"
+    if [[ ! -f "$dst" ]]; then
+        return 0  # dst doesn't exist — "newer"
+    fi
+    if [[ ! -f "$src" ]]; then
+        return 1  # src doesn't exist — not newer
+    fi
+    [[ "$src" -nt "$dst" ]]
 }

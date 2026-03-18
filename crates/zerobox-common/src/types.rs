@@ -87,6 +87,8 @@ pub struct SandboxInfo {
     pub created_at: String,
     pub timeout: u64,
     pub ports: HashMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
