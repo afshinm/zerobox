@@ -48,6 +48,8 @@ jobs:
         with:
           name: upstream
           path: upstream/
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y libcap-dev
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -93,6 +95,8 @@ jobs:
         with:
           name: upstream
           path: upstream/
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y libcap-dev
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build
