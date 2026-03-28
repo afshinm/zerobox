@@ -4934,6 +4934,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "clap",
+ "codex-linux-sandbox",
  "codex-network-proxy",
  "codex-protocol",
  "codex-sandboxing",

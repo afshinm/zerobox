@@ -103,7 +103,6 @@ fn default_network_blocked() {
 // --allow-read: restrict readable paths (includes platform defaults)
 // ═══════════════════════════════════════════════════════════════════════════
 
-#[cfg(target_os = "macos")]
 mod allow_read {
     use super::*;
 
@@ -143,7 +142,6 @@ mod allow_read {
 // --deny-read: carve out exceptions within allowed reads
 // ═══════════════════════════════════════════════════════════════════════════
 
-#[cfg(target_os = "macos")]
 mod deny_read {
     use super::*;
 
@@ -200,7 +198,6 @@ fn allow_write_does_not_grant_other_paths() {
     assert!(!out.status.success());
 }
 
-#[cfg(target_os = "macos")]
 mod deny_write {
     use super::*;
 
@@ -269,7 +266,6 @@ fn allow_net_full_permits_outbound() {
 // --allow-net=<domains>: domain-level filtering via Codex network proxy
 // ═══════════════════════════════════════════════════════════════════════════
 
-#[cfg(target_os = "macos")]
 mod allow_net_domains {
     use super::*;
 
@@ -322,7 +318,6 @@ mod allow_net_domains {
 // --deny-net=<domains>: block specific domains
 // ═══════════════════════════════════════════════════════════════════════════
 
-#[cfg(target_os = "macos")]
 mod deny_net_domains {
     use super::*;
 
@@ -399,7 +394,6 @@ fn no_sandbox_permits_everything() {
 // Combined flags
 // ═══════════════════════════════════════════════════════════════════════════
 
-#[cfg(target_os = "macos")]
 #[test]
 fn allow_read_and_write_combined() {
     std::fs::write("/tmp/zerobox-e2e-rw-in", "input").expect("setup");
@@ -417,14 +411,12 @@ fn allow_read_and_write_combined() {
     assert_eq!(content.trim(), "input");
 }
 
-#[cfg(target_os = "macos")]
 #[test]
 fn allow_read_and_net_combined() {
     let (code, ok) = curl_status(&["--allow-read=/tmp", "--allow-net"], "https://example.com");
     assert!(ok, "expected 200, got {code}");
 }
 
-#[cfg(target_os = "macos")]
 #[test]
 fn deny_read_and_deny_write_combined() {
     let dir = setup_tmp("combo");
@@ -456,7 +448,6 @@ console.log(r.join(','));
     assert!(result.contains("write-sec:blocked"), "got: {result}");
 }
 
-#[cfg(target_os = "macos")]
 #[test]
 fn allow_net_domain_with_write_restriction() {
     let dir = setup_tmp("net-write");

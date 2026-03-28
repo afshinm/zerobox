@@ -326,6 +326,21 @@ fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    // Arg0 dispatch: when invoked as "codex-linux-sandbox" (e.g. by bubblewrap
+    // re-exec), run the Linux sandbox helper instead of the CLI. This makes
+    // zerobox a single binary that doubles as the sandbox helper on Linux.
+    #[cfg(target_os = "linux")]
+    {
+        use codex_sandboxing::landlock::CODEX_LINUX_SANDBOX_ARG0;
+        let exe_name = std::env::args_os()
+            .next()
+            .as_ref()
+            .and_then(|s| Path::new(s).file_name().map(|f| f.to_os_string()));
+        if exe_name.as_deref() == Some(std::ffi::OsStr::new(CODEX_LINUX_SANDBOX_ARG0)) {
+            codex_linux_sandbox::run_main(); // never returns
+        }
+    }
+
     let cli = Cli::parse();
 
     let cwd = match cli.cwd.clone().map_or_else(std::env::current_dir, Ok) {
@@ -376,6 +391,15 @@ async fn main() -> ExitCode {
         None
     };
 
+    // On Linux, the sandbox helper is this same binary (arg0 dispatch).
+    // Pass our own exe path; bubblewrap will re-invoke us with
+    // argv[0] = "codex-linux-sandbox" which triggers the dispatch above.
+    let linux_sandbox_exe: Option<PathBuf> = if cfg!(target_os = "linux") {
+        std::env::current_exe().ok()
+    } else {
+        None
+    };
+
     let manager = SandboxManager::new();
     let request = SandboxTransformRequest {
         command: SandboxCommand {
@@ -394,7 +418,7 @@ async fn main() -> ExitCode {
         sandbox_policy_cwd: &cwd,
         #[cfg(target_os = "macos")]
         macos_seatbelt_profile_extensions: None,
-        codex_linux_sandbox_exe: None,
+        codex_linux_sandbox_exe: linux_sandbox_exe.as_ref(),
         use_legacy_landlock: false,
         windows_sandbox_level: WindowsSandboxLevel::default(),
         windows_sandbox_private_desktop: false,
@@ -412,6 +436,17 @@ async fn main() -> ExitCode {
     cmd.args(&exec_request.command[1..]);
     cmd.current_dir(&cwd);
     cmd.env_clear();
+
+    // On Unix, the sandbox transform may set arg0 (e.g. "codex-linux-sandbox")
+    // so our arg0 dispatch triggers when bubblewrap re-execs us.
+    #[cfg(unix)]
+    {
+        #[allow(unused_imports)]
+        use std::os::unix::process::CommandExt;
+        if let Some(ref arg0) = exec_request.arg0 {
+            cmd.arg0(arg0);
+        }
+    }
 
     // Start with the sandbox-transformed env, then overlay proxy env vars
     // so the child process routes traffic through the network proxy.

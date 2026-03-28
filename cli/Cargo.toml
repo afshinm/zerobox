@@ -18,3 +18,6 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = ["process", "rt-multi-thread", "macros", "io-util"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+codex-linux-sandbox = { workspace = true }

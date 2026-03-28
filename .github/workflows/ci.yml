@@ -109,7 +109,11 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libcap-dev
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Build
+      - name: Build release binary
         run: cargo build --release -p zerobox
-      - name: Unit tests (lib only)
+      - name: Unit tests
         run: cargo test --workspace --lib
+      - name: E2E sandbox tests (against release binary)
+        env:
+          ZEROBOX_EXEC: ./target/release/zerobox
+        run: cargo test -p zerobox --test sandbox_e2e
