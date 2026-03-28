@@ -1,22 +1,22 @@
-use std::path::{Path, PathBuf};
-use std::process::ExitCode;
-use std::sync::Arc;
+mod policy;
+mod proxy;
 
-use anyhow::{Context, Result};
+#[cfg(target_os = "linux")]
+use std::path::Path;
+use std::path::PathBuf;
+use std::process::ExitCode;
+
 use clap::Parser;
-use codex_network_proxy::{
-    ConfigReloader, ConfigState, NetworkProxy, NetworkProxyState, build_config_state,
-};
 use codex_protocol::config_types::WindowsSandboxLevel;
-use codex_protocol::permissions::{
-    FileSystemAccessMode, FileSystemPath, FileSystemSandboxEntry, FileSystemSandboxPolicy,
-    FileSystemSpecialPath, NetworkSandboxPolicy,
-};
-use codex_protocol::protocol::SandboxPolicy;
 use codex_sandboxing::{
     SandboxCommand, SandboxManager, SandboxTransformRequest, SandboxType, get_platform_sandbox,
 };
-use codex_utils_absolute_path::AbsolutePathBuf;
+
+use policy::{
+    build_fs_policy, build_legacy_sandbox_policy, build_net_policy, net_is_enabled,
+    resolve_cli_paths,
+};
+use proxy::build_network_proxy;
 
 /// Run a command inside a cross-platform sandbox.
 ///
@@ -36,291 +36,55 @@ use codex_utils_absolute_path::AbsolutePathBuf;
 ///   zerobox --allow-all -- bash -c "echo anything goes"
 #[derive(Parser, Debug)]
 #[command(name = "zerobox", version, about, long_about = None)]
-struct Cli {
+pub struct Cli {
     /// Restrict readable user data to these paths only (comma-separated).
     /// System libraries and binaries remain accessible for execution.
     /// By default all reads are allowed.
     #[arg(long, value_delimiter = ',', num_args = 1..)]
-    allow_read: Option<Vec<PathBuf>>,
+    pub allow_read: Option<Vec<PathBuf>>,
 
     /// Block reading from these paths (comma-separated). Takes precedence
     /// over --allow-read.
     #[arg(long, value_delimiter = ',', num_args = 1..)]
-    deny_read: Option<Vec<PathBuf>>,
+    pub deny_read: Option<Vec<PathBuf>>,
 
     /// Allow writing to these paths (comma-separated).
     /// Without a value, allows writing everywhere.
     #[arg(long, value_delimiter = ',', num_args = 0..)]
-    allow_write: Option<Vec<PathBuf>>,
+    pub allow_write: Option<Vec<PathBuf>>,
 
     /// Block writing to these paths (comma-separated). Takes precedence
     /// over --allow-write.
     #[arg(long, value_delimiter = ',', num_args = 1..)]
-    deny_write: Option<Vec<PathBuf>>,
+    pub deny_write: Option<Vec<PathBuf>>,
 
     /// Allow outbound network access. Without a value, allows all domains.
     /// With values, restricts to specific domains (comma-separated).
     /// Examples: --allow-net, --allow-net=example.com,api.example.com
     #[arg(long, value_delimiter = ',', num_args = 0..)]
-    allow_net: Option<Vec<String>>,
+    pub allow_net: Option<Vec<String>>,
 
     /// Block network access to these domains (comma-separated).
     /// Takes precedence over --allow-net.
     #[arg(long, value_delimiter = ',', num_args = 1..)]
-    deny_net: Option<Vec<String>>,
+    pub deny_net: Option<Vec<String>>,
 
     /// Grant all permissions (no sandbox). Use with caution.
     #[arg(long, short = 'A')]
-    allow_all: bool,
+    pub allow_all: bool,
 
     /// Working directory for the sandboxed command.
     #[arg(long, short = 'C')]
-    cwd: Option<PathBuf>,
+    pub cwd: Option<PathBuf>,
 
     /// Disable the sandbox entirely (just run the command).
     #[arg(long)]
-    no_sandbox: bool,
+    pub no_sandbox: bool,
 
     /// The command and arguments to run.
     #[arg(trailing_var_arg = true, required = true)]
-    command: Vec<String>,
+    pub command: Vec<String>,
 }
-
-/// Pre-resolved paths from CLI flags.
-struct ResolvedPaths {
-    readable: Option<Vec<AbsolutePathBuf>>,
-    deny_readable: Vec<AbsolutePathBuf>,
-    writable: Option<Vec<AbsolutePathBuf>>,
-    deny_writable: Vec<AbsolutePathBuf>,
-    full_write: bool,
-}
-
-fn resolve_path(base: &Path, p: &Path) -> Result<AbsolutePathBuf> {
-    let abs = if p.is_absolute() {
-        p.to_path_buf()
-    } else {
-        base.join(p)
-    };
-    AbsolutePathBuf::try_from(abs).context("failed to resolve path")
-}
-
-fn resolve_all(base: &Path, paths: &[PathBuf]) -> Result<Vec<AbsolutePathBuf>> {
-    paths.iter().map(|p| resolve_path(base, p)).collect()
-}
-
-fn resolve_cli_paths(cli: &Cli, cwd: &Path) -> Result<ResolvedPaths> {
-    let readable = cli
-        .allow_read
-        .as_ref()
-        .map(|paths| resolve_all(cwd, paths))
-        .transpose()?;
-
-    let deny_readable = cli
-        .deny_read
-        .as_ref()
-        .map(|paths| resolve_all(cwd, paths))
-        .transpose()?
-        .unwrap_or_default();
-
-    let (writable, full_write) = match &cli.allow_write {
-        Some(paths) if paths.is_empty() => (None, true),
-        Some(paths) => (Some(resolve_all(cwd, paths)?), false),
-        None => (None, false),
-    };
-
-    let deny_writable = cli
-        .deny_write
-        .as_ref()
-        .map(|paths| resolve_all(cwd, paths))
-        .transpose()?
-        .unwrap_or_default();
-
-    Ok(ResolvedPaths {
-        readable,
-        deny_readable,
-        writable,
-        deny_writable,
-        full_write,
-    })
-}
-
-// ── Policy builders: CLI flags → Codex policy types ──
-
-fn make_root_entry(access: FileSystemAccessMode) -> FileSystemSandboxEntry {
-    FileSystemSandboxEntry {
-        path: FileSystemPath::Special {
-            value: FileSystemSpecialPath::Root,
-        },
-        access,
-    }
-}
-
-fn make_path_entries(
-    paths: &[AbsolutePathBuf],
-    access: FileSystemAccessMode,
-) -> Vec<FileSystemSandboxEntry> {
-    paths
-        .iter()
-        .map(|abs| FileSystemSandboxEntry {
-            path: FileSystemPath::Path { path: abs.clone() },
-            access,
-        })
-        .collect()
-}
-
-fn build_fs_policy(resolved: &ResolvedPaths, allow_all: bool) -> FileSystemSandboxPolicy {
-    if allow_all {
-        return FileSystemSandboxPolicy::unrestricted();
-    }
-
-    let mut entries: Vec<FileSystemSandboxEntry> = Vec::new();
-
-    match &resolved.readable {
-        Some(paths) => {
-            entries.push(FileSystemSandboxEntry {
-                path: FileSystemPath::Special {
-                    value: FileSystemSpecialPath::Minimal,
-                },
-                access: FileSystemAccessMode::Read,
-            });
-            entries.extend(make_path_entries(paths, FileSystemAccessMode::Read));
-            // On Linux, bubblewrap creates an isolated mount namespace. The
-            // sandbox helper binary must be readable inside it for the seccomp
-            // re-exec to work. Add the binary's own directory.
-            if let Ok(exe) = std::env::current_exe()
-                && let Some(dir) = exe.parent()
-                && let Ok(abs) = AbsolutePathBuf::try_from(dir.to_path_buf())
-            {
-                entries.push(FileSystemSandboxEntry {
-                    path: FileSystemPath::Path { path: abs },
-                    access: FileSystemAccessMode::Read,
-                });
-            }
-        }
-        None => {
-            entries.push(make_root_entry(FileSystemAccessMode::Read));
-        }
-    }
-
-    entries.extend(make_path_entries(
-        &resolved.deny_readable,
-        FileSystemAccessMode::None,
-    ));
-
-    if resolved.full_write {
-        entries.push(make_root_entry(FileSystemAccessMode::Write));
-    } else if let Some(paths) = &resolved.writable {
-        entries.extend(make_path_entries(paths, FileSystemAccessMode::Write));
-    }
-
-    entries.extend(make_path_entries(
-        &resolved.deny_writable,
-        FileSystemAccessMode::Read,
-    ));
-
-    FileSystemSandboxPolicy::restricted(entries)
-}
-
-fn net_is_enabled(cli: &Cli) -> bool {
-    cli.allow_all || cli.allow_net.is_some()
-}
-
-fn build_net_policy(cli: &Cli) -> NetworkSandboxPolicy {
-    if net_is_enabled(cli) {
-        NetworkSandboxPolicy::Enabled
-    } else {
-        NetworkSandboxPolicy::Restricted
-    }
-}
-
-fn build_legacy_sandbox_policy(resolved: &ResolvedPaths, cli: &Cli) -> SandboxPolicy {
-    if cli.allow_all || resolved.full_write {
-        return SandboxPolicy::DangerFullAccess;
-    }
-
-    let network_access = net_is_enabled(cli);
-
-    if let Some(writable_roots) = &resolved.writable {
-        SandboxPolicy::WorkspaceWrite {
-            writable_roots: writable_roots.clone(),
-            read_only_access: Default::default(),
-            network_access,
-            exclude_tmpdir_env_var: false,
-            exclude_slash_tmp: false,
-        }
-    } else {
-        SandboxPolicy::ReadOnly {
-            access: Default::default(),
-            network_access,
-        }
-    }
-}
-
-// ── Network proxy: domain-level filtering via Codex network-proxy ──
-
-/// A ConfigReloader that never reloads (static config for CLI use).
-struct StaticReloader;
-
-#[async_trait::async_trait]
-impl ConfigReloader for StaticReloader {
-    fn source_label(&self) -> String {
-        "zerobox static config".to_string()
-    }
-
-    async fn maybe_reload(&self) -> anyhow::Result<Option<ConfigState>> {
-        Ok(None)
-    }
-
-    async fn reload_now(&self) -> anyhow::Result<ConfigState> {
-        Err(anyhow::anyhow!("static config does not support reload"))
-    }
-}
-
-/// Build a NetworkProxy when --allow-net has domain filters or --deny-net is used.
-async fn build_network_proxy(cli: &Cli) -> Result<Option<NetworkProxy>> {
-    let Some(allow_domains) = &cli.allow_net else {
-        return Ok(None); // Network not enabled.
-    };
-
-    let has_filters = !allow_domains.is_empty() || cli.deny_net.is_some();
-    if !has_filters {
-        return Ok(None); // Full network, no filtering needed.
-    }
-
-    use codex_network_proxy::NetworkProxyConfig;
-    let mut config = NetworkProxyConfig::default();
-    config.network.enabled = true;
-
-    if allow_domains.is_empty() {
-        // Bare --allow-net with --deny-net: allow everything except denied.
-        config.network.allowed_domains = vec!["*".to_string()];
-    } else {
-        config.network.allowed_domains = allow_domains.clone();
-    }
-    if let Some(deny) = &cli.deny_net {
-        config.network.denied_domains = deny.clone();
-    }
-
-    let state = build_config_state(
-        config,
-        codex_network_proxy::NetworkProxyConstraints::default(),
-    )?;
-
-    let proxy_state = Arc::new(NetworkProxyState::with_reloader(
-        state,
-        Arc::new(StaticReloader),
-    ));
-
-    let proxy = NetworkProxy::builder()
-        .state(proxy_state)
-        .managed_by_codex(true)
-        .build()
-        .await?;
-
-    Ok(Some(proxy))
-}
-
-// ── Execution ──
 
 fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
     if let Some(code) = status.code() {
@@ -377,7 +141,7 @@ async fn main() -> ExitCode {
         get_platform_sandbox(false).unwrap_or(SandboxType::None)
     };
 
-    let fs_policy = build_fs_policy(&resolved, cli.allow_all);
+    let fs_policy = build_fs_policy(&resolved, cli.allow_all, net_is_enabled(&cli));
     let net_policy = build_net_policy(&cli);
     let legacy_policy = build_legacy_sandbox_policy(&resolved, &cli);
 
