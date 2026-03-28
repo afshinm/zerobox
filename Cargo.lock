@@ -4928,7 +4928,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "zerobox-exec"
+name = "zerobox"
 version = "0.0.0"
 dependencies = [
  "anyhow",

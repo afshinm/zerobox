@@ -35,7 +35,7 @@ use codex_utils_absolute_path::AbsolutePathBuf;
 ///   zerobox-exec --allow-net --deny-net=evil.com -- node script.js
 ///   zerobox-exec --allow-all -- bash -c "echo anything goes"
 #[derive(Parser, Debug)]
-#[command(name = "zerobox-exec", version, about, long_about = None)]
+#[command(name = "zerobox", version, about, long_about = None)]
 struct Cli {
     /// Restrict readable user data to these paths only (comma-separated).
     /// System libraries and binaries remain accessible for execution.

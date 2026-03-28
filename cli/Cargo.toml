@@ -1,12 +1,12 @@
 [package]
-name = "zerobox-exec"
+name = "zerobox"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Run commands in a cross-platform sandbox"
 
 [[bin]]
-name = "zerobox-exec"
+name = "zerobox"
 path = "src/main.rs"
 
 [dependencies]

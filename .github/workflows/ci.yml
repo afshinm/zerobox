@@ -70,6 +70,8 @@ jobs:
           --exclude codex-utils-pty
           --exclude codex-utils-string
           --exclude codex-utils-template
+          --exclude codex-network-proxy
+          --exclude codex-utils-rustls-provider
           -- -D warnings
 
   test-macos:
@@ -85,13 +87,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build release binary
-        run: cargo build --release -p zerobox-exec
+        run: cargo build --release -p zerobox
       - name: Unit tests
         run: cargo test --workspace --lib
       - name: E2E sandbox tests (against release binary)
         env:
-          ZEROBOX_EXEC: ./target/release/zerobox-exec
-        run: cargo test -p zerobox-exec --test sandbox_e2e
+          ZEROBOX_EXEC: ./target/release/zerobox
+        run: cargo test -p zerobox --test sandbox_e2e
 
   test-linux:
     name: Test (Linux)
@@ -108,6 +110,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build
-        run: cargo build --release -p zerobox-exec
+        run: cargo build --release -p zerobox
       - name: Unit tests (lib only)
         run: cargo test --workspace --lib
