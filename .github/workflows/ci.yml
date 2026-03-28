@@ -107,6 +107,10 @@ jobs:
           path: upstream/
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y libcap-dev
+      - name: Enable unprivileged user namespaces (required by bubblewrap)
+        run: |
+          sudo sysctl -w kernel.unprivileged_userns_clone=1
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build release binary
