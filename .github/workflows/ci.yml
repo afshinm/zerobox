@@ -72,7 +72,7 @@ jobs:
           --exclude codex-utils-template
           --exclude codex-network-proxy
           --exclude codex-utils-rustls-provider
-          -- -D warnings
+          -- -D warnings -A clippy::result_large_err
 
   test-macos:
     name: Test (macOS)

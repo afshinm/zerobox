@@ -115,10 +115,27 @@ mod allow_read {
     }
 
     #[test]
-    fn home_dir_blocked() {
+    fn unallowed_path_blocked() {
+        // Create a file under $HOME which is not in platform defaults on
+        // any OS. (/tmp is in macOS seatbelt platform defaults so can't
+        // be used here.)
         let home = std::env::var("HOME").expect("HOME not set");
-        let out = run(&["--allow-read=/tmp", "--", "ls", &home]);
-        assert!(!out.status.success());
+        let dir = PathBuf::from(&home).join(".zerobox-e2e-blocked");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("setup");
+        std::fs::write(dir.join("secret.txt"), "hidden").expect("setup");
+        let out = run(&[
+            "--allow-read=/var",
+            "--",
+            "cat",
+            &dir.join("secret.txt").to_string_lossy(),
+        ]);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(
+            !out.status.success(),
+            "should be blocked, stdout: {}",
+            super::stdout(&out)
+        );
     }
 
     #[test]
@@ -413,7 +430,11 @@ fn allow_read_and_write_combined() {
 
 #[test]
 fn allow_read_and_net_combined() {
-    let (code, ok) = curl_status(&["--allow-read=/tmp", "--allow-net"], "https://example.com");
+    // curl needs write access to /tmp on some platforms for TLS session state.
+    let (code, ok) = curl_status(
+        &["--allow-read=/tmp", "--allow-write=/tmp", "--allow-net"],
+        "https://example.com",
+    );
     assert!(ok, "expected 200, got {code}");
 }
 
