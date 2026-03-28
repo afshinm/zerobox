@@ -10,55 +10,92 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    name: Build & Lint
+  sync:
+    name: Sync Upstream
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Sync upstream Codex crates
+        run: ./sync.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: upstream
+          path: upstream/
+          retention-days: 1
+
+  fmt:
+    name: Format
+    needs: sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: upstream
+          path: upstream/
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-unknown-linux-musl
-          components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v2
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-      - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
-      - name: Build
-        run: cargo build --release --target x86_64-unknown-linux-musl
-      - name: Unit tests
-        run: cargo test --lib
+          components: rustfmt
+      - run: cargo fmt --check
 
-  # integration:
-  #   name: Integration Tests
-  #   runs-on: [self-hosted, linux, kvm]
-  #   needs: build
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: dtolnay/rust-toolchain@stable
-  #     - uses: Swatinem/rust-cache@v2
-  #     - name: Build
-  #       run: cargo build --release
-  #     - name: Integration tests
-  #       run: sudo cargo test --test '*' -- --test-threads=1
-
-  sdk:
-    name: TypeScript SDK
+  clippy:
+    name: Clippy
+    needs: sync
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: '22'
-      - uses: pnpm/action-setup@v4
+          name: upstream
+          path: upstream/
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          version: 10
-      - name: Install & Build
-        working-directory: sdk/typescript
-        run: pnpm install && pnpm run build
-      - name: Lint
-        working-directory: sdk/typescript
-        run: pnpm run lint
-      - name: Test
-        working-directory: sdk/typescript
-        run: pnpm test
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace -- -D warnings
+
+  test-macos:
+    name: Test (macOS)
+    needs: sync
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: upstream
+          path: upstream/
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release -p zerobox-exec
+      - name: Unit tests
+        run: cargo test --workspace
+      - name: Sandbox smoke test (read allowed)
+        run: |
+          echo "hello" > /tmp/zerobox-ci-test
+          ./target/release/zerobox-exec -- cat /tmp/zerobox-ci-test | grep -q "hello"
+      - name: Sandbox smoke test (write blocked)
+        run: |
+          ! ./target/release/zerobox-exec -- node -e "require('fs').writeFileSync('/tmp/zb-ci','x')" 2>/dev/null
+      - name: Sandbox smoke test (--allow-read restricts)
+        run: |
+          echo "secret" > /tmp/zerobox-ci-test
+          ./target/release/zerobox-exec --allow-read=/tmp -- cat /tmp/zerobox-ci-test | grep -q "secret"
+          ! ./target/release/zerobox-exec --allow-read=/tmp -- cat /etc/passwd 2>/dev/null
+
+  test-linux:
+    name: Test (Linux)
+    needs: sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: upstream
+          path: upstream/
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release -p zerobox-exec
+      - name: Unit tests (lib only)
+        run: cargo test --workspace --lib
