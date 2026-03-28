@@ -341,6 +341,7 @@ impl SandboxManager {
             timeout,
             ports: port_map,
             error: boot_error,
+            vsock_path: Some(vsock_path.to_string_lossy().to_string()),
         };
 
         let state = SandboxState {

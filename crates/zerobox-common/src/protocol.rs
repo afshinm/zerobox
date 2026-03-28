@@ -17,6 +17,7 @@ pub const METHOD_WRITE_FILE: &str = "write_file";
 pub const METHOD_READ_FILE: &str = "read_file";
 pub const METHOD_MKDIR: &str = "mkdir";
 pub const METHOD_HEALTH: &str = "health";
+pub const METHOD_SHELL: &str = "shell";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RpcRequest {

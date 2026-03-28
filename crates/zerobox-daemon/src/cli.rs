@@ -199,3 +199,128 @@ impl DaemonClient {
         Ok(())
     }
 }
+
+/// Connect to a sandbox shell via the vsock UDS.
+///
+/// Opens a direct connection to the guest agent, sends the `shell` RPC,
+/// then proxies raw bytes between the terminal and the PTY inside the VM.
+pub async fn connect_shell(vsock_path: &str) -> Result<()> {
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+    use tokio::net::UnixStream;
+    use zerobox_common::protocol::*;
+
+    let stream = UnixStream::connect(vsock_path)
+        .await
+        .map_err(|e| anyhow!("Failed to connect to VM: {}", e))?;
+
+    let (reader, mut writer) = stream.into_split();
+    let mut reader = BufReader::new(reader);
+
+    // Firecracker vsock handshake: CONNECT <port>
+    writer
+        .write_all(format!("CONNECT {}\n", VSOCK_PORT).as_bytes())
+        .await?;
+    let mut ok_line = String::new();
+    reader.read_line(&mut ok_line).await?;
+    if !ok_line.starts_with("OK") {
+        return Err(anyhow!("Vsock handshake failed: {}", ok_line.trim()));
+    }
+
+    // Send shell RPC
+    let req = RpcRequest {
+        id: 1,
+        method: METHOD_SHELL.to_string(),
+        params: serde_json::json!({}),
+    };
+    let mut req_json = serde_json::to_string(&req)?;
+    req_json.push('\n');
+    writer.write_all(req_json.as_bytes()).await?;
+
+    // Read JSON response
+    let mut resp_line = String::new();
+    reader.read_line(&mut resp_line).await?;
+    let resp: RpcResponse =
+        serde_json::from_str(&resp_line).map_err(|e| anyhow!("Invalid shell response: {}", e))?;
+    if let Some(err) = resp.error {
+        return Err(anyhow!("Shell failed: {}", err.message));
+    }
+
+    // Connection is now in raw byte mode. Set terminal to raw mode.
+    let _raw_guard = RawTerminal::enter()?;
+
+    eprintln!("\r\nConnected. Press Ctrl-D to disconnect.\r");
+
+    // Get the inner reader (BufReader may have buffered data)
+    let mut inner_reader = reader.into_inner();
+
+    // Bidirectional proxy: terminal stdin <-> vsock
+    let mut stdin = tokio::io::stdin();
+    let mut stdout = tokio::io::stdout();
+
+    let mut stdin_buf = [0u8; 1024];
+    let mut vsock_buf = [0u8; 4096];
+
+    loop {
+        tokio::select! {
+            // Terminal -> VM
+            n = stdin.read(&mut stdin_buf) => {
+                match n {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        if writer.write_all(&stdin_buf[..n]).await.is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
+            // VM -> Terminal
+            n = inner_reader.read(&mut vsock_buf) => {
+                match n {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        if stdout.write_all(&vsock_buf[..n]).await.is_err() {
+                            break;
+                        }
+                        stdout.flush().await.ok();
+                    }
+                }
+            }
+        }
+    }
+
+    drop(_raw_guard); // restore terminal
+    eprintln!("\r\nDisconnected.");
+    Ok(())
+}
+
+/// RAII guard that puts the terminal in raw mode and restores it on drop.
+struct RawTerminal {
+    original: libc::termios,
+}
+
+impl RawTerminal {
+    fn enter() -> Result<Self> {
+        unsafe {
+            let mut original: libc::termios = std::mem::zeroed();
+            if libc::tcgetattr(libc::STDIN_FILENO, &mut original) != 0 {
+                return Err(anyhow!("tcgetattr failed"));
+            }
+
+            let mut raw = original;
+            libc::cfmakeraw(&mut raw);
+            if libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &raw) != 0 {
+                return Err(anyhow!("tcsetattr failed"));
+            }
+
+            Ok(Self { original })
+        }
+    }
+}
+
+impl Drop for RawTerminal {
+    fn drop(&mut self) {
+        unsafe {
+            libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &self.original);
+        }
+    }
+}

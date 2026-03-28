@@ -29,6 +29,7 @@ hyper = { version = "1", features = ["client", "http1"] }
 hyper-util = { version = "0.1", features = ["client-legacy", "tokio"] }
 http-body-util = "0.1"
 base64 = "0.22"
+libc = "0.2"
 
 [package.metadata.deb]
 maintainer = "Zerobox Contributors"

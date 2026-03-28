@@ -1,6 +1,7 @@
 mod executor;
 mod files;
 mod health;
+mod shell;
 
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
@@ -160,6 +161,29 @@ where
         };
 
         let request_id = request.id;
+
+        // Special case: shell takes over the connection entirely
+        if request.method == METHOD_SHELL {
+            // Send success response, then switch to raw byte mode
+            let resp = RpcResponse {
+                id: request_id,
+                result: Some(serde_json::json!({"status": "ok"})),
+                error: None,
+            };
+            let mut buf = serde_json::to_vec(&resp)?;
+            buf.push(b'\n');
+            writer.write_all(&buf).await?;
+            writer.flush().await?;
+
+            // The BufReader may have buffered data — get the inner reader back
+            let inner_reader = lines.into_inner().into_inner();
+
+            // Hand off to the shell handler (this blocks until the shell exits)
+            if let Err(e) = shell::handle_shell(inner_reader, writer).await {
+                tracing::warn!("Shell session error: {}", e);
+            }
+            return Ok(());
+        }
 
         // Special case: stream_logs returns multiple lines
         if request.method == METHOD_STREAM_LOGS {

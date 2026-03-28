@@ -230,7 +230,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Commands::Connect { id } => {
-            // Verify sandbox exists and is running
+            // Get sandbox info including vsock path
             let resp = client.get_sandbox(&id).await?;
             let status = resp["status"].as_str().unwrap_or("unknown");
             if status != "running" {
@@ -240,55 +240,11 @@ async fn main() -> anyhow::Result<()> {
                     status
                 ));
             }
+            let vsock_path = resp["vsockPath"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("Sandbox has no vsock path"))?;
 
-            eprintln!(
-                "Connected to sandbox {}. Type commands, Ctrl-D to exit.",
-                id
-            );
-            eprintln!("---");
-
-            let stdin = std::io::stdin();
-            let mut line = String::new();
-            loop {
-                // Print prompt
-                eprint!("zerobox:{}$ ", &id[4..id.len().min(12)]);
-
-                line.clear();
-                let n = std::io::BufRead::read_line(&mut stdin.lock(), &mut line)?;
-                if n == 0 {
-                    // EOF (Ctrl-D)
-                    eprintln!("\nDisconnected.");
-                    break;
-                }
-
-                let trimmed = line.trim();
-                if trimmed.is_empty() {
-                    continue;
-                }
-
-                // Parse as shell: first word is cmd, rest are args
-                let parts: Vec<&str> = trimmed.split_whitespace().collect();
-                let cmd_name = parts[0];
-                let args: Vec<String> = parts[1..].iter().map(|s| s.to_string()).collect();
-
-                match client.exec_command(&id, cmd_name, &args).await {
-                    Ok(resp) => {
-                        if let Some(stdout) = resp["stdout"].as_str() {
-                            if !stdout.is_empty() {
-                                print!("{}", stdout);
-                            }
-                        }
-                        if let Some(stderr) = resp["stderr"].as_str() {
-                            if !stderr.is_empty() {
-                                eprint!("{}", stderr);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Error: {}", e);
-                    }
-                }
-            }
+            cli::connect_shell(vsock_path).await?;
         }
         Commands::Snapshot(args) => match args.command {
             SnapshotCommands::Create { id } => {
