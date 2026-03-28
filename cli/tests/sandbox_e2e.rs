@@ -182,6 +182,39 @@ mod deny_read {
         assert!(out.status.success(), "stderr: {}", stderr(&out));
         assert_eq!(stdout(&out).trim(), "BLOCKED");
     }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn deny_blocks_within_explicit_allow_read() {
+        let dir = setup_tmp("dr2");
+        let secret = dir.join("secret");
+        std::fs::create_dir_all(&secret).expect("setup");
+        std::fs::write(dir.join("public.txt"), "visible").expect("setup");
+        std::fs::write(secret.join("key.txt"), "hidden").expect("setup");
+
+        let out = run(&[
+            &format!("--allow-read={}", dir.display()),
+            &format!("--deny-read={}", secret.display()),
+            "--",
+            "sh",
+            "-c",
+            &format!(
+                "cat {}/public.txt 2>/dev/null && cat {}/secret/key.txt 2>/dev/null || echo DENIED",
+                dir.display(),
+                dir.display()
+            ),
+        ]);
+        assert!(out.status.success(), "stderr: {}", stderr(&out));
+        let out_str = stdout(&out);
+        assert!(
+            out_str.contains("visible"),
+            "public file should be readable, got: {out_str}"
+        );
+        assert!(
+            !out_str.contains("hidden"),
+            "secret file should be blocked, got: {out_str}"
+        );
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -321,6 +354,14 @@ mod allow_net_domains {
     }
 
     #[test]
+    fn allowed_domain_passes_unlisted_fails() {
+        let (code, ok) = curl_status(&["--allow-net=example.com"], "https://example.com");
+        assert!(ok, "allowed domain should pass, got {code}");
+        let (code, ok) = curl_status(&["--allow-net=example.com"], "https://google.com");
+        assert!(!ok, "unlisted domain should fail, got {code}");
+    }
+
+    #[test]
     fn apex_and_wildcard_combined() {
         // To allow both apex and subdomains, list both.
         let (code, ok) = curl_status(
@@ -374,6 +415,16 @@ mod deny_net_domains {
             "https://example.com",
         );
         assert!(ok, "example.com should still work, got {code}");
+    }
+
+    #[test]
+    fn deny_multiple_domains() {
+        // Deny both google.com and example.com.
+        let (code, ok) = curl_status(
+            &["--allow-net", "--deny-net=google.com,example.com"],
+            "https://example.com",
+        );
+        assert!(!ok, "example.com should be denied, got {code}");
     }
 }
 

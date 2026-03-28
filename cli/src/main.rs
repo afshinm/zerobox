@@ -27,13 +27,13 @@ use codex_utils_absolute_path::AbsolutePathBuf;
 /// precedence over allow flags.
 ///
 /// Examples:
-///   zerobox-exec -- node -e "console.log('hello')"
-///   zerobox-exec --allow-write=. --deny-write=./.git -- node script.js
-///   zerobox-exec --allow-read=/tmp --allow-write=/tmp -- node script.js
-///   zerobox-exec --allow-net -- curl https://example.com
-///   zerobox-exec --allow-net=example.com,api.example.com -- node script.js
-///   zerobox-exec --allow-net --deny-net=evil.com -- node script.js
-///   zerobox-exec --allow-all -- bash -c "echo anything goes"
+///   zerobox -- node -e "console.log('hello')"
+///   zerobox --allow-write=. --deny-write=./.git -- node script.js
+///   zerobox --allow-read=/tmp --allow-write=/tmp -- node script.js
+///   zerobox --allow-net -- curl https://example.com
+///   zerobox --allow-net=example.com,api.example.com -- node script.js
+///   zerobox --allow-net --deny-net=evil.com -- node script.js
+///   zerobox --allow-all -- bash -c "echo anything goes"
 #[derive(Parser, Debug)]
 #[command(name = "zerobox", version, about, long_about = None)]
 struct Cli {
@@ -264,7 +264,7 @@ struct StaticReloader;
 #[async_trait::async_trait]
 impl ConfigReloader for StaticReloader {
     fn source_label(&self) -> String {
-        "zerobox-exec static config".to_string()
+        "zerobox static config".to_string()
     }
 
     async fn maybe_reload(&self) -> anyhow::Result<Option<ConfigState>> {
