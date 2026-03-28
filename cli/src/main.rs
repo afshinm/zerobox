@@ -168,7 +168,11 @@ fn make_path_entries(
         .collect()
 }
 
-fn build_fs_policy(resolved: &ResolvedPaths, allow_all: bool) -> FileSystemSandboxPolicy {
+fn build_fs_policy(
+    resolved: &ResolvedPaths,
+    allow_all: bool,
+    net_enabled: bool,
+) -> FileSystemSandboxPolicy {
     if allow_all {
         return FileSystemSandboxPolicy::unrestricted();
     }
@@ -195,6 +199,17 @@ fn build_fs_policy(resolved: &ResolvedPaths, allow_all: bool) -> FileSystemSandb
                     path: FileSystemPath::Path { path: abs },
                     access: FileSystemAccessMode::Read,
                 });
+            }
+            // On systemd-based Linux, /etc/resolv.conf is a symlink to
+            // /run/systemd/resolve/stub-resolv.conf. When network is enabled,
+            // /run must be readable for DNS to work inside the bwrap namespace.
+            if net_enabled {
+                if let Ok(abs) = AbsolutePathBuf::try_from(PathBuf::from("/run")) {
+                    entries.push(FileSystemSandboxEntry {
+                        path: FileSystemPath::Path { path: abs },
+                        access: FileSystemAccessMode::Read,
+                    });
+                }
             }
         }
         None => {
@@ -377,7 +392,7 @@ async fn main() -> ExitCode {
         get_platform_sandbox(false).unwrap_or(SandboxType::None)
     };
 
-    let fs_policy = build_fs_policy(&resolved, cli.allow_all);
+    let fs_policy = build_fs_policy(&resolved, cli.allow_all, net_is_enabled(&cli));
     let net_policy = build_net_policy(&cli);
     let legacy_policy = build_legacy_sandbox_policy(&resolved, &cli);
 
