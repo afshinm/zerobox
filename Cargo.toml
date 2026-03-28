@@ -1,28 +1,132 @@
 [workspace]
 members = [
-    "crates/zerobox-daemon",
-    "crates/zerobox-guest-agent",
-    "crates/zerobox-common",
+    # ── Upstream Codex crates (synced by sync.sh) ──
+    "upstream/sandboxing",
+    "upstream/linux-sandbox",
+    "upstream/windows-sandbox-rs",
+    "upstream/process-hardening",
+    "upstream/protocol",
+    "upstream/execpolicy",
+    "upstream/utils/absolute-path",
+    "upstream/utils/string",
+    "upstream/utils/pty",
+    "upstream/utils/image",
+    "upstream/utils/cache",
+    "upstream/utils/template",
+    "upstream/utils/home-dir",
+    # ── Our code ──
+    "cli",
+    "shims/core",
+    "shims/network-proxy",
+    "shims/git-utils",
+    "shims/rustls-provider",
 ]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
-edition = "2021"
+version = "0.0.0"
+edition = "2024"
 license = "Apache-2.0"
 
 [workspace.dependencies]
-tokio = { version = "1", features = ["full"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = { version = "1", features = ["v4"] }
-anyhow = "1"
-thiserror = "2"
-chrono = { version = "0.4", features = ["serde"] }
+# ── Upstream Codex crates ──
+codex-execpolicy = { path = "upstream/execpolicy" }
+codex-linux-sandbox = { path = "upstream/linux-sandbox" }
+codex-process-hardening = { path = "upstream/process-hardening" }
+codex-protocol = { path = "upstream/protocol" }
+codex-sandboxing = { path = "upstream/sandboxing" }
+codex-windows-sandbox = { path = "upstream/windows-sandbox-rs" }
+codex-utils-absolute-path = { path = "upstream/utils/absolute-path" }
+codex-utils-cache = { path = "upstream/utils/cache" }
+codex-utils-image = { path = "upstream/utils/image" }
+codex-utils-pty = { path = "upstream/utils/pty" }
+codex-utils-string = { path = "upstream/utils/string" }
+codex-utils-template = { path = "upstream/utils/template" }
+codex-utils-home-dir = { path = "upstream/utils/home-dir" }
 
-# The profile that 'dist' will build with
-[profile.dist]
-inherits = "release"
-lto = "thin"
+# ── Shims (replace heavy Codex deps we don't need) ──
+codex-core = { path = "shims/core" }
+codex-network-proxy = { path = "shims/network-proxy" }
+codex-git-utils = { path = "shims/git-utils" }
+codex-utils-rustls-provider = { path = "shims/rustls-provider" }
+
+# ── External deps: versions pinned to match Codex upstream ──
+anyhow = "1"
+base64 = "0.22.1"
+chrono = "0.4.43"
+clap = "4"
+dirs = "6"
+dunce = "1.0.4"
+icu_decimal = "2.1"
+icu_locale_core = "2.1"
+icu_provider = { version = "2.1", features = ["sync"] }
+image = { version = "^0.25.9", default-features = false }
+landlock = "0.4.4"
+lazy_static = "1"
+libc = "0.2.182"
+log = "0.4"
+lru = "0.16.3"
+mime_guess = "2.0.5"
+multimap = "0.10.0"
+path-absolutize = "3.1.1"
+portable-pty = "0.9.0"
+pretty_assertions = "1.4.1"
+quick-xml = "0.38.4"
+regex-lite = "0.1.8"
+schemars = "0.8.22"
+seccompiler = "0.5.0"
+serde = "1"
+serde_json = "1"
+serde_with = "3.17"
+sha1 = "0.10.6"
+shlex = "1.3.0"
+starlark = "0.13.0"
+strum = "0.27.2"
+strum_macros = "0.28.0"
+sys-locale = "0.3.2"
+tempfile = "3.23.0"
+thiserror = "2.0.17"
+tokio = "1"
+tracing = "0.1"
+ts-rs = "11"
+url = "2"
+uuid = "1"
+which = "8"
+
+[workspace.lints]
+rust = {}
+
+[workspace.lints.clippy]
+expect_used = "deny"
+identity_op = "deny"
+manual_clamp = "deny"
+manual_filter = "deny"
+manual_find = "deny"
+manual_flatten = "deny"
+manual_map = "deny"
+manual_memcpy = "deny"
+manual_non_exhaustive = "deny"
+manual_ok_or = "deny"
+manual_range_contains = "deny"
+manual_retain = "deny"
+manual_strip = "deny"
+manual_try_fold = "deny"
+manual_unwrap_or = "deny"
+needless_borrow = "deny"
+needless_borrowed_reference = "deny"
+needless_collect = "deny"
+needless_late_init = "deny"
+needless_option_as_deref = "deny"
+needless_question_mark = "deny"
+needless_update = "deny"
+redundant_clone = "deny"
+redundant_closure = "deny"
+redundant_closure_for_method_calls = "deny"
+redundant_static_lifetimes = "deny"
+trivially_copy_pass_by_ref = "deny"
+uninlined_format_args = "deny"
+unnecessary_filter_map = "deny"
+unnecessary_lazy_evaluations = "deny"
+unnecessary_sort_by = "deny"
+unnecessary_to_owned = "deny"
+unwrap_used = "deny"

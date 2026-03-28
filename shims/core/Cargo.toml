@@ -1,0 +1,13 @@
+[package]
+name = "codex-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Thin shim replacing codex-core for sandbox crates"
+
+[dependencies]
+thiserror = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+landlock = { workspace = true }
+seccompiler = { workspace = true }

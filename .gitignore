@@ -4,10 +4,8 @@
 *.swo
 .DS_Store
 
-# Node
-node_modules/
-dist/
-*.tsbuildinfo
+# Upstream Codex crates
+/upstream/
 
 # IDE
 .idea/
@@ -17,6 +15,3 @@ dist/
 # Runtime
 *.log
 *.pid
-
-# Zerobox data
-/data/

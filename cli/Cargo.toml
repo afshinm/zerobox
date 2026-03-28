@@ -1,0 +1,18 @@
+[package]
+name = "zerobox-exec"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Run commands in a cross-platform sandbox"
+
+[[bin]]
+name = "zerobox-exec"
+path = "src/main.rs"
+
+[dependencies]
+codex-sandboxing = { workspace = true }
+codex-protocol = { workspace = true }
+codex-utils-absolute-path = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+anyhow = { workspace = true }
+tokio = { workspace = true, features = ["process", "rt-multi-thread", "macros", "io-util"] }

@@ -1,0 +1,11 @@
+[package]
+name = "codex-git-utils"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Thin shim replacing codex-git-utils for sandbox crates"
+
+[dependencies]
+schemars = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+ts-rs = { workspace = true }
