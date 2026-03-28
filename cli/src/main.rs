@@ -20,15 +20,14 @@ use codex_utils_absolute_path::AbsolutePathBuf;
 /// Permissions are deny-by-default for writes and network. Reads are allowed
 /// everywhere unless restricted with --allow-read=<paths>.
 ///
-/// When --allow-read is used, the sandboxed process can only read user data
-/// from the listed paths. System libraries and binaries remain loadable
-/// (the process can execute) but their contents are not exposed to user code.
+/// Deny flags carve out exceptions within allowed paths and always take
+/// precedence over allow flags.
 ///
 /// Examples:
 ///   zerobox-exec -- node -e "console.log('hello')"
-///   zerobox-exec --allow-write=. -- node -e "require('fs').writeFileSync('out.txt','hi')"
-///   zerobox-exec --allow-net -- curl https://example.com
+///   zerobox-exec --allow-write=. --deny-write=./.git -- node script.js
 ///   zerobox-exec --allow-read=/tmp --allow-write=/tmp -- node script.js
+///   zerobox-exec --allow-net -- curl https://example.com
 ///   zerobox-exec --allow-all -- bash -c "echo anything goes"
 #[derive(Parser, Debug)]
 #[command(name = "zerobox-exec", version, about, long_about = None)]
@@ -39,10 +38,20 @@ struct Cli {
     #[arg(long, value_delimiter = ',', num_args = 1..)]
     allow_read: Option<Vec<PathBuf>>,
 
+    /// Block reading from these paths (comma-separated). Takes precedence
+    /// over --allow-read.
+    #[arg(long, value_delimiter = ',', num_args = 1..)]
+    deny_read: Option<Vec<PathBuf>>,
+
     /// Allow writing to these paths (comma-separated).
     /// Without a value, allows writing everywhere.
     #[arg(long, value_delimiter = ',', num_args = 0..)]
     allow_write: Option<Vec<PathBuf>>,
+
+    /// Block writing to these paths (comma-separated). Takes precedence
+    /// over --allow-write.
+    #[arg(long, value_delimiter = ',', num_args = 1..)]
+    deny_write: Option<Vec<PathBuf>>,
 
     /// Allow outbound network access.
     #[arg(long)]
@@ -65,10 +74,12 @@ struct Cli {
     command: Vec<String>,
 }
 
-/// Pre-resolved paths from CLI flags. Resolved once, used by both policy builders.
+/// Pre-resolved paths from CLI flags.
 struct ResolvedPaths {
     readable: Option<Vec<AbsolutePathBuf>>,
+    deny_readable: Vec<AbsolutePathBuf>,
     writable: Option<Vec<AbsolutePathBuf>>,
+    deny_writable: Vec<AbsolutePathBuf>,
     full_write: bool,
 }
 
@@ -92,18 +103,36 @@ fn resolve_cli_paths(cli: &Cli, cwd: &Path) -> Result<ResolvedPaths> {
         .map(|paths| resolve_all(cwd, paths))
         .transpose()?;
 
+    let deny_readable = cli
+        .deny_read
+        .as_ref()
+        .map(|paths| resolve_all(cwd, paths))
+        .transpose()?
+        .unwrap_or_default();
+
     let (writable, full_write) = match &cli.allow_write {
         Some(paths) if paths.is_empty() => (None, true),
         Some(paths) => (Some(resolve_all(cwd, paths)?), false),
         None => (None, false),
     };
 
+    let deny_writable = cli
+        .deny_write
+        .as_ref()
+        .map(|paths| resolve_all(cwd, paths))
+        .transpose()?
+        .unwrap_or_default();
+
     Ok(ResolvedPaths {
         readable,
+        deny_readable,
         writable,
+        deny_writable,
         full_write,
     })
 }
+
+// ── Policy builders: CLI flags → Codex policy types ──
 
 fn make_root_entry(access: FileSystemAccessMode) -> FileSystemSandboxEntry {
     FileSystemSandboxEntry {
@@ -134,16 +163,42 @@ fn build_fs_policy(resolved: &ResolvedPaths, allow_all: bool) -> FileSystemSandb
 
     let mut entries: Vec<FileSystemSandboxEntry> = Vec::new();
 
+    // Read policy.
     match &resolved.readable {
-        Some(paths) => entries.extend(make_path_entries(paths, FileSystemAccessMode::Read)),
-        None => entries.push(make_root_entry(FileSystemAccessMode::Read)),
+        Some(paths) => {
+            // --allow-read=<paths>: include Minimal platform defaults so
+            // binaries, libraries and frameworks are still loadable.
+            entries.push(FileSystemSandboxEntry {
+                path: FileSystemPath::Special {
+                    value: FileSystemSpecialPath::Minimal,
+                },
+                access: FileSystemAccessMode::Read,
+            });
+            entries.extend(make_path_entries(paths, FileSystemAccessMode::Read));
+        }
+        None => {
+            entries.push(make_root_entry(FileSystemAccessMode::Read));
+        }
     }
 
+    // --deny-read: FileSystemAccessMode::None takes precedence.
+    entries.extend(make_path_entries(
+        &resolved.deny_readable,
+        FileSystemAccessMode::None,
+    ));
+
+    // Write policy.
     if resolved.full_write {
         entries.push(make_root_entry(FileSystemAccessMode::Write));
     } else if let Some(paths) = &resolved.writable {
         entries.extend(make_path_entries(paths, FileSystemAccessMode::Write));
     }
+
+    // --deny-write: downgrade to Read (removes write, keeps read).
+    entries.extend(make_path_entries(
+        &resolved.deny_writable,
+        FileSystemAccessMode::Read,
+    ));
 
     FileSystemSandboxPolicy::restricted(entries)
 }
@@ -181,156 +236,8 @@ fn build_legacy_sandbox_policy(
     }
 }
 
-// ---------------------------------------------------------------------------
-// macOS: custom seatbelt policy for --allow-read
-//
-// The Codex SandboxManager can produce either "full disk read" or "platform
-// defaults + specific paths" policies. Neither gives us what --allow-read
-// needs: system libraries loadable for execution, but user-visible file reads
-// restricted to the listed paths only.
-//
-// When --allow-read is used on macOS, we build the seatbelt policy directly
-// instead of going through SandboxManager.
-// ---------------------------------------------------------------------------
+// ── Execution ──
 
-/// Return the path plus its canonical form (if different) so seatbelt rules
-/// cover both the symlink and the physical path (e.g. /tmp and /private/tmp).
-#[cfg(target_os = "macos")]
-fn seatbelt_path_variants(path: &Path) -> Vec<String> {
-    let original = path.to_string_lossy().to_string();
-    let mut variants = vec![original.clone()];
-    if let Ok(canonical) = std::fs::canonicalize(path) {
-        let canon_str = canonical.to_string_lossy().to_string();
-        if canon_str != original {
-            variants.push(canon_str);
-        }
-    }
-    variants
-}
-
-#[cfg(target_os = "macos")]
-fn build_restricted_read_seatbelt_policy(
-    user_read_paths: &[AbsolutePathBuf],
-    user_write_paths: &[AbsolutePathBuf],
-    cwd: &Path,
-    allow_net: bool,
-) -> String {
-    let mut policy = String::from(
-        r#"(version 1)
-(deny default)
-
-; ── Process basics ──
-(allow process*)
-(allow sysctl-read)
-(allow mach-lookup)
-(allow ipc-posix-shm-read*)
-(allow system-mac-syscall)
-(allow system-fsctl)
-
-; ── System libraries and frameworks (file-read* for dyld loading) ──
-(allow file-read* file-map-executable file-test-existence
-  (literal "/")
-  (subpath "/System")
-  (subpath "/usr/lib")
-  (subpath "/usr/share")
-  (subpath "/usr/libexec")
-  (subpath "/Library/Apple")
-  (subpath "/Library/Preferences")
-  (subpath "/private/var/db")
-  (subpath "/opt/homebrew/lib")
-  (subpath "/usr/local/lib")
-  (subpath "/Applications"))
-
-; ── Binaries (readable + executable) ──
-(allow file-read* file-test-existence
-  (subpath "/usr/bin")
-  (subpath "/usr/sbin")
-  (subpath "/bin")
-  (subpath "/sbin"))
-
-; ── Config dirs: metadata only (stat works, open+read denied) ──
-(allow file-read-metadata file-test-existence
-  (subpath "/etc")
-  (subpath "/private/etc")
-  (subpath "/private"))
-
-; ── Devices and terminal ──
-(allow file-read* file-write* file-ioctl
-  (regex #"^/dev/ttys[0-9]+$")
-  (literal "/dev/tty")
-  (literal "/dev/null")
-  (literal "/dev/zero")
-  (literal "/dev/ptmx"))
-(allow file-read* file-write* (subpath "/dev/fd"))
-(allow file-read-metadata (subpath "/dev"))
-(allow file-read-data
-  (literal "/dev/random")
-  (literal "/dev/urandom"))
-
-; ── Path traversal (firmlinks, symlinks) ──
-(allow file-read-metadata file-test-existence
-  (subpath "/System/Volumes")
-  (literal "/tmp")
-  (literal "/var"))
-
-; ── Syslog ──
-(allow network-outbound (literal "/private/var/run/syslog"))
-
-"#,
-    );
-
-    // CWD: node/python/etc. need getcwd() which requires file-read-data on CWD.
-    policy.push_str("; ── CWD (getcwd requires read access) ──\n");
-    for p in seatbelt_path_variants(cwd) {
-        policy.push_str(&format!(
-            "(allow file-read* file-test-existence (subpath \"{p}\"))\n"
-        ));
-    }
-    policy.push('\n');
-
-    // User-specified read paths.
-    // On macOS, symlinks like /tmp → /private/tmp must be resolved because
-    // seatbelt checks the physical path after symlink resolution.
-    if !user_read_paths.is_empty() {
-        policy.push_str("; ── User data: allowed reads ──\n");
-        for path in user_read_paths {
-            for p in seatbelt_path_variants(path.as_path()) {
-                policy.push_str(&format!("(allow file-read* (subpath \"{p}\"))\n"));
-            }
-        }
-        policy.push('\n');
-    }
-
-    // User-specified write paths.
-    if !user_write_paths.is_empty() {
-        policy.push_str("; ── User data: allowed writes ──\n");
-        for path in user_write_paths {
-            for p in seatbelt_path_variants(path.as_path()) {
-                policy.push_str(&format!(
-                    "(allow file-read* file-write* (subpath \"{p}\"))\n"
-                ));
-            }
-        }
-        policy.push('\n');
-    }
-
-    // Network.
-    if allow_net {
-        policy.push_str(
-            "; ── Network ──\n\
-             (allow network*)\n\
-             (allow system-socket)\n\
-             ; TLS needs OpenSSL config and certificates\n\
-             (allow file-read* (subpath \"/private/etc/ssl\"))\n\
-             (allow file-read* (subpath \"/etc/ssl\"))\n\
-             (allow file-read* (literal \"/private/etc/resolv.conf\"))\n\n",
-        );
-    }
-
-    policy
-}
-
-/// Map process exit status to an exit code, preserving signal information.
 fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
     if let Some(code) = status.code() {
         return ExitCode::from(code as u8);
@@ -343,24 +250,6 @@ fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
         }
     }
     ExitCode::from(1)
-}
-
-async fn spawn_and_wait(argv: &[String], cwd: &Path, env: &HashMap<String, String>) -> ExitCode {
-    let mut cmd = tokio::process::Command::new(&argv[0]);
-    cmd.args(&argv[1..]);
-    cmd.current_dir(cwd);
-    cmd.env_clear();
-    for (k, v) in env {
-        cmd.env(k, v);
-    }
-
-    match cmd.status().await {
-        Ok(status) => exit_code_from_status(status),
-        Err(e) => {
-            eprintln!("error: failed to execute command: {e}");
-            ExitCode::from(1)
-        }
-    }
 }
 
 #[tokio::main]
@@ -383,33 +272,6 @@ async fn main() -> ExitCode {
         }
     };
 
-    let env: HashMap<String, String> = std::env::vars().collect();
-
-    // ── Restricted-read path (macOS): build seatbelt policy directly ──
-    //
-    // When --allow-read is used, the Codex SandboxManager can't produce the
-    // policy we need (system libs loadable but user reads restricted). We
-    // build the sandbox-exec invocation ourselves.
-    #[cfg(target_os = "macos")]
-    if resolved.readable.is_some() && !cli.allow_all && !cli.no_sandbox {
-        let user_reads = resolved.readable.as_deref().unwrap_or_default();
-        let user_writes = resolved.writable.as_deref().unwrap_or_default();
-
-        let policy =
-            build_restricted_read_seatbelt_policy(user_reads, user_writes, &cwd, cli.allow_net);
-
-        let mut argv = vec![
-            "/usr/bin/sandbox-exec".to_string(),
-            "-p".to_string(),
-            policy,
-            "--".to_string(),
-        ];
-        argv.extend(cli.command.iter().cloned());
-
-        return spawn_and_wait(&argv, &cwd, &env).await;
-    }
-
-    // ── Default path: use Codex SandboxManager ──
     let sandbox_type = if cli.no_sandbox || cli.allow_all {
         SandboxType::None
     } else {
@@ -422,6 +284,7 @@ async fn main() -> ExitCode {
 
     let program = cli.command[0].clone();
     let args: Vec<String> = cli.command[1..].to_vec();
+    let env: HashMap<String, String> = std::env::vars().collect();
 
     let manager = SandboxManager::new();
     let request = SandboxTransformRequest {
@@ -429,7 +292,7 @@ async fn main() -> ExitCode {
             program,
             args,
             cwd: cwd.clone(),
-            env: env.clone(),
+            env,
             additional_permissions: None,
         },
         policy: &legacy_policy,
@@ -455,5 +318,19 @@ async fn main() -> ExitCode {
         }
     };
 
-    spawn_and_wait(&exec_request.command, &cwd, &exec_request.env).await
+    let mut cmd = tokio::process::Command::new(&exec_request.command[0]);
+    cmd.args(&exec_request.command[1..]);
+    cmd.current_dir(&cwd);
+    cmd.env_clear();
+    for (k, v) in &exec_request.env {
+        cmd.env(k, v);
+    }
+
+    match cmd.status().await {
+        Ok(status) => exit_code_from_status(status),
+        Err(e) => {
+            eprintln!("error: failed to execute command: {e}");
+            ExitCode::from(1)
+        }
+    }
 }

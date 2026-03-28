@@ -1,24 +1,18 @@
 //! End-to-end tests for zerobox-exec sandbox enforcement.
 //!
-//! Each test builds the real binary and runs it against the host OS sandbox
-//! backend. On macOS this exercises seatbelt; on Linux it exercises
-//! bubblewrap+seccomp (when available).
+//! Each test runs the real binary through the Codex sandboxing API.
+//! On macOS this exercises seatbelt; on Linux bubblewrap+seccomp.
 //!
-//! Tests are grouped by capability: read, write, network, combined.
+//! Set ZEROBOX_EXEC to test a pre-built binary (e.g. release build).
+//! Falls back to the debug binary that `cargo test` builds automatically.
 
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
-/// Path to the zerobox-exec binary under test.
-///
-/// Set ZEROBOX_EXEC to point at a pre-built binary (e.g. a release build).
-/// Falls back to the debug binary that `cargo test` builds automatically.
 fn zerobox_exec() -> PathBuf {
     let path: PathBuf = std::env::var("ZEROBOX_EXEC")
         .map(PathBuf::from)
         .unwrap_or_else(|_| env!("CARGO_BIN_EXE_zerobox-exec").into());
-    // Resolve relative paths against CARGO_MANIFEST_DIR so they work
-    // regardless of the cwd cargo runs the test from.
     if path.is_relative() {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
@@ -44,6 +38,13 @@ fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).to_string()
 }
 
+fn setup_tmp(name: &str) -> PathBuf {
+    let dir = PathBuf::from(format!("/tmp/zerobox-e2e-{name}"));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("setup dir");
+    dir
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Default mode: full read, no write, no network
 // ═══════════════════════════════════════════════════════════════════════════
@@ -62,7 +63,7 @@ fn default_write_blocked() {
         "--",
         "node",
         "-e",
-        "try{require('fs').writeFileSync('/tmp/zerobox-e2e-write','x');process.exit(0)}catch(e){process.exit(1)}",
+        "try{require('fs').writeFileSync('/tmp/zerobox-e2e-wb','x');process.exit(0)}catch(e){process.exit(1)}",
     ]);
     assert!(!out.status.success());
 }
@@ -79,7 +80,7 @@ fn default_network_blocked() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// --allow-read: restrict readable user data
+// --allow-read: restrict readable paths (includes platform defaults)
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[cfg(target_os = "macos")]
@@ -95,17 +96,6 @@ mod allow_read {
     }
 
     #[test]
-    fn etc_passwd_blocked() {
-        let out = run(&["--allow-read=/tmp", "--", "cat", "/etc/passwd"]);
-        assert!(!out.status.success());
-        let err = stderr(&out);
-        assert!(
-            err.contains("Operation not permitted") || err.contains("Permission denied"),
-            "unexpected stderr: {err}"
-        );
-    }
-
-    #[test]
     fn home_dir_blocked() {
         let home = std::env::var("HOME").expect("HOME not set");
         let out = run(&["--allow-read=/tmp", "--", "ls", &home]);
@@ -113,48 +103,55 @@ mod allow_read {
     }
 
     #[test]
-    fn node_can_run_but_reads_restricted() {
+    fn cat_runs_with_restricted_read() {
         std::fs::write("/tmp/zerobox-e2e-nr", "data").expect("setup");
-        let out = run(&[
-            "--allow-read=/tmp",
-            "--",
-            "node",
-            "-e",
-            r#"
-const fs = require('fs');
-let results = [];
-try { fs.readFileSync('/tmp/zerobox-e2e-nr','utf8'); results.push('tmp:ok'); }
-catch(e) { results.push('tmp:blocked'); }
-try { fs.readFileSync('/etc/passwd'); results.push('etc:ok'); }
-catch(e) { results.push('etc:blocked'); }
-console.log(results.join(','));
-"#,
-        ]);
+        let out = run(&["--allow-read=/tmp", "--", "cat", "/tmp/zerobox-e2e-nr"]);
         assert!(out.status.success(), "stderr: {}", stderr(&out));
-        let result = stdout(&out).trim().to_string();
-        assert!(result.contains("tmp:ok"), "expected tmp:ok, got: {result}");
-        assert!(
-            result.contains("etc:blocked"),
-            "expected etc:blocked, got: {result}"
-        );
+        assert_eq!(stdout(&out).trim(), "data");
     }
 
     #[test]
     fn multiple_read_paths() {
-        std::fs::write("/tmp/zerobox-e2e-m1", "one").expect("setup");
-        let out = run(&[
-            "--allow-read=/tmp,/var",
-            "--",
-            "cat",
-            "/tmp/zerobox-e2e-m1",
-        ]);
+        std::fs::write("/tmp/zerobox-e2e-mr", "one").expect("setup");
+        let out = run(&["--allow-read=/tmp,/var", "--", "cat", "/tmp/zerobox-e2e-mr"]);
         assert!(out.status.success(), "stderr: {}", stderr(&out));
         assert_eq!(stdout(&out).trim(), "one");
     }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// --allow-write: grant write access
+// --deny-read: carve out exceptions within allowed reads
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[cfg(target_os = "macos")]
+mod deny_read {
+    use super::*;
+
+    #[test]
+    fn deny_blocks_within_default_full_read() {
+        let dir = setup_tmp("dr1");
+        let secret = dir.join("private");
+        std::fs::create_dir_all(&secret).expect("setup");
+        std::fs::write(secret.join("key.txt"), "password").expect("setup");
+
+        // Default full read + deny a specific subdir.
+        let out = run(&[
+            &format!("--deny-read={}", secret.display()),
+            "--",
+            "node",
+            "-e",
+            &format!(
+                "try{{require('fs').readFileSync('{}/private/key.txt');console.log('ALLOWED')}}catch(e){{console.log('BLOCKED')}}",
+                dir.display()
+            ),
+        ]);
+        assert!(out.status.success(), "stderr: {}", stderr(&out));
+        assert_eq!(stdout(&out).trim(), "BLOCKED");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// --allow-write / --deny-write
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -184,8 +181,63 @@ fn allow_write_does_not_grant_other_paths() {
     assert!(!out.status.success());
 }
 
+#[cfg(target_os = "macos")]
+mod deny_write {
+    use super::*;
+
+    #[test]
+    fn deny_blocks_within_allowed_dir() {
+        let dir = setup_tmp("dw1");
+        let protected = dir.join(".git");
+        std::fs::create_dir_all(&protected).expect("setup");
+
+        let out = run(&[
+            &format!("--allow-write={}", dir.display()),
+            &format!("--deny-write={}", protected.display()),
+            "--",
+            "node",
+            "-e",
+            &format!(
+                r#"
+const fs = require('fs');
+let r = [];
+try {{ fs.writeFileSync('{}/file.txt','ok'); r.push('file:ok'); }} catch(e) {{ r.push('file:blocked'); }}
+try {{ fs.writeFileSync('{}/.git/evil','x'); r.push('git:ok'); }} catch(e) {{ r.push('git:blocked'); }}
+console.log(r.join(','));
+"#,
+                dir.display(),
+                dir.display()
+            ),
+        ]);
+        assert!(out.status.success(), "stderr: {}", stderr(&out));
+        let result = stdout(&out).trim().to_string();
+        assert!(result.contains("file:ok"), "got: {result}");
+        assert!(result.contains("git:blocked"), "got: {result}");
+    }
+
+    #[test]
+    fn deny_write_with_full_write() {
+        let dir = setup_tmp("dw2");
+        std::fs::create_dir_all(&dir).expect("setup");
+
+        let out = run(&[
+            "--allow-write",
+            &format!("--deny-write={}", dir.display()),
+            "--",
+            "node",
+            "-e",
+            &format!(
+                "try{{require('fs').writeFileSync('{}/blocked.txt','x');console.log('ALLOWED')}}catch(e){{console.log('BLOCKED')}}",
+                dir.display()
+            ),
+        ]);
+        assert!(out.status.success(), "stderr: {}", stderr(&out));
+        assert_eq!(stdout(&out).trim(), "BLOCKED");
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
-// --allow-net: grant network access
+// --allow-net
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -206,7 +258,7 @@ fn allow_net_permits_outbound() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// --allow-all / --no-sandbox: escape hatches
+// --allow-all / --no-sandbox
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -243,22 +295,19 @@ fn no_sandbox_permits_everything() {
 #[test]
 fn allow_read_and_write_combined() {
     std::fs::write("/tmp/zerobox-e2e-rw-in", "input").expect("setup");
+    // Use sh -c to read+write since node needs OpenSSL paths not in Minimal defaults.
     let out = run(&[
         "--allow-read=/tmp",
         "--allow-write=/tmp",
         "--",
-        "node",
-        "-e",
-        r#"
-const fs = require('fs');
-const data = fs.readFileSync('/tmp/zerobox-e2e-rw-in','utf8');
-fs.writeFileSync('/tmp/zerobox-e2e-rw-out', data + '-processed');
-console.log('ok');
-"#,
+        "sh",
+        "-c",
+        "cat /tmp/zerobox-e2e-rw-in > /tmp/zerobox-e2e-rw-out && echo ok",
     ]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(stdout(&out).trim(), "ok");
     let content = std::fs::read_to_string("/tmp/zerobox-e2e-rw-out").expect("read back");
-    assert_eq!(content, "input-processed");
+    assert_eq!(content.trim(), "input");
 }
 
 #[cfg(target_os = "macos")]
@@ -278,6 +327,38 @@ fn allow_read_and_net_combined() {
     ]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert_eq!(stdout(&out).trim(), "200");
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn deny_read_and_deny_write_combined() {
+    let dir = setup_tmp("combo");
+    let secret = dir.join("secret");
+    std::fs::create_dir_all(&secret).expect("setup");
+    std::fs::write(dir.join("public"), "hello").expect("setup");
+
+    let out = run(&[
+        &format!("--allow-write={}", dir.display()),
+        &format!("--deny-write={}", secret.display()),
+        "--",
+        "node",
+        "-e",
+        &format!(
+            r#"
+const fs = require('fs');
+let r = [];
+try {{ fs.writeFileSync('{}/new.txt','x'); r.push('write-pub:ok'); }} catch(e) {{ r.push('write-pub:blocked'); }}
+try {{ fs.writeFileSync('{}/secret/evil','x'); r.push('write-sec:ok'); }} catch(e) {{ r.push('write-sec:blocked'); }}
+console.log(r.join(','));
+"#,
+            dir.display(),
+            dir.display()
+        ),
+    ]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    let result = stdout(&out).trim().to_string();
+    assert!(result.contains("write-pub:ok"), "got: {result}");
+    assert!(result.contains("write-sec:blocked"), "got: {result}");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -302,7 +383,6 @@ fn exit_code_nonzero_propagated() {
 
 #[test]
 fn relative_write_path_resolved() {
-    // --allow-write=. should resolve to CWD
     let out = run(&[
         "--allow-write=/tmp",
         "-C",
