@@ -430,10 +430,11 @@ fn allow_read_and_write_combined() {
 
 #[test]
 fn allow_read_and_net_combined() {
-    // curl needs write access to /tmp on some platforms for TLS session state.
+    // Use HTTP (not HTTPS) to avoid TLS cert path issues in restricted
+    // bwrap namespaces where CA bundles may not be accessible.
     let (code, ok) = curl_status(
         &["--allow-read=/tmp", "--allow-write=/tmp", "--allow-net"],
-        "https://example.com",
+        "http://example.com",
     );
     assert!(ok, "expected 200, got {code}");
 }
