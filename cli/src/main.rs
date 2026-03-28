@@ -184,6 +184,18 @@ fn build_fs_policy(resolved: &ResolvedPaths, allow_all: bool) -> FileSystemSandb
                 access: FileSystemAccessMode::Read,
             });
             entries.extend(make_path_entries(paths, FileSystemAccessMode::Read));
+            // On Linux, bubblewrap creates an isolated mount namespace. The
+            // sandbox helper binary must be readable inside it for the seccomp
+            // re-exec to work. Add the binary's own directory.
+            if let Ok(exe) = std::env::current_exe()
+                && let Some(dir) = exe.parent()
+                && let Ok(abs) = AbsolutePathBuf::try_from(dir.to_path_buf())
+            {
+                entries.push(FileSystemSandboxEntry {
+                    path: FileSystemPath::Path { path: abs },
+                    access: FileSystemAccessMode::Read,
+                });
+            }
         }
         None => {
             entries.push(make_root_entry(FileSystemAccessMode::Read));
@@ -436,6 +448,7 @@ async fn main() -> ExitCode {
     cmd.args(&exec_request.command[1..]);
     cmd.current_dir(&cwd);
     cmd.env_clear();
+    cmd.kill_on_drop(true);
 
     // On Unix, the sandbox transform may set arg0 (e.g. "codex-linux-sandbox")
     // so our arg0 dispatch triggers when bubblewrap re-execs us.
@@ -448,11 +461,17 @@ async fn main() -> ExitCode {
         }
     }
 
-    // Start with the sandbox-transformed env, then overlay proxy env vars
-    // so the child process routes traffic through the network proxy.
+    // Build the child environment: sandbox-transformed env, proxy overlay,
+    // and network-disabled signal for sandboxed processes.
     let mut child_env = exec_request.env;
     if let Some(ref proxy) = proxy {
         proxy.apply_to_env(&mut child_env);
+    }
+    if !net_is_enabled(&cli) {
+        child_env.insert(
+            "CODEX_SANDBOX_NETWORK_DISABLED".to_string(),
+            "1".to_string(),
+        );
     }
     cmd.envs(&child_env);
 
