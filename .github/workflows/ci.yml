@@ -54,7 +54,23 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --workspace -- -D warnings
+      - name: Clippy (workspace, excluding upstream)
+        run: >
+          cargo clippy --workspace
+          --exclude codex-sandboxing
+          --exclude codex-linux-sandbox
+          --exclude codex-windows-sandbox
+          --exclude codex-process-hardening
+          --exclude codex-protocol
+          --exclude codex-execpolicy
+          --exclude codex-utils-absolute-path
+          --exclude codex-utils-cache
+          --exclude codex-utils-home-dir
+          --exclude codex-utils-image
+          --exclude codex-utils-pty
+          --exclude codex-utils-string
+          --exclude codex-utils-template
+          -- -D warnings
 
   test-macos:
     name: Test (macOS)
@@ -68,22 +84,14 @@ jobs:
           path: upstream/
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Build
+      - name: Build release binary
         run: cargo build --release -p zerobox-exec
       - name: Unit tests
-        run: cargo test --workspace
-      - name: Sandbox smoke test (read allowed)
-        run: |
-          echo "hello" > /tmp/zerobox-ci-test
-          ./target/release/zerobox-exec -- cat /tmp/zerobox-ci-test | grep -q "hello"
-      - name: Sandbox smoke test (write blocked)
-        run: |
-          ! ./target/release/zerobox-exec -- node -e "require('fs').writeFileSync('/tmp/zb-ci','x')" 2>/dev/null
-      - name: Sandbox smoke test (--allow-read restricts)
-        run: |
-          echo "secret" > /tmp/zerobox-ci-test
-          ./target/release/zerobox-exec --allow-read=/tmp -- cat /tmp/zerobox-ci-test | grep -q "secret"
-          ! ./target/release/zerobox-exec --allow-read=/tmp -- cat /etc/passwd 2>/dev/null
+        run: cargo test --workspace --lib
+      - name: E2E sandbox tests (against release binary)
+        env:
+          ZEROBOX_EXEC: ./target/release/zerobox-exec
+        run: cargo test -p zerobox-exec --test sandbox_e2e
 
   test-linux:
     name: Test (Linux)
