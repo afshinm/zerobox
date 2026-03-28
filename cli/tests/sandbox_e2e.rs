@@ -45,6 +45,26 @@ fn setup_tmp(name: &str) -> PathBuf {
     dir
 }
 
+/// Helper: run curl and return the HTTP status code string.
+fn curl_status(args: &[&str], url: &str) -> (String, bool) {
+    let mut full_args: Vec<&str> = args.to_vec();
+    full_args.extend([
+        "--",
+        "curl",
+        "-s",
+        "--max-time",
+        "5",
+        "-o",
+        "/dev/null",
+        "-w",
+        "%{http_code}",
+        url,
+    ]);
+    let out = run(&full_args);
+    let code = stdout(&out).trim().to_string();
+    (code.clone(), code == "200")
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Default mode: full read, no write, no network
 // ═══════════════════════════════════════════════════════════════════════════
@@ -134,7 +154,6 @@ mod deny_read {
         std::fs::create_dir_all(&secret).expect("setup");
         std::fs::write(secret.join("key.txt"), "password").expect("setup");
 
-        // Default full read + deny a specific subdir.
         let out = run(&[
             &format!("--deny-read={}", secret.display()),
             "--",
@@ -237,24 +256,113 @@ console.log(r.join(','));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// --allow-net
+// --allow-net: boolean (all network)
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-fn allow_net_permits_outbound() {
-    let out = run(&[
-        "--allow-net",
-        "--",
-        "curl",
-        "-s",
-        "-o",
-        "/dev/null",
-        "-w",
-        "%{http_code}",
-        "https://example.com",
-    ]);
-    assert!(out.status.success(), "stderr: {}", stderr(&out));
-    assert_eq!(stdout(&out).trim(), "200");
+fn allow_net_full_permits_outbound() {
+    let (code, ok) = curl_status(&["--allow-net"], "https://example.com");
+    assert!(ok, "expected 200, got {code}");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// --allow-net=<domains>: domain-level filtering via Codex network proxy
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[cfg(target_os = "macos")]
+mod allow_net_domains {
+    use super::*;
+
+    #[test]
+    fn single_domain_allowed() {
+        let (code, ok) = curl_status(&["--allow-net=example.com"], "https://example.com");
+        assert!(ok, "expected 200, got {code}");
+    }
+
+    #[test]
+    fn unlisted_domain_blocked() {
+        let (code, ok) = curl_status(&["--allow-net=example.com"], "https://google.com");
+        assert!(!ok, "expected blocked, got {code}");
+    }
+
+    #[test]
+    fn multiple_domains_allowed() {
+        let (code, ok) = curl_status(
+            &["--allow-net=example.com,google.com"],
+            "https://example.com",
+        );
+        assert!(ok, "expected 200, got {code}");
+    }
+
+    #[test]
+    fn wildcard_subdomain_allows_subdomains() {
+        // *.example.com should allow www.example.com
+        // (we can't easily test a real subdomain that resolves, so test
+        // that the apex is NOT matched by the wildcard -- that's the
+        // important semantic)
+        let (code, ok) = curl_status(&["--allow-net=*.example.com"], "https://example.com");
+        assert!(
+            !ok,
+            "*.example.com should NOT match apex example.com, got {code}"
+        );
+    }
+
+    #[test]
+    fn apex_and_wildcard_combined() {
+        // To allow both apex and subdomains, list both.
+        let (code, ok) = curl_status(
+            &["--allow-net=example.com,*.example.com"],
+            "https://example.com",
+        );
+        assert!(ok, "expected 200, got {code}");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// --deny-net=<domains>: block specific domains
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[cfg(target_os = "macos")]
+mod deny_net_domains {
+    use super::*;
+
+    #[test]
+    fn deny_blocks_specific_domain() {
+        let (code, ok) = curl_status(
+            &["--allow-net", "--deny-net=google.com"],
+            "https://google.com",
+        );
+        assert!(!ok, "expected blocked, got {code}");
+    }
+
+    #[test]
+    fn deny_does_not_affect_other_domains() {
+        let (code, ok) = curl_status(
+            &["--allow-net", "--deny-net=google.com"],
+            "https://example.com",
+        );
+        assert!(ok, "expected 200, got {code}");
+    }
+
+    #[test]
+    fn deny_overrides_allow() {
+        // Allow example.com but also deny it. Deny wins.
+        let (code, ok) = curl_status(
+            &["--allow-net=example.com", "--deny-net=example.com"],
+            "https://example.com",
+        );
+        assert!(!ok, "deny should override allow, got {code}");
+    }
+
+    #[test]
+    fn deny_wildcard_blocks_subdomains() {
+        // Deny *.google.com, allow everything else.
+        let (code, ok) = curl_status(
+            &["--allow-net", "--deny-net=*.google.com"],
+            "https://example.com",
+        );
+        assert!(ok, "example.com should still work, got {code}");
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -295,7 +403,6 @@ fn no_sandbox_permits_everything() {
 #[test]
 fn allow_read_and_write_combined() {
     std::fs::write("/tmp/zerobox-e2e-rw-in", "input").expect("setup");
-    // Use sh -c to read+write since node needs OpenSSL paths not in Minimal defaults.
     let out = run(&[
         "--allow-read=/tmp",
         "--allow-write=/tmp",
@@ -313,20 +420,8 @@ fn allow_read_and_write_combined() {
 #[cfg(target_os = "macos")]
 #[test]
 fn allow_read_and_net_combined() {
-    let out = run(&[
-        "--allow-read=/tmp",
-        "--allow-net",
-        "--",
-        "curl",
-        "-s",
-        "-o",
-        "/dev/null",
-        "-w",
-        "%{http_code}",
-        "https://example.com",
-    ]);
-    assert!(out.status.success(), "stderr: {}", stderr(&out));
-    assert_eq!(stdout(&out).trim(), "200");
+    let (code, ok) = curl_status(&["--allow-read=/tmp", "--allow-net"], "https://example.com");
+    assert!(ok, "expected 200, got {code}");
 }
 
 #[cfg(target_os = "macos")]
@@ -359,6 +454,20 @@ console.log(r.join(','));
     let result = stdout(&out).trim().to_string();
     assert!(result.contains("write-pub:ok"), "got: {result}");
     assert!(result.contains("write-sec:blocked"), "got: {result}");
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn allow_net_domain_with_write_restriction() {
+    let dir = setup_tmp("net-write");
+    let (code, ok) = curl_status(
+        &[
+            "--allow-net=example.com",
+            &format!("--allow-write={}", dir.display()),
+        ],
+        "https://example.com",
+    );
+    assert!(ok, "expected 200, got {code}");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

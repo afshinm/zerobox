@@ -1,9 +1,12 @@
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use codex_network_proxy::{
+    ConfigReloader, ConfigState, NetworkProxy, NetworkProxyState, build_config_state,
+};
 use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::permissions::{
     FileSystemAccessMode, FileSystemPath, FileSystemSandboxEntry, FileSystemSandboxPolicy,
@@ -28,6 +31,8 @@ use codex_utils_absolute_path::AbsolutePathBuf;
 ///   zerobox-exec --allow-write=. --deny-write=./.git -- node script.js
 ///   zerobox-exec --allow-read=/tmp --allow-write=/tmp -- node script.js
 ///   zerobox-exec --allow-net -- curl https://example.com
+///   zerobox-exec --allow-net=example.com,api.example.com -- node script.js
+///   zerobox-exec --allow-net --deny-net=evil.com -- node script.js
 ///   zerobox-exec --allow-all -- bash -c "echo anything goes"
 #[derive(Parser, Debug)]
 #[command(name = "zerobox-exec", version, about, long_about = None)]
@@ -53,9 +58,16 @@ struct Cli {
     #[arg(long, value_delimiter = ',', num_args = 1..)]
     deny_write: Option<Vec<PathBuf>>,
 
-    /// Allow outbound network access.
-    #[arg(long)]
-    allow_net: bool,
+    /// Allow outbound network access. Without a value, allows all domains.
+    /// With values, restricts to specific domains (comma-separated).
+    /// Examples: --allow-net, --allow-net=example.com,api.example.com
+    #[arg(long, value_delimiter = ',', num_args = 0..)]
+    allow_net: Option<Vec<String>>,
+
+    /// Block network access to these domains (comma-separated).
+    /// Takes precedence over --allow-net.
+    #[arg(long, value_delimiter = ',', num_args = 1..)]
+    deny_net: Option<Vec<String>>,
 
     /// Grant all permissions (no sandbox). Use with caution.
     #[arg(long, short = 'A')]
@@ -163,11 +175,8 @@ fn build_fs_policy(resolved: &ResolvedPaths, allow_all: bool) -> FileSystemSandb
 
     let mut entries: Vec<FileSystemSandboxEntry> = Vec::new();
 
-    // Read policy.
     match &resolved.readable {
         Some(paths) => {
-            // --allow-read=<paths>: include Minimal platform defaults so
-            // binaries, libraries and frameworks are still loadable.
             entries.push(FileSystemSandboxEntry {
                 path: FileSystemPath::Special {
                     value: FileSystemSpecialPath::Minimal,
@@ -181,20 +190,17 @@ fn build_fs_policy(resolved: &ResolvedPaths, allow_all: bool) -> FileSystemSandb
         }
     }
 
-    // --deny-read: FileSystemAccessMode::None takes precedence.
     entries.extend(make_path_entries(
         &resolved.deny_readable,
         FileSystemAccessMode::None,
     ));
 
-    // Write policy.
     if resolved.full_write {
         entries.push(make_root_entry(FileSystemAccessMode::Write));
     } else if let Some(paths) = &resolved.writable {
         entries.extend(make_path_entries(paths, FileSystemAccessMode::Write));
     }
 
-    // --deny-write: downgrade to Read (removes write, keeps read).
     entries.extend(make_path_entries(
         &resolved.deny_writable,
         FileSystemAccessMode::Read,
@@ -203,37 +209,103 @@ fn build_fs_policy(resolved: &ResolvedPaths, allow_all: bool) -> FileSystemSandb
     FileSystemSandboxPolicy::restricted(entries)
 }
 
-fn build_net_policy(allow_all: bool, allow_net: bool) -> NetworkSandboxPolicy {
-    if allow_all || allow_net {
+fn net_is_enabled(cli: &Cli) -> bool {
+    cli.allow_all || cli.allow_net.is_some()
+}
+
+fn build_net_policy(cli: &Cli) -> NetworkSandboxPolicy {
+    if net_is_enabled(cli) {
         NetworkSandboxPolicy::Enabled
     } else {
         NetworkSandboxPolicy::Restricted
     }
 }
 
-fn build_legacy_sandbox_policy(
-    resolved: &ResolvedPaths,
-    allow_all: bool,
-    allow_net: bool,
-) -> SandboxPolicy {
-    if allow_all || resolved.full_write {
+fn build_legacy_sandbox_policy(resolved: &ResolvedPaths, cli: &Cli) -> SandboxPolicy {
+    if cli.allow_all || resolved.full_write {
         return SandboxPolicy::DangerFullAccess;
     }
+
+    let network_access = net_is_enabled(cli);
 
     if let Some(writable_roots) = &resolved.writable {
         SandboxPolicy::WorkspaceWrite {
             writable_roots: writable_roots.clone(),
             read_only_access: Default::default(),
-            network_access: allow_net,
+            network_access,
             exclude_tmpdir_env_var: false,
             exclude_slash_tmp: false,
         }
     } else {
         SandboxPolicy::ReadOnly {
             access: Default::default(),
-            network_access: allow_net,
+            network_access,
         }
     }
+}
+
+// ── Network proxy: domain-level filtering via Codex network-proxy ──
+
+/// A ConfigReloader that never reloads (static config for CLI use).
+struct StaticReloader;
+
+#[async_trait::async_trait]
+impl ConfigReloader for StaticReloader {
+    fn source_label(&self) -> String {
+        "zerobox-exec static config".to_string()
+    }
+
+    async fn maybe_reload(&self) -> anyhow::Result<Option<ConfigState>> {
+        Ok(None)
+    }
+
+    async fn reload_now(&self) -> anyhow::Result<ConfigState> {
+        Err(anyhow::anyhow!("static config does not support reload"))
+    }
+}
+
+/// Build a NetworkProxy when --allow-net has domain filters or --deny-net is used.
+async fn build_network_proxy(cli: &Cli) -> Result<Option<NetworkProxy>> {
+    let Some(allow_domains) = &cli.allow_net else {
+        return Ok(None); // Network not enabled.
+    };
+
+    let has_filters = !allow_domains.is_empty() || cli.deny_net.is_some();
+    if !has_filters {
+        return Ok(None); // Full network, no filtering needed.
+    }
+
+    use codex_network_proxy::NetworkProxyConfig;
+    let mut config = NetworkProxyConfig::default();
+    config.network.enabled = true;
+
+    if allow_domains.is_empty() {
+        // Bare --allow-net with --deny-net: allow everything except denied.
+        config.network.allowed_domains = vec!["*".to_string()];
+    } else {
+        config.network.allowed_domains = allow_domains.clone();
+    }
+    if let Some(deny) = &cli.deny_net {
+        config.network.denied_domains = deny.clone();
+    }
+
+    let state = build_config_state(
+        config,
+        codex_network_proxy::NetworkProxyConstraints::default(),
+    )?;
+
+    let proxy_state = Arc::new(NetworkProxyState::with_reloader(
+        state,
+        Arc::new(StaticReloader),
+    ));
+
+    let proxy = NetworkProxy::builder()
+        .state(proxy_state)
+        .managed_by_codex(true)
+        .build()
+        .await?;
+
+    Ok(Some(proxy))
 }
 
 // ── Execution ──
@@ -279,28 +351,46 @@ async fn main() -> ExitCode {
     };
 
     let fs_policy = build_fs_policy(&resolved, cli.allow_all);
-    let net_policy = build_net_policy(cli.allow_all, cli.allow_net);
-    let legacy_policy = build_legacy_sandbox_policy(&resolved, cli.allow_all, cli.allow_net);
+    let net_policy = build_net_policy(&cli);
+    let legacy_policy = build_legacy_sandbox_policy(&resolved, &cli);
 
-    let program = cli.command[0].clone();
-    let args: Vec<String> = cli.command[1..].to_vec();
-    let env: HashMap<String, String> = std::env::vars().collect();
+    let proxy = match build_network_proxy(&cli).await {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("error: failed to build network proxy: {e:#}");
+            return ExitCode::from(1);
+        }
+    };
+
+    // Start the proxy listeners (HTTP + SOCKS5). The handle keeps them alive
+    // until dropped. Must be held for the lifetime of the sandboxed process.
+    let _proxy_handle = if let Some(ref proxy) = proxy {
+        match proxy.run().await {
+            Ok(handle) => Some(handle),
+            Err(e) => {
+                eprintln!("error: failed to start network proxy: {e:#}");
+                return ExitCode::from(1);
+            }
+        }
+    } else {
+        None
+    };
 
     let manager = SandboxManager::new();
     let request = SandboxTransformRequest {
         command: SandboxCommand {
-            program,
-            args,
+            program: cli.command[0].clone(),
+            args: cli.command[1..].to_vec(),
             cwd: cwd.clone(),
-            env,
+            env: std::env::vars().collect(),
             additional_permissions: None,
         },
         policy: &legacy_policy,
         file_system_policy: &fs_policy,
         network_policy: net_policy,
         sandbox: sandbox_type,
-        enforce_managed_network: false,
-        network: None,
+        enforce_managed_network: proxy.is_some(),
+        network: proxy.as_ref(),
         sandbox_policy_cwd: &cwd,
         #[cfg(target_os = "macos")]
         macos_seatbelt_profile_extensions: None,
@@ -322,9 +412,14 @@ async fn main() -> ExitCode {
     cmd.args(&exec_request.command[1..]);
     cmd.current_dir(&cwd);
     cmd.env_clear();
-    for (k, v) in &exec_request.env {
-        cmd.env(k, v);
+
+    // Start with the sandbox-transformed env, then overlay proxy env vars
+    // so the child process routes traffic through the network proxy.
+    let mut child_env = exec_request.env;
+    if let Some(ref proxy) = proxy {
+        proxy.apply_to_env(&mut child_env);
     }
+    cmd.envs(&child_env);
 
     match cmd.status().await {
         Ok(status) => exit_code_from_status(status),

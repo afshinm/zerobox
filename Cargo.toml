@@ -14,12 +14,12 @@ members = [
     "upstream/utils/cache",
     "upstream/utils/template",
     "upstream/utils/home-dir",
+    "upstream/utils/rustls-provider",
+    "upstream/network-proxy",
     # ── Our code ──
     "cli",
     "shims/core",
-    "shims/network-proxy",
     "shims/git-utils",
-    "shims/rustls-provider",
 ]
 resolver = "2"
 
@@ -44,19 +44,23 @@ codex-utils-string = { path = "upstream/utils/string" }
 codex-utils-template = { path = "upstream/utils/template" }
 codex-utils-home-dir = { path = "upstream/utils/home-dir" }
 
+# ── Upstream: formerly shimmed, now real ──
+codex-network-proxy = { path = "upstream/network-proxy" }
+codex-utils-rustls-provider = { path = "upstream/utils/rustls-provider" }
+
 # ── Shims (replace heavy Codex deps we don't need) ──
 codex-core = { path = "shims/core" }
-codex-network-proxy = { path = "shims/network-proxy" }
 codex-git-utils = { path = "shims/git-utils" }
-codex-utils-rustls-provider = { path = "shims/rustls-provider" }
 
 # ── External deps: versions pinned to match Codex upstream ──
 anyhow = "1"
+async-trait = "0.1.89"
 base64 = "0.22.1"
 chrono = "0.4.43"
 clap = "4"
 dirs = "6"
 dunce = "1.0.4"
+globset = "0.4"
 icu_decimal = "2.1"
 icu_locale_core = "2.1"
 icu_provider = { version = "2.1", features = ["sync"] }
@@ -86,11 +90,13 @@ strum_macros = "0.28.0"
 sys-locale = "0.3.2"
 tempfile = "3.23.0"
 thiserror = "2.0.17"
+time = "0.3"
 tokio = "1"
 tracing = "0.1"
 ts-rs = "11"
 url = "2"
 uuid = "1"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 which = "8"
 
 [workspace.lints]

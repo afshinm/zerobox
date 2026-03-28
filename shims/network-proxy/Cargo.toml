@@ -1,8 +1,0 @@
-[package]
-name = "codex-network-proxy"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-description = "Thin shim replacing codex-network-proxy for sandbox crates"
-
-[dependencies]

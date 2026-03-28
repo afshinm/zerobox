@@ -52,6 +52,7 @@ CRATES=(
     process-hardening
     protocol
     execpolicy
+    network-proxy
 )
 
 UTILS=(
@@ -62,6 +63,7 @@ UTILS=(
     cache
     template
     home-dir
+    rustls-provider
 )
 
 # ── Clean and copy ──
