@@ -28,7 +28,7 @@ declare -A TARGET_MAP=(
 
 for target in "${!TARGET_MAP[@]}"; do
   pkg_dir="$ROOT/packages/${TARGET_MAP[$target]}"
-  archive=$(find "$ARTIFACTS" -name "zerobox-*-${target}.tar.xz" -o -name "zerobox-*-${target}.tar.gz" | head -1)
+  archive=$(find "$ARTIFACTS" -name "zerobox*${target}.tar.xz" -o -name "zerobox*${target}.tar.gz" | head -1)
 
   if [ -z "$archive" ]; then
     echo "warning: no archive found for $target, skipping"

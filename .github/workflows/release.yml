@@ -120,21 +120,21 @@ jobs:
           - target: aarch64-apple-darwin
             runner: macos-latest
           - target: x86_64-apple-darwin
-            runner: macos-13
+            runner: macos-latest
           - target: aarch64-unknown-linux-gnu
-            runner: ubuntu-latest
-            packages: libcap-dev gcc-aarch64-linux-gnu
-            cargo-linker: aarch64-linux-gnu-gcc
+            runner: ubuntu-24.04-arm
+            packages: libcap-dev
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
             packages: libcap-dev
           - target: x86_64-unknown-linux-musl
             runner: ubuntu-latest
-            packages: musl-tools libcap-dev
+            packages: musl-tools
+            musl-libcap: true
           - target: aarch64-unknown-linux-musl
-            runner: ubuntu-latest
-            packages: musl-tools gcc-aarch64-linux-gnu
-            cargo-linker: aarch64-linux-gnu-gcc
+            runner: ubuntu-24.04-arm
+            packages: musl-tools
+            musl-libcap: true
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -145,18 +145,36 @@ jobs:
       - name: Install system deps
         if: matrix.packages
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.packages }}
+      - name: Build libcap for musl
+        if: matrix.musl-libcap
+        run: |
+          LIBCAP_VERSION="2.75"
+          curl -fsSL "https://mirrors.edge.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-${LIBCAP_VERSION}.tar.xz" -o libcap.tar.xz
+          tar xJf libcap.tar.xz
+          PREFIX="$(pwd)/libcap-musl"
+          mkdir -p "$PREFIX/lib" "$PREFIX/include/sys" "$PREFIX/include/linux" "$PREFIX/lib/pkgconfig"
+          make -C "libcap-${LIBCAP_VERSION}/libcap" -j"$(nproc)" CC=musl-gcc AR=ar RANLIB=ranlib
+          cp "libcap-${LIBCAP_VERSION}/libcap/libcap.a" "$PREFIX/lib/"
+          cp "libcap-${LIBCAP_VERSION}/libcap/include/uapi/linux/capability.h" "$PREFIX/include/linux/"
+          cp "libcap-${LIBCAP_VERSION}/libcap/include/sys/capability.h" "$PREFIX/include/sys/"
+          cat > "$PREFIX/lib/pkgconfig/libcap.pc" <<EOF
+          prefix=$PREFIX
+          libdir=\${prefix}/lib
+          includedir=\${prefix}/include
+          Name: libcap
+          Description: Linux capabilities library
+          Version: $LIBCAP_VERSION
+          Libs: -L\${libdir} -lcap
+          Cflags: -I\${includedir}
+          EOF
+          echo "PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_ALLOW_CROSS=1" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
-      - name: Configure cross-linker
-        if: matrix.cargo-linker
-        run: |
-          mkdir -p .cargo
-          echo '[target.${{ matrix.target }}]' >> .cargo/config.toml
-          echo 'linker = "${{ matrix.cargo-linker }}"' >> .cargo/config.toml
       - name: Build
         run: cargo build --profile dist --target ${{ matrix.target }} -p zerobox
       - name: Package
