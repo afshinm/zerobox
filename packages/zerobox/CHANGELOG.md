@@ -1,5 +1,11 @@
 # zerobox
 
+## 0.1.5
+
+### Patch Changes
+
+- [`f276e07`](https://github.com/afshinm/zerobox/commit/f276e078429ca1ded51a76165c52467a21c5fca8) Thanks [@afshinm](https://github.com/afshinm)! - Downgrade the glibc version for linux builds
+
 ## 0.1.4
 
 ### Patch Changes
