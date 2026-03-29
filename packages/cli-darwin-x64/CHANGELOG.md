@@ -1,5 +1,11 @@
 # @zerobox/cli-darwin-x64
 
+## 0.1.2
+
+### Patch Changes
+
+- [`2730427`](https://github.com/afshinm/zerobox/commit/2730427ca33126233199a40c1538cdad62743bae) Thanks [@afshinm](https://github.com/afshinm)! - Fix the platform specific npm packages
+
 ## 0.1.1
 
 ### Patch Changes
