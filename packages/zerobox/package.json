@@ -1,6 +1,6 @@
 {
   "name": "zerobox",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Run any command in a sandbox with file and network restrictions.",
   "license": "Apache-2.0",
   "repository": {
