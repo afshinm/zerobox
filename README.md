@@ -1,85 +1,156 @@
-# sandbox
+<div align="center">
+  <h1>🫙 zerobox</h1>
+  <p><strong>Run any command in a sandbox. Control what it can read, write, and connect to.</strong></p>
+  <p>
+    <a href="https://crates.io/crates/zerobox" target="_blank">
+      <img src="https://img.shields.io/crates/v/zerobox?style=for-the-badge&labelColor=000000" alt="crates.io version" />
+    </a>
+    <a href="https://www.npmjs.com/package/zerobox" target="_blank">
+      <img src="https://img.shields.io/npm/v/zerobox?style=for-the-badge&labelColor=000000" alt="npm version" />
+    </a>
+    <a href="https://github.com/afshinm/zerobox/blob/main/LICENSE" target="_blank">
+      <img src="https://img.shields.io/github/license/afshinm/zerobox?style=for-the-badge&labelColor=000000" alt="license" />
+    </a>
+    <a href="https://github.com/afshinm/zerobox/actions/workflows/ci.yml" target="_blank">
+      <img src="https://img.shields.io/github/actions/workflow/status/afshinm/zerobox/ci.yml?style=for-the-badge&labelColor=000000&label=CI" alt="CI status" />
+    </a>
+  </p>
+</div>
 
-Cross-platform process sandboxing, built on [OpenAI Codex](https://github.com/openai/codex)'s
-production sandboxing crates.
+## Overview
 
-## Structure
+Cross-platform process sandboxing powered by [OpenAI Codex](https://github.com/openai/codex)'s production sandbox runtime — seatbelt on macOS, bubblewrap + seccomp on Linux.
 
-```
-sandbox/
-  upstream/       Codex crates, copied verbatim by sync.sh (zero source modifications)
-  shims/          Thin API-compatible replacements for heavy Codex deps (~250 LOC)
-  cli/            zerobox-exec binary -- Deno-style sandbox CLI
-  sync.sh         Pulls upstream crates from a Codex release
-  UPSTREAM_VERSION  Pinned ref + commit SHA
+- 🔒 **Deny by default** — writes and network blocked unless you allow them
+- 📁 **File access control** — allow/deny reads and writes to specific paths
+- 🌐 **Network filtering** — allow/deny by domain, powered by a real HTTP/SOCKS proxy
+- 🧩 **TypeScript SDK** — `import { Sandbox } from "zerobox"` with Deno-style API
+- 🖥️ **Cross-platform** — macOS, Linux, and Windows
+- 📦 **Single binary** — no runtime dependencies, no Docker, no VMs
+
+## Install
+
+```bash
+# Cargo
+cargo install zerobox
+
+# npm
+npm install -g zerobox
+
+# From source
+git clone https://github.com/afshinm/zerobox && cd zerobox
+./sync.sh && cargo build --release -p zerobox
 ```
 
 ## Usage
 
 ```bash
-# Default: full read, no write, no network
-zerobox-exec -- node -e "console.log('hello')"
+# Run a command — writes and network blocked by default
+zerobox -- node -e "console.log('hello')"
 
 # Allow writes to specific paths
-zerobox-exec --allow-write=. -- node -e "require('fs').writeFileSync('out.txt','hi')"
+zerobox --allow-write=. -- node script.js
 
-# Allow network
-zerobox-exec --allow-net -- curl https://example.com
+# Protect .git from writes
+zerobox --allow-write=. --deny-write=./.git -- npm install
 
-# Restrict reads to specific paths
-zerobox-exec --allow-read=/tmp,/data --allow-write=. -- python3 script.py
+# Allow network to specific domains
+zerobox --allow-net=example.com,api.example.com -- node fetch.js
 
-# No sandbox
-zerobox-exec --allow-all -- bash -c "anything goes"
+# Allow all network, block specific domains
+zerobox --allow-net --deny-net=evil.com -- node server.js
+
+# Restrict reads (system libraries still accessible)
+zerobox --allow-read=/tmp --allow-write=/tmp -- python3 script.py
+
+# No sandbox (escape hatch)
+zerobox --allow-all -- bash -c "anything goes"
 ```
+
+## Sandboxing a browser agent
+
+Use [LightPanda](https://lightpanda.io) (headless browser) for fully sandboxed web browsing:
+
+```bash
+# Fetch a page — only example.com is reachable
+zerobox --allow-net=example.com -- lightpanda fetch --dump markdown https://example.com
+
+# With write access for downloads
+zerobox --allow-net=example.com --allow-write=/tmp -- lightpanda fetch --dump html https://example.com
+```
+
+> **Note:** GUI browsers (Chrome, Firefox) cannot run inside the sandbox — they need macOS WindowServer access and Unix socket IPC that the sandbox blocks by design. Use a headless engine like LightPanda, or run the browser outside the sandbox and connect via CDP.
+
+## SDK (TypeScript)
+
+```bash
+npm install zerobox
+```
+
+```ts
+import { Sandbox } from "zerobox";
+
+const sandbox = Sandbox.create({
+  allowWrite: ["/tmp"],
+  allowNet: ["example.com"],
+});
+
+// Shell commands via tagged template
+const output = await sandbox.sh`echo hello`.text();
+
+// Parse JSON output
+const data = await sandbox.sh`cat data.json`.json();
+
+// Raw output (doesn't throw on non-zero exit)
+const result = await sandbox.sh`exit 42`.output();
+// { code: 42, stdout: "", stderr: "" }
+
+// Explicit command + args
+await sandbox.exec("node", ["-e", "console.log('hi')"]).text();
+
+// Cancellation
+const controller = new AbortController();
+await sandbox.sh`sleep 60`.text({ signal: controller.signal });
+```
+
+Non-zero exit codes throw `SandboxCommandError`:
+
+```ts
+import { Sandbox, SandboxCommandError } from "zerobox";
+
+const sandbox = Sandbox.create();
+try {
+  await sandbox.sh`exit 1`.text();
+} catch (e) {
+  if (e instanceof SandboxCommandError) {
+    console.log(e.code);   // 1
+    console.log(e.stderr);  // error output
+  }
+}
+```
+
+## CLI reference
+
+| Flag | Example | Effect |
+|------|---------|--------|
+| `--allow-read=<paths>` | `--allow-read=/tmp,/data` | Restrict reads to listed paths (default: all reads allowed) |
+| `--deny-read=<paths>` | `--deny-read=/secret` | Block reads (takes precedence over allow) |
+| `--allow-write[=<paths>]` | `--allow-write=.` | Allow writes (default: no writes) |
+| `--deny-write=<paths>` | `--deny-write=./.git` | Block writes (takes precedence over allow) |
+| `--allow-net[=<domains>]` | `--allow-net=example.com` | Allow network (default: no network) |
+| `--deny-net=<domains>` | `--deny-net=evil.com` | Block domains (takes precedence over allow) |
+| `--allow-all` / `-A` | `-A` | Disable sandbox entirely |
+| `--no-sandbox` | `--no-sandbox` | Same as --allow-all |
+| `-C <dir>` | `-C /workspace` | Set working directory |
 
 ## Platform support
 
-| Platform | Backend | Build | Test | Runtime |
-|----------|---------|-------|------|---------|
-| macOS | Seatbelt (`/usr/bin/sandbox-exec`) | yes | yes (43 tests) | yes |
-| Linux | Bubblewrap + Seccomp + Namespaces | yes | unit tests only (see below) | yes |
-| Windows | Restricted Tokens + ACLs + Firewall | yes | yes | untested |
+| Platform | Backend | Status |
+|----------|---------|--------|
+| macOS | Seatbelt (`sandbox-exec`) | Fully supported |
+| Linux | Bubblewrap + Seccomp + Namespaces | Fully supported |
+| Windows | Restricted Tokens + ACLs + Firewall | Supported (not yet tested in CI) |
 
-## Shims
+## License
 
-The Codex sandbox crates depend on `codex-core` (30+ transitive crates) and
-`codex-network-proxy` (HTTP/SOCKS proxy runtime). We replace these with thin
-shims that expose only the types the sandbox crates actually import:
-
-| Shim | Replaces | Provides | Why |
-|------|----------|----------|-----|
-| `shims/core/` | `codex-core` | `error::{Result, CodexErr, SandboxErr}` | linux-sandbox uses 3 error types |
-| `shims/network-proxy/` | `codex-network-proxy` | `NetworkProxy` struct + proxy env helpers | sandboxing uses struct + 5 functions |
-| `shims/git-utils/` | `codex-git-utils` | `GitSha`, `GhostCommit` | protocol uses 2 types |
-| `shims/rustls-provider/` | `codex-utils-rustls-provider` | empty | nothing references it |
-
-## Known limitation: linux-sandbox integration tests
-
-The upstream `linux-sandbox/tests/` integration tests import
-`codex_core::exec::process_exec_tool_call` and related types from the full
-Codex execution engine. Our `codex-core` shim intentionally does not provide
-these (doing so would require pulling in 30+ crates).
-
-**Impact**: `cargo test -p codex-linux-sandbox` will fail to compile on Linux.
-
-**What works on Linux**:
-- `cargo check` / `cargo build` -- the library and binary compile fine
-- `cargo test --lib -p codex-linux-sandbox` -- inline unit tests pass
-- Runtime sandboxing via `zerobox-exec` -- works
-
-The integration tests exercise "run a command through Codex's exec pipeline and
-verify the sandbox restricted it." That test path belongs to Codex's CI. Our
-CLI (`zerobox-exec`) covers the same runtime behavior.
-
-## Upgrading upstream
-
-```bash
-./sync.sh main            # or a specific tag/branch
-cargo check               # compiles? done.
-                          # fails? update shims/ to match API changes.
-```
-
-The script clones the specified ref, copies the 15 crates into `upstream/`,
-applies one mechanical patch (`windows-sandbox-rs` Cargo.toml path dep →
-workspace), and records the commit SHA in `UPSTREAM_VERSION`.
+Apache-2.0
