@@ -159,5 +159,5 @@ jobs:
         run: cargo build --release -p zerobox
       - name: SDK tests
         env:
-          ZEROBOX_BIN: ./target/release/zerobox
+          ZEROBOX_BIN: ${{ github.workspace }}/target/release/zerobox
         run: pnpm --filter zerobox run test

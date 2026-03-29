@@ -120,7 +120,7 @@ jobs:
       - run: pnpm install
       - name: SDK build + test
         env:
-          ZEROBOX_BIN: ./target/release/zerobox
+          ZEROBOX_BIN: ${{ github.workspace }}/target/release/zerobox
         run: |
           pnpm --filter zerobox run build
           pnpm --filter zerobox run lint
