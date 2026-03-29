@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Sync upstream Codex crates
-        run: ./sync.sh
+        run: ./scripts/sync.sh
       - uses: actions/upload-artifact@v4
         with:
           name: upstream

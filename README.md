@@ -39,7 +39,7 @@ npm install -g zerobox
 
 # From source
 git clone https://github.com/afshinm/zerobox && cd zerobox
-./sync.sh && cargo build --release -p zerobox
+./scripts/sync.sh && cargo build --release -p zerobox
 ```
 
 ## Usage

@@ -9,8 +9,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-UPSTREAM_DIR="$SCRIPT_DIR/upstream"
-VERSION_FILE="$SCRIPT_DIR/UPSTREAM_VERSION"
+ROOT="$SCRIPT_DIR/.."
+UPSTREAM_DIR="$ROOT/upstream"
+VERSION_FILE="$ROOT/UPSTREAM_VERSION"
 
 # ── Resolve version ──
 if [ $# -ge 1 ]; then
@@ -117,5 +118,5 @@ fi
 echo "==> Done. Synced to $REF ($COMMIT_SHA)"
 echo ""
 echo "Next steps:"
-echo "  cd $(basename "$SCRIPT_DIR") && cargo check"
+echo "  cargo check"
 echo "  If it fails, update shims/ to match any API changes."
