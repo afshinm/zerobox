@@ -169,6 +169,15 @@ jobs:
           EOF
           echo "PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig" >> "$GITHUB_ENV"
           echo "PKG_CONFIG_ALLOW_CROSS=1" >> "$GITHUB_ENV"
+          # Symlink Linux kernel headers into musl's include path.
+          # Only exposes linux/, asm/, asm-generic/ — not the full glibc tree.
+          MUSL_INC=$(find /usr/include -name "musl" -type d | head -1)
+          sudo ln -sf /usr/include/linux "$MUSL_INC/linux"
+          sudo ln -sf /usr/include/asm-generic "$MUSL_INC/asm-generic"
+          ARCH_ASM=$(find /usr/include -path "*/linux-gnu/asm" -type d | head -1)
+          if [ -n "$ARCH_ASM" ]; then
+            sudo ln -sf "$ARCH_ASM" "$MUSL_INC/asm"
+          fi
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
