@@ -22,6 +22,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     outputs:
       published: ${{ steps.changesets.outputs.published }}
+      hasChangesets: ${{ steps.changesets.outputs.hasChangesets }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -47,7 +48,7 @@ jobs:
   tag:
     name: Tag Release
     needs: changesets
-    if: needs.changesets.outputs.published == 'true'
+    if: needs.changesets.outputs.hasChangesets == 'false'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
