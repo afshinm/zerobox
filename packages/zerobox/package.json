@@ -27,10 +27,10 @@
     "format:fix": "prettier --write src/"
   },
   "optionalDependencies": {
-    "@zerobox/cli-darwin-arm64": "0.0.0",
-    "@zerobox/cli-darwin-x64": "0.0.0",
-    "@zerobox/cli-linux-arm64": "0.0.0",
-    "@zerobox/cli-linux-x64": "0.0.0"
+    "@zerobox/cli-darwin-arm64": "workspace:*",
+    "@zerobox/cli-darwin-x64": "workspace:*",
+    "@zerobox/cli-linux-arm64": "workspace:*",
+    "@zerobox/cli-linux-x64": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

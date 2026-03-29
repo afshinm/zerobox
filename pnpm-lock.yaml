@@ -39,6 +39,19 @@ importers:
       vitest:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@22.19.15)
+    optionalDependencies:
+      '@zerobox/cli-darwin-arm64':
+        specifier: workspace:*
+        version: link:../cli-darwin-arm64
+      '@zerobox/cli-darwin-x64':
+        specifier: workspace:*
+        version: link:../cli-darwin-x64
+      '@zerobox/cli-linux-arm64':
+        specifier: workspace:*
+        version: link:../cli-linux-arm64
+      '@zerobox/cli-linux-x64':
+        specifier: workspace:*
+        version: link:../cli-linux-x64
 
 packages:
 
