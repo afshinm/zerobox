@@ -174,7 +174,8 @@ jobs:
           # /usr/include for kernel-only headers (linux/sched.h, etc.).
           # cc-rs picks up target-specific CFLAGS from this env var.
           TARGET_CFLAGS=$(echo "${{ matrix.target }}" | tr '-' '_')
-          echo "CFLAGS_${TARGET_CFLAGS}=-idirafter /usr/include" >> "$GITHUB_ENV"
+          GNU_ARCH=$(gcc -dumpmachine)
+          echo "CFLAGS_${TARGET_CFLAGS}=-idirafter /usr/include -idirafter /usr/include/${GNU_ARCH}" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
