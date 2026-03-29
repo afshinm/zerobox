@@ -88,9 +88,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build release binary
         run: cargo build --release -p zerobox
-      - name: Unit tests
+      - name: Rust unit tests
         run: cargo test --workspace --lib
-      - name: E2E sandbox tests (against release binary)
+      - name: Rust E2E sandbox tests
         env:
           ZEROBOX_EXEC: ./target/release/zerobox
         run: cargo test -p zerobox --test sandbox_e2e
@@ -120,9 +120,44 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build release binary
         run: cargo build --release -p zerobox
-      - name: Unit tests
+      - name: Rust unit tests
         run: cargo test --workspace --lib
-      - name: E2E sandbox tests (against release binary)
+      - name: Rust E2E sandbox tests
         env:
           ZEROBOX_EXEC: ./target/release/zerobox
         run: cargo test -p zerobox --test sandbox_e2e
+
+  sdk:
+    name: SDK (TypeScript)
+    needs: sync
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: upstream
+          path: upstream/
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install
+      - name: Build SDK
+        run: pnpm --filter zerobox run build
+      - name: Lint
+        run: pnpm --filter zerobox run lint
+      - name: Format
+        run: pnpm --filter zerobox run format
+      - name: Typecheck
+        run: pnpm --filter zerobox run typecheck
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build zerobox binary
+        run: cargo build --release -p zerobox
+      - name: SDK tests
+        env:
+          ZEROBOX_BIN: ./target/release/zerobox
+        run: pnpm --filter zerobox run test

@@ -1,0 +1,47 @@
+{
+  "name": "zerobox",
+  "version": "0.0.0",
+  "description": "Cross-platform process sandboxing",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "zerobox": "dist/bin.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src/",
+    "format": "prettier --check src/",
+    "format:fix": "prettier --write src/"
+  },
+  "optionalDependencies": {
+    "@zerobox/cli-darwin-arm64": "0.0.0",
+    "@zerobox/cli-darwin-x64": "0.0.0",
+    "@zerobox/cli-linux-arm64": "0.0.0",
+    "@zerobox/cli-linux-x64": "0.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8",
+    "eslint": "^9.0.0",
+    "@eslint/js": "^9.0.0",
+    "typescript-eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

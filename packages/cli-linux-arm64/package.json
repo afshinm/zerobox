@@ -1,0 +1,10 @@
+{
+  "name": "@zerobox/cli-linux-arm64",
+  "version": "0.0.0",
+  "description": "zerobox binary for linux arm64",
+  "license": "Apache-2.0",
+  "os": ["linux"],
+  "cpu": ["arm64"],
+  "files": ["zerobox"],
+  "preferUnplugged": true
+}

@@ -7,6 +7,18 @@
 # Upstream Codex crates
 /upstream/
 
+# Node / pnpm
+node_modules/
+
+# TypeScript build output
+packages/zerobox/dist/
+
+# Platform binaries (populated by CI, not committed)
+packages/cli-darwin-arm64/zerobox
+packages/cli-darwin-x64/zerobox
+packages/cli-linux-arm64/zerobox
+packages/cli-linux-x64/zerobox
+
 # IDE
 .idea/
 .vscode/
