@@ -128,15 +128,33 @@ jobs:
         run: cargo test -p zerobox --test sandbox_e2e
 
   sdk:
-    name: SDK (TypeScript)
+    name: SDK (${{ matrix.os }})
     needs: sync
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+          - os: ubuntu-latest
+            system-deps: libcap-dev
+            enable-userns: true
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: upstream
           path: upstream/
+      - name: Install system deps
+        if: matrix.system-deps
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.system-deps }}
+      - name: Enable unprivileged user namespaces (required by bubblewrap)
+        if: matrix.enable-userns
+        run: |
+          sudo sysctl -w kernel.unprivileged_userns_clone=1
+          if sudo sysctl -a 2>/dev/null | grep -q '^kernel.apparmor_restrict_unprivileged_userns'; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
       - uses: pnpm/action-setup@v4
         with:
           version: 10
