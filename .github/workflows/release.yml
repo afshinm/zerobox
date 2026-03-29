@@ -123,11 +123,9 @@ jobs:
             runner: macos-latest
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04-arm
-            packages: libcap-dev
             glibc: "2.31"
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
-            packages: libcap-dev
             glibc: "2.31"
           - target: x86_64-unknown-linux-musl
             runner: ubuntu-latest
@@ -147,12 +145,34 @@ jobs:
       - name: Install system deps
         if: matrix.packages
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.packages }}
-      - name: Symlink libcap for zigbuild
+      - name: Build libcap for zigbuild
         if: matrix.glibc
         run: |
-          LIBDIR="/usr/lib/$(gcc -dumpmachine)"
-          sudo ln -sf "$LIBDIR/libcap.so" /usr/lib/libcap.so
-          sudo ln -sf "$LIBDIR/libcap.a" /usr/lib/libcap.a
+          LIBCAP_VERSION="2.75"
+          curl -fsSL "https://mirrors.edge.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-${LIBCAP_VERSION}.tar.xz" -o libcap.tar.xz
+          tar xJf libcap.tar.xz
+          ZIG_TARGET="$(echo "${{ matrix.target }}" | sed 's/-unknown//').${{ matrix.glibc }}"
+          PREFIX="$(pwd)/libcap-zig"
+          mkdir -p "$PREFIX/lib" "$PREFIX/include/sys" "$PREFIX/include/linux" "$PREFIX/lib/pkgconfig"
+          make -C "libcap-${LIBCAP_VERSION}/libcap" -j"$(nproc)" \
+            CC="zig cc -target $ZIG_TARGET" AR="zig ar" RANLIB="zig ranlib" \
+            SHARED=no PTHREADS=no
+          cp "libcap-${LIBCAP_VERSION}/libcap/libcap.a" "$PREFIX/lib/"
+          cp "libcap-${LIBCAP_VERSION}/libcap/include/uapi/linux/capability.h" "$PREFIX/include/linux/"
+          cp "libcap-${LIBCAP_VERSION}/libcap/include/sys/capability.h" "$PREFIX/include/sys/"
+          cat > "$PREFIX/lib/pkgconfig/libcap.pc" <<EOF
+          prefix=$PREFIX
+          libdir=\${prefix}/lib
+          includedir=\${prefix}/include
+          Name: libcap
+          Description: Linux capabilities library
+          Version: $LIBCAP_VERSION
+          Libs: -L\${libdir} -lcap
+          Cflags: -I\${includedir}
+          EOF
+          echo "PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_ALLOW_CROSS=1" >> "$GITHUB_ENV"
+          echo "LIBCAP_STATIC=1" >> "$GITHUB_ENV"
       - name: Build libcap for musl
         if: matrix.musl-libcap
         run: |
