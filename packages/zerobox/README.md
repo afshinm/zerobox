@@ -32,7 +32,10 @@ Cross-platform process sandboxing powered by [OpenAI Codex](https://github.com/o
 ## Install
 
 ```bash
-# npm (recommended)
+# Shell (macOS / Linux)
+curl -fsSL https://raw.githubusercontent.com/afshinm/zerobox/main/install.sh | sh
+
+# npm
 npm install -g zerobox
 
 # From source
