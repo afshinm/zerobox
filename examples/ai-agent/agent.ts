@@ -60,24 +60,17 @@ const result = await generateText({
     }),
 
     fetchUrl: tool({
-      description: "Fetch a URL and return the status and body preview",
+      description: "Fetch a URL and return the HTTP status code",
       parameters: z.object({ url: z.string() }),
       execute: async ({ url }) => {
-        const r = await fetcher.js`
-          fetch("${url}")
-            .then(async (res) => {
-              const body = await res.text();
-              console.log(JSON.stringify({
-                success: true,
-                status: res.status,
-                body: body.slice(0, 300),
-              }));
-            })
-            .catch((e) => {
-              console.log(JSON.stringify({ success: false, error: e.message }));
-            });
-        `.json<{ success: boolean; status?: number; body?: string; error?: string }>();
-        return r;
+        const result = await fetcher
+          .exec("curl", ["-s", "--max-time", "5", "-o", "/dev/null", "-w", "%{http_code}", url])
+          .output();
+        const code = result.stdout.trim();
+        if (result.code === 0 && code === "200") {
+          return { success: true, status: 200 };
+        }
+        return { success: false, error: "fetch failed" };
       },
     }),
   },

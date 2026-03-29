@@ -1,16 +1,14 @@
 {
-  "name": "zerobox-workflow-agent-example",
+  "name": "zerobox-workflow-example",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "tsx agent.ts"
+    "start": "tsx workflow.ts"
   },
   "dependencies": {
-    "ai": "^4.0.0",
-    "@ai-sdk/openai": "^1.0.0",
-    "zerobox": "workspace:*",
-    "zod": "^3.0.0"
+    "workflow": "4.2.0-beta.73",
+    "zerobox": "workspace:*"
   },
   "devDependencies": {
     "tsx": "^4.0.0",

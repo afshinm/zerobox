@@ -133,7 +133,7 @@ const result = await fetcher.js`
 
 Full working examples:
 - [`examples/ai-agent`](examples/ai-agent) -- Vercel AI SDK with sandboxed tools
-- [`examples/workflow-agent`](examples/workflow-agent) -- [Vercel Workflow](https://useworkflow.dev/) with sandboxed durable steps
+- [`examples/workflow`](examples/workflow) -- [Vercel Workflow](https://useworkflow.dev/) with sandboxed durable steps
 
 ### Protect your repo during builds
 
