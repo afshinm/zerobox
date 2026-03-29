@@ -136,7 +136,7 @@ describe.skipIf(skip)("Sandbox (e2e)", () => {
         denyWrite: [`${dir}/.git`],
       });
 
-      const result = await sandbox
+      const output = await sandbox
         .exec("node", [
           "-e",
           `const fs=require('fs');
@@ -145,16 +145,12 @@ try{fs.writeFileSync('${dir}/ok.txt','x');r.push('file:ok')}catch(e){r.push('fil
 try{fs.writeFileSync('${dir}/.git/evil','x');r.push('git:ok')}catch(e){r.push('git:blocked:'+e.code)}
 console.log(r.join(','))`,
         ])
-        .output();
+        .text();
 
       // .git/evil must never be created.
       expect(existsSync(`${dir}/.git/evil`)).toBe(false);
-
-      // If node produced output, verify git was blocked and file was allowed.
-      if (result.stdout.trim().length > 0) {
-        expect(result.stdout).toContain("git:blocked");
-        expect(result.stdout).not.toContain("git:ok");
-      }
+      expect(output).toContain("git:blocked");
+      expect(output).not.toContain("git:ok");
     }),
   );
 
@@ -162,14 +158,13 @@ console.log(r.join(','))`,
 
   it("blocks network by default", async () => {
     const sandbox = Sandbox.create();
-    const result = await sandbox
+    const output = await sandbox
       .exec("node", [
         "-e",
         "fetch('https://example.com').then(()=>console.log('OK')).catch(()=>console.log('BLOCKED'))",
       ])
-      .output();
-    // "OK" (successful fetch) must never appear.
-    expect(result.stdout.trim()).not.toBe("OK");
+      .text();
+    expect(output.trim()).toBe("BLOCKED");
   });
 
   it("allows network with allowNet: true", async () => {
