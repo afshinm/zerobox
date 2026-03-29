@@ -26,7 +26,7 @@ Cross-platform process sandboxing powered by [OpenAI Codex](https://github.com/o
 - 📦 **Single binary.** No runtime dependencies, no Docker, no VMs.
 
 <p align="center">
-  <img src="./assets/sandbox-flow.png" alt="zerobox sandbox flow" width="700" />
+  <img src="https://raw.githubusercontent.com/afshinm/zerobox/refs/heads/main/packages/zerobox/assets/sandbox-flow.png" alt="zerobox sandbox flow" width="700" />
 </p>
 
 ## Install
