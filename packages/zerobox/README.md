@@ -2,9 +2,6 @@
   <h1>🫙 zerobox</h1>
   <p><strong>Run any command in a sandbox. Control what it can read, write, and connect to.</strong></p>
   <p>
-    <a href="https://crates.io/crates/zerobox" target="_blank">
-      <img src="https://img.shields.io/crates/v/zerobox?style=for-the-badge&labelColor=000000" alt="crates.io version" />
-    </a>
     <a href="https://www.npmjs.com/package/zerobox" target="_blank">
       <img src="https://img.shields.io/npm/v/zerobox?style=for-the-badge&labelColor=000000" alt="npm version" />
     </a>
@@ -27,6 +24,10 @@ Cross-platform process sandboxing powered by [OpenAI Codex](https://github.com/o
 - 🧩 **TypeScript SDK.** `import { Sandbox } from "zerobox"` with a Deno-style API.
 - 🖥️ **Cross-platform.** macOS, Linux, and Windows.
 - 📦 **Single binary.** No runtime dependencies, no Docker, no VMs.
+
+<p align="center">
+  <img src="./assets/sandbox-flow.png" alt="zerobox sandbox flow" width="700" />
+</p>
 
 ## Install
 
