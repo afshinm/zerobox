@@ -239,8 +239,16 @@ async fn main() -> ExitCode {
     }
     cmd.envs(&child_env);
 
-    match cmd.status().await {
-        Ok(status) => exit_code_from_status(status),
+    // Use output() instead of status() to capture and relay stdout/stderr.
+    // On Linux bwrap, inherited stdio can lose buffered output from runtimes
+    // like Node.js when the bwrap process exits before the pipe is drained.
+    match cmd.output().await {
+        Ok(output) => {
+            use std::io::Write;
+            let _ = std::io::stdout().write_all(&output.stdout);
+            let _ = std::io::stderr().write_all(&output.stderr);
+            exit_code_from_status(output.status)
+        }
         Err(e) => {
             eprintln!("error: failed to execute command: {e}");
             ExitCode::from(1)
