@@ -19,14 +19,14 @@
 
 ## Overview
 
-Cross-platform process sandboxing powered by [OpenAI Codex](https://github.com/openai/codex)'s production sandbox runtime — seatbelt on macOS, bubblewrap + seccomp on Linux.
+Cross-platform process sandboxing powered by [OpenAI Codex](https://github.com/openai/codex)'s production sandbox runtime. Uses seatbelt on macOS and bubblewrap + seccomp on Linux.
 
-- 🔒 **Deny by default** — writes and network blocked unless you allow them
-- 📁 **File access control** — allow/deny reads and writes to specific paths
-- 🌐 **Network filtering** — allow/deny by domain, powered by a real HTTP/SOCKS proxy
-- 🧩 **TypeScript SDK** — `import { Sandbox } from "zerobox"` with Deno-style API
-- 🖥️ **Cross-platform** — macOS, Linux, and Windows
-- 📦 **Single binary** — no runtime dependencies, no Docker, no VMs
+- 🔒 **Deny by default.** Writes and network are blocked unless you allow them.
+- 📁 **File access control.** Allow or deny reads and writes to specific paths.
+- 🌐 **Network filtering.** Allow or deny by domain, powered by a real HTTP/SOCKS proxy.
+- 🧩 **TypeScript SDK.** `import { Sandbox } from "zerobox"` with a Deno-style API.
+- 🖥️ **Cross-platform.** macOS, Linux, and Windows.
+- 📦 **Single binary.** No runtime dependencies, no Docker, no VMs.
 
 ## Install
 
@@ -45,7 +45,7 @@ git clone https://github.com/afshinm/zerobox && cd zerobox
 ## Usage
 
 ```bash
-# Run a command — writes and network blocked by default
+# Run a command (writes and network are blocked by default)
 zerobox -- node -e "console.log('hello')"
 
 # Allow writes to specific paths
@@ -69,17 +69,17 @@ zerobox --allow-all -- bash -c "anything goes"
 
 ## Sandboxing a browser agent
 
-Use [LightPanda](https://lightpanda.io) (headless browser) for fully sandboxed web browsing:
+Use [LightPanda](https://lightpanda.io), a headless browser, for fully sandboxed web browsing:
 
 ```bash
-# Fetch a page — only example.com is reachable
+# Fetch a page (only example.com is reachable)
 zerobox --allow-net=example.com -- lightpanda fetch --dump markdown https://example.com
 
 # With write access for downloads
 zerobox --allow-net=example.com --allow-write=/tmp -- lightpanda fetch --dump html https://example.com
 ```
 
-> **Note:** GUI browsers (Chrome, Firefox) cannot run inside the sandbox — they need macOS WindowServer access and Unix socket IPC that the sandbox blocks by design. Use a headless engine like LightPanda, or run the browser outside the sandbox and connect via CDP.
+> **Note:** GUI browsers like Chrome and Firefox cannot run inside the sandbox. They require macOS WindowServer access and Unix socket IPC that the sandbox blocks by design. Use a headless engine like LightPanda, or run the browser outside the sandbox and connect via CDP.
 
 ## SDK (TypeScript)
 
@@ -129,19 +129,19 @@ try {
 }
 ```
 
-## CLI reference
+## Performance
 
-| Flag | Example | Effect |
-|------|---------|--------|
-| `--allow-read=<paths>` | `--allow-read=/tmp,/data` | Restrict reads to listed paths (default: all reads allowed) |
-| `--deny-read=<paths>` | `--deny-read=/secret` | Block reads (takes precedence over allow) |
-| `--allow-write[=<paths>]` | `--allow-write=.` | Allow writes (default: no writes) |
-| `--deny-write=<paths>` | `--deny-write=./.git` | Block writes (takes precedence over allow) |
-| `--allow-net[=<domains>]` | `--allow-net=example.com` | Allow network (default: no network) |
-| `--deny-net=<domains>` | `--deny-net=evil.com` | Block domains (takes precedence over allow) |
-| `--allow-all` / `-A` | `-A` | Disable sandbox entirely |
-| `--no-sandbox` | `--no-sandbox` | Same as --allow-all |
-| `-C <dir>` | `-C /workspace` | Set working directory |
+Sandbox overhead is minimal, typically ~10ms and ~7MB:
+
+| Command | Bare | Sandboxed | Overhead | Bare Mem | Sandbox Mem |
+|---------|------|-----------|----------|----------|-------------|
+| `echo hello` | <1ms | 10ms | +10ms | 1.2 MB | 8.4 MB |
+| `node -e '...'` | 10ms | 20ms | +10ms | 39.3 MB | 39.1 MB |
+| `python3 -c '...'` | 10ms | 20ms | +10ms | 12.9 MB | 13.0 MB |
+| `cat 10MB file` | <1ms | 10ms | +10ms | 1.9 MB | 8.4 MB |
+| `curl https://...` | 50ms | 60ms | +10ms | 7.2 MB | 8.4 MB |
+
+<sub>Best of 10 runs with warmup, Apple M5 Pro. The ~7MB memory overhead is the sandbox-exec process. For runtimes like Node/Python, the runtime itself dominates memory. Run `./bench/run.sh` to reproduce.</sub>
 
 ## Platform support
 
@@ -150,6 +150,22 @@ try {
 | macOS | Seatbelt (`sandbox-exec`) | Fully supported |
 | Linux | Bubblewrap + Seccomp + Namespaces | Fully supported |
 | Windows | Restricted Tokens + ACLs + Firewall | Supported (not yet tested in CI) |
+
+## CLI reference
+
+| Flag | Example | Description |
+|------|---------|-------------|
+| `--allow-read <paths>` | `--allow-read=/tmp,/data` | Restrict readable user data to listed paths. System libraries remain accessible. Default: all reads allowed. |
+| `--deny-read <paths>` | `--deny-read=/secret` | Block reading from these paths. Takes precedence over `--allow-read`. |
+| `--allow-write [paths]` | `--allow-write=.` | Allow writing to these paths. Without a value, allows writing everywhere. Default: no writes. |
+| `--deny-write <paths>` | `--deny-write=./.git` | Block writing to these paths. Takes precedence over `--allow-write`. |
+| `--allow-net [domains]` | `--allow-net=example.com` | Allow outbound network. Without a value, allows all domains. Default: no network. |
+| `--deny-net <domains>` | `--deny-net=evil.com` | Block network to these domains. Takes precedence over `--allow-net`. |
+| `-A`, `--allow-all` | `-A` | Grant all permissions. No sandbox enforcement. |
+| `--no-sandbox` | `--no-sandbox` | Disable the sandbox entirely. |
+| `-C <dir>` | `-C /workspace` | Set working directory for the sandboxed command. |
+| `-V`, `--version` | `--version` | Print version. |
+| `-h`, `--help` | `--help` | Print help. |
 
 ## License
 
