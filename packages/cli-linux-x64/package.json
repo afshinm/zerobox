@@ -24,6 +24,7 @@
   },
   "preferUnplugged": true,
   "publishConfig": {
-    "provenance": true
+    "provenance": true,
+    "executableFiles": ["./zerobox"]
   }
 }

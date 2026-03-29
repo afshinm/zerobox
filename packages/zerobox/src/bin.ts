@@ -56,9 +56,10 @@ function resolveBinary(): string {
 
   console.error(
     "error: zerobox binary not found.\n\n" +
-      "Install it with one of:\n" +
-      "  cargo install zerobox\n" +
-      "  Set ZEROBOX_BIN=/path/to/zerobox\n",
+      "Install the package to get the binary:\n" +
+      "  npm install zerobox\n\n" +
+      "Or set the path manually:\n" +
+      "  export ZEROBOX_BIN=/path/to/zerobox\n",
   );
   process.exit(1);
 }
@@ -84,6 +85,10 @@ try {
     stdio: "inherit",
   });
 } catch (e: unknown) {
-  const status = (e as { status?: number }).status;
-  process.exit(status ?? 1);
+  const err = e as { status?: number; message?: string };
+  if (err.status != null) {
+    process.exit(err.status);
+  }
+  console.error(`error: ${err.message ?? e}`);
+  process.exit(1);
 }

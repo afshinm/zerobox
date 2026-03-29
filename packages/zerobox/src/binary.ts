@@ -42,7 +42,7 @@ export function verifyBinary(): string {
   } catch (e: unknown) {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") {
       throw new Error(
-        `zerobox binary not found at "${bin}". Install it via cargo or set ZEROBOX_BIN.`,
+        `zerobox binary not found at "${bin}". Install the package (npm install zerobox) or set ZEROBOX_BIN.`,
       );
     }
     // Binary exists but --help failed -- still usable.
