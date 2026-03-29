@@ -1,5 +1,11 @@
 # @zerobox/cli-linux-arm64-musl
 
+## 0.1.4
+
+### Patch Changes
+
+- [`146d01e`](https://github.com/afshinm/zerobox/commit/146d01e6111385c7293768c5f64cf3233dd7f4b3) Thanks [@afshinm](https://github.com/afshinm)! - Update readme, add install.sh
+
 ## 0.1.3
 
 ### Patch Changes
