@@ -70,6 +70,29 @@ describe.skipIf(skip)("Sandbox (e2e)", () => {
     expect(output.trim()).toBe("hello world");
   });
 
+  // ── js ──
+
+  it("js`...` runs inline JavaScript via node", async () => {
+    const sandbox = Sandbox.create();
+    const output = await sandbox.js`console.log(1 + 1)`.text();
+    expect(output.trim()).toBe("2");
+  });
+
+  it("js`...` interpolates values", async () => {
+    const sandbox = Sandbox.create();
+    const x = 21;
+    const output = await sandbox.js`console.log(${x} * 2)`.text();
+    expect(output.trim()).toBe("42");
+  });
+
+  it("js`...`.json() parses node output", async () => {
+    const sandbox = Sandbox.create();
+    const data = await sandbox.js`
+      console.log(JSON.stringify({ sum: 1 + 2 }));
+    `.json<{ sum: number }>();
+    expect(data.sum).toBe(3);
+  });
+
   // ── exec ──
 
   it("exec() runs a command with args", async () => {

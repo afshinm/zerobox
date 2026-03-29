@@ -44,6 +44,28 @@ export class Sandbox {
   }
 
   /**
+   * Execute inline JavaScript via Node.js.
+   *
+   * Returns a `ShellCommand` builder (same `.text()`, `.json()`, `.output()` API).
+   *
+   * @example
+   * ```ts
+   * const output = await sandbox.js`console.log(1 + 1)`.text();
+   * const data = await sandbox.js`
+   *   const result = { sum: 1 + 1 };
+   *   console.log(JSON.stringify(result));
+   * `.json();
+   * ```
+   */
+  js(strings: TemplateStringsArray, ...values: unknown[]): ShellCommand {
+    const code = strings.reduce(
+      (acc, str, i) => acc + str + (i < values.length ? String(values[i]) : ""),
+      "",
+    );
+    return new ShellCommand(this.bin, this.flags, "node", ["-e", code]);
+  }
+
+  /**
    * Execute a command with explicit arguments.
    *
    * Returns a `ShellCommand` builder (same `.text()`, `.json()`, `.output()` API).

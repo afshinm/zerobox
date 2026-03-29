@@ -102,28 +102,36 @@ zerobox --allow-net=example.com --allow-write=/tmp -- lightpanda fetch --dump ht
 
 ### Restrict LLM tool calls
 
-When an LLM agent calls shell tools, each call can be sandboxed individually with different permissions.
+Each tool call can be sandboxed individually. The agent runs normally. Only the dangerous operations are sandboxed.
 
 ```ts
 import { Sandbox } from "zerobox";
 
-// Read-only sandbox for search/lookup tools
-const reader = Sandbox.create({ allowRead: ["/data"] });
-const results = await reader.sh`grep -r "TODO" /data/src`.text();
+// Each tool gets its own sandbox with minimum permissions.
+const reader = Sandbox.create();                               // read-only
+const writer = Sandbox.create({ allowWrite: ["/tmp"] });       // writes to /tmp
+const fetcher = Sandbox.create({ allowNet: ["example.com"] }); // one domain
 
-// Write sandbox for file editing tools
-const writer = Sandbox.create({
-  allowWrite: ["/data/src"],
-  denyWrite: ["/data/src/.git"],
-});
-await writer.sh`echo "fix applied" >> /data/src/output.log`.output();
+// Read a file inside the sandbox
+const data = await reader.js`
+  const content = require("fs").readFileSync("/tmp/input.txt", "utf8");
+  console.log(JSON.stringify({ content }));
+`.json();
 
-// Network sandbox for API calls
-const caller = Sandbox.create({ allowNet: ["api.openai.com"] });
-const response = await caller
-  .exec("curl", ["-s", "https://api.openai.com/v1/models"])
-  .text();
+// Write a file (only /tmp is writable)
+await writer.js`
+  require("fs").writeFileSync("/tmp/output.txt", "result");
+  console.log("ok");
+`.text();
+
+// Fetch a URL (only example.com is reachable)
+const result = await fetcher.js`
+  const res = await fetch("https://example.com");
+  console.log(JSON.stringify({ status: res.status }));
+`.json();
 ```
+
+See [`examples/ai-agent`](examples/ai-agent) for a full working example using Vercel AI SDK with sandboxed tools.
 
 ### Protect your repo during builds
 
