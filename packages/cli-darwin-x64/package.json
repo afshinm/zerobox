@@ -6,5 +6,11 @@
   "os": ["darwin"],
   "cpu": ["x64"],
   "files": ["zerobox"],
-  "preferUnplugged": true
+  "engines": {
+    "node": ">=18"
+  },
+  "preferUnplugged": true,
+  "publishConfig": {
+    "provenance": true
+  }
 }

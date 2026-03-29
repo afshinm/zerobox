@@ -30,7 +30,9 @@
     "@zerobox/cli-darwin-arm64": "workspace:*",
     "@zerobox/cli-darwin-x64": "workspace:*",
     "@zerobox/cli-linux-arm64": "workspace:*",
-    "@zerobox/cli-linux-x64": "workspace:*"
+    "@zerobox/cli-linux-x64": "workspace:*",
+    "@zerobox/cli-linux-arm64-musl": "workspace:*",
+    "@zerobox/cli-linux-x64-musl": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -43,5 +45,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "publishConfig": {
+    "provenance": true
   }
 }

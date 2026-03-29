@@ -18,6 +18,8 @@ packages/cli-darwin-arm64/zerobox
 packages/cli-darwin-x64/zerobox
 packages/cli-linux-arm64/zerobox
 packages/cli-linux-x64/zerobox
+packages/cli-linux-arm64-musl/zerobox
+packages/cli-linux-x64-musl/zerobox
 
 # IDE
 .idea/

@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { PLATFORMS } from "./platforms.js";
+import { platformPackage } from "./platforms.js";
 
 /**
  * Resolve the path to the zerobox binary.
@@ -17,7 +17,7 @@ export function resolveBinary(): string {
     return process.env.ZEROBOX_BIN;
   }
 
-  const pkg = PLATFORMS[`${process.platform}-${process.arch}`];
+  const pkg = platformPackage();
   if (pkg) {
     try {
       const nodeRequire = createRequire(import.meta.url);

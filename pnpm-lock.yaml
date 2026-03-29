@@ -21,7 +21,11 @@ importers:
 
   packages/cli-linux-arm64: {}
 
+  packages/cli-linux-arm64-musl: {}
+
   packages/cli-linux-x64: {}
+
+  packages/cli-linux-x64-musl: {}
 
   packages/zerobox:
     devDependencies:
@@ -56,9 +60,15 @@ importers:
       '@zerobox/cli-linux-arm64':
         specifier: workspace:*
         version: link:../cli-linux-arm64
+      '@zerobox/cli-linux-arm64-musl':
+        specifier: workspace:*
+        version: link:../cli-linux-arm64-musl
       '@zerobox/cli-linux-x64':
         specifier: workspace:*
         version: link:../cli-linux-x64
+      '@zerobox/cli-linux-x64-musl':
+        specifier: workspace:*
+        version: link:../cli-linux-x64-musl
 
 packages:
 

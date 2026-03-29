@@ -146,6 +146,13 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
             packages: libcap-dev
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-latest
+            packages: musl-tools libcap-dev
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-latest
+            packages: musl-tools gcc-aarch64-linux-gnu
+            cargo-linker: aarch64-linux-gnu-gcc
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -231,11 +238,13 @@ jobs:
       - name: Publish platform packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
         run: |
-          for pkg in cli-darwin-arm64 cli-darwin-x64 cli-linux-arm64 cli-linux-x64; do
-            npm publish "packages/$pkg" --access public --provenance || true
+          for pkg in cli-darwin-arm64 cli-darwin-x64 cli-linux-arm64 cli-linux-x64 cli-linux-arm64-musl cli-linux-x64-musl; do
+            pnpm publish "packages/$pkg" --access public --no-git-checks || true
           done
       - name: Publish main package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish packages/zerobox --access public --provenance
+          NPM_CONFIG_PROVENANCE: true
+        run: pnpm publish packages/zerobox --access public --no-git-checks

@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { delimiter, dirname, join } from "node:path";
 import { existsSync, openSync, readSync, closeSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { PLATFORMS } from "./platforms.js";
+import { platformPackage } from "./platforms.js";
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -16,7 +16,7 @@ function resolveBinary(): string {
   }
 
   // 2. Platform-specific optional dependency.
-  const pkg = PLATFORMS[`${process.platform}-${process.arch}`];
+  const pkg = platformPackage();
   if (pkg) {
     try {
       const nodeRequire = createRequire(import.meta.url);

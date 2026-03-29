@@ -6,7 +6,7 @@
   ],
   "commit": false,
   "fixed": [
-    ["zerobox", "@zerobox/cli-darwin-arm64", "@zerobox/cli-darwin-x64", "@zerobox/cli-linux-arm64", "@zerobox/cli-linux-x64"]
+    ["zerobox", "@zerobox/cli-darwin-arm64", "@zerobox/cli-darwin-x64", "@zerobox/cli-linux-arm64", "@zerobox/cli-linux-x64", "@zerobox/cli-linux-arm64-musl", "@zerobox/cli-linux-x64-musl"]
   ],
   "linked": [],
   "access": "public",

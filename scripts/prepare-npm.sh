@@ -22,6 +22,8 @@ declare -A TARGET_MAP=(
   ["x86_64-apple-darwin"]="cli-darwin-x64"
   ["aarch64-unknown-linux-gnu"]="cli-linux-arm64"
   ["x86_64-unknown-linux-gnu"]="cli-linux-x64"
+  ["aarch64-unknown-linux-musl"]="cli-linux-arm64-musl"
+  ["x86_64-unknown-linux-musl"]="cli-linux-x64-musl"
 )
 
 for target in "${!TARGET_MAP[@]}"; do
