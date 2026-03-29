@@ -1,12 +1,20 @@
 {
   "name": "@zerobox/cli-linux-x64",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "zerobox binary for Linux x64 (glibc)",
   "license": "Apache-2.0",
-  "os": ["linux"],
-  "cpu": ["x64"],
-  "libc": ["glibc"],
-  "files": ["zerobox"],
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "files": [
+    "zerobox"
+  ],
   "engines": {
     "node": ">=18"
   },

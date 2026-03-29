@@ -1,12 +1,20 @@
 {
   "name": "@zerobox/cli-linux-arm64-musl",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "zerobox binary for Linux arm64 (musl)",
   "license": "Apache-2.0",
-  "os": ["linux"],
-  "cpu": ["arm64"],
-  "libc": ["musl"],
-  "files": ["zerobox"],
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "libc": [
+    "musl"
+  ],
+  "files": [
+    "zerobox"
+  ],
   "engines": {
     "node": ">=18"
   },
