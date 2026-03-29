@@ -1,6 +1,6 @@
 {
   "name": "zerobox",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Run any command in a sandbox with file and network restrictions.",
   "license": "Apache-2.0",
   "repository": {
@@ -8,7 +8,14 @@
     "url": "https://github.com/afshinm/zerobox"
   },
   "homepage": "https://github.com/afshinm/zerobox",
-  "keywords": ["sandbox", "security", "isolation", "seatbelt", "bubblewrap", "seccomp"],
+  "keywords": [
+    "sandbox",
+    "security",
+    "isolation",
+    "seatbelt",
+    "bubblewrap",
+    "seccomp"
+  ],
   "type": "module",
   "bin": {
     "zerobox": "dist/bin.js"
