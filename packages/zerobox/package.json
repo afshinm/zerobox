@@ -1,8 +1,14 @@
 {
   "name": "zerobox",
   "version": "0.0.0",
-  "description": "Cross-platform process sandboxing",
+  "description": "Run any command in a sandbox with file and network restrictions.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/afshinm/zerobox"
+  },
+  "homepage": "https://github.com/afshinm/zerobox",
+  "keywords": ["sandbox", "security", "isolation", "seatbelt", "bubblewrap", "seccomp"],
   "type": "module",
   "bin": {
     "zerobox": "dist/bin.js"

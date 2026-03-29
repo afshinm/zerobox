@@ -42,44 +42,103 @@ git clone https://github.com/afshinm/zerobox && cd zerobox
 ./scripts/sync.sh && cargo build --release -p zerobox
 ```
 
-## Usage
+## Quick start
 
 ```bash
-# Run a command (writes and network are blocked by default)
+# Writes and network are blocked by default
 zerobox -- node -e "console.log('hello')"
 
-# Allow writes to specific paths
+# Allow writes to a directory
 zerobox --allow-write=. -- node script.js
 
-# Protect .git from writes
-zerobox --allow-write=. --deny-write=./.git -- npm install
-
 # Allow network to specific domains
-zerobox --allow-net=example.com,api.example.com -- node fetch.js
-
-# Allow all network, block specific domains
-zerobox --allow-net --deny-net=evil.com -- node server.js
-
-# Restrict reads (system libraries still accessible)
-zerobox --allow-read=/tmp --allow-write=/tmp -- python3 script.py
-
-# No sandbox (escape hatch)
-zerobox --allow-all -- bash -c "anything goes"
+zerobox --allow-net=api.openai.com -- node agent.js
 ```
 
-## Sandboxing a browser agent
+## Examples
 
-Use [LightPanda](https://lightpanda.io), a headless browser, for fully sandboxed web browsing:
+### Run AI-generated code safely
+
+An LLM generates code. You need to execute it without risking file corruption, data exfiltration, or network abuse.
 
 ```bash
-# Fetch a page (only example.com is reachable)
+# LLM writes code to /tmp/task.py. Run it with no writes, no network.
+zerobox -- python3 /tmp/task.py
+
+# Allow writes only to an output directory
+zerobox --allow-write=/tmp/output -- python3 /tmp/task.py
+
+# Allow the script to call a specific API
+zerobox --allow-write=/tmp/output --allow-net=api.openai.com -- python3 /tmp/task.py
+```
+
+Or via the TypeScript SDK:
+
+```ts
+import { Sandbox } from "zerobox";
+
+const sandbox = Sandbox.create({
+  allowWrite: ["/tmp/output"],
+  allowNet: ["api.openai.com"],
+});
+
+const result = await sandbox.sh`python3 /tmp/task.py`.output();
+console.log(result.code, result.stdout);
+```
+
+### Sandbox a browser agent
+
+Use [LightPanda](https://lightpanda.io), a headless browser, for fully sandboxed web browsing. The agent can only reach the domains you allow.
+
+```bash
+# Fetch a page as markdown (only example.com is reachable)
 zerobox --allow-net=example.com -- lightpanda fetch --dump markdown https://example.com
 
-# With write access for downloads
+# Allow write access for saving results
 zerobox --allow-net=example.com --allow-write=/tmp -- lightpanda fetch --dump html https://example.com
 ```
 
 > **Note:** GUI browsers like Chrome and Firefox cannot run inside the sandbox. They require macOS WindowServer access and Unix socket IPC that the sandbox blocks by design. Use a headless engine like LightPanda, or run the browser outside the sandbox and connect via CDP.
+
+### Restrict LLM tool calls
+
+When an LLM agent calls shell tools, each call can be sandboxed individually with different permissions.
+
+```ts
+import { Sandbox } from "zerobox";
+
+// Read-only sandbox for search/lookup tools
+const reader = Sandbox.create({ allowRead: ["/data"] });
+const results = await reader.sh`grep -r "TODO" /data/src`.text();
+
+// Write sandbox for file editing tools
+const writer = Sandbox.create({
+  allowWrite: ["/data/src"],
+  denyWrite: ["/data/src/.git"],
+});
+await writer.sh`echo "fix applied" >> /data/src/output.log`.output();
+
+// Network sandbox for API calls
+const caller = Sandbox.create({ allowNet: ["api.openai.com"] });
+const response = await caller
+  .exec("curl", ["-s", "https://api.openai.com/v1/models"])
+  .text();
+```
+
+### Protect your repo during builds
+
+Run package installs and build scripts without risking your `.git` history or config files.
+
+```bash
+# npm install can write to node_modules but not .git or .env
+zerobox --allow-write=./node_modules,./package-lock.json --deny-write=./.git,./.env -- npm install
+
+# Run a build script with network access for downloading deps
+zerobox --allow-write=./dist --allow-net -- npm run build
+
+# Run tests with no network (catch accidental external calls)
+zerobox --allow-write=/tmp -- npm test
+```
 
 ## SDK (TypeScript)
 

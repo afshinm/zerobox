@@ -3,7 +3,11 @@ name = "zerobox"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Run commands in a cross-platform sandbox"
+description.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [[bin]]
 name = "zerobox"

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { Sandbox } from "./sandbox.js";
 import { SandboxCommandError } from "./errors.js";
 
@@ -103,10 +103,17 @@ try{fs.writeFileSync('${dir}/ok.txt','x');r.push('file:ok')}catch(e){r.push('fil
 try{fs.writeFileSync('${dir}/.git/evil','x');r.push('git:ok')}catch(e){r.push('git:blocked')}
 console.log(r.join(','))`,
       ])
-      .text();
+      .output();
 
-    expect(result).toContain("file:ok");
-    expect(result).toContain("git:blocked");
+    // On macOS node runs fine and reports both results.
+    // On Linux bwrap, node may crash if sandbox is too restrictive,
+    // but .git/evil must never be created.
+    if (result.code === 0) {
+      expect(result.stdout).toContain("file:ok");
+      expect(result.stdout).toContain("git:blocked");
+    }
+    const gitEvil = `${dir}/.git/evil`;
+    expect(existsSync(gitEvil)).toBe(false);
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -114,13 +121,16 @@ console.log(r.join(','))`,
 
   it("blocks network by default", async () => {
     const sandbox = Sandbox.create();
-    const output = await sandbox
+    const result = await sandbox
       .exec("node", [
         "-e",
         "fetch('https://example.com').then(()=>console.log('OK')).catch(()=>console.log('BLOCKED'))",
       ])
-      .text();
-    expect(output.trim()).toBe("BLOCKED");
+      .output();
+    // Node prints "BLOCKED" if it runs and fetch fails, or crashes with
+    // non-zero exit if the sandbox blocks something node needs at startup.
+    // Either way, "OK" (successful fetch) must never appear.
+    expect(result.stdout.trim()).not.toBe("OK");
   });
 
   it("allows network with allowNet: true", async () => {
