@@ -1,5 +1,11 @@
 # @zerobox/cli-linux-arm64-musl
 
+## 0.1.3
+
+### Patch Changes
+
+- [`9f78502`](https://github.com/afshinm/zerobox/commit/9f78502e855fa6ba7023ebb7753e23a303e0a198) Thanks [@afshinm](https://github.com/afshinm)! - Update readme, fix pnpm binary permission
+
 ## 0.1.2
 
 ### Patch Changes
