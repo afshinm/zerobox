@@ -145,6 +145,13 @@ jobs:
       - name: Install system deps
         if: matrix.packages
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.packages }}
+      - uses: mlugg/setup-zig@v2
+        if: matrix.glibc
+        with:
+          version: 0.13.0
+      - name: Install cargo-zigbuild
+        if: matrix.glibc
+        run: pip install cargo-zigbuild
       - name: Build libcap for zigbuild
         if: matrix.glibc
         run: |
@@ -204,13 +211,6 @@ jobs:
           TARGET_CFLAGS=$(echo "${{ matrix.target }}" | tr '-' '_')
           GNU_ARCH=$(gcc -dumpmachine)
           echo "CFLAGS_${TARGET_CFLAGS}=-idirafter /usr/include -idirafter /usr/include/${GNU_ARCH}" >> "$GITHUB_ENV"
-      - uses: mlugg/setup-zig@v2
-        if: matrix.glibc
-        with:
-          version: 0.13.0
-      - name: Install cargo-zigbuild
-        if: matrix.glibc
-        run: pip install cargo-zigbuild
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
