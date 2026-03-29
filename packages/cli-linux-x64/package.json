@@ -3,6 +3,10 @@
   "version": "0.1.1",
   "description": "zerobox binary for Linux x64 (glibc)",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/afshinm/zerobox"
+  },
   "os": [
     "linux"
   ],

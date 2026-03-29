@@ -249,7 +249,7 @@ jobs:
           NPM_CONFIG_PROVENANCE: true
         run: |
           for pkg in cli-darwin-arm64 cli-darwin-x64 cli-linux-arm64 cli-linux-x64 cli-linux-arm64-musl cli-linux-x64-musl; do
-            pnpm publish "packages/$pkg" --access public --no-git-checks || true
+            pnpm publish "packages/$pkg" --access public --no-git-checks
           done
       - name: Publish main package
         env:
