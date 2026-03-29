@@ -122,10 +122,10 @@ jobs:
           - target: x86_64-apple-darwin
             runner: macos-latest
           - target: aarch64-unknown-linux-gnu
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-22.04-arm
             packages: libcap-dev
           - target: x86_64-unknown-linux-gnu
-            runner: ubuntu-latest
+            runner: ubuntu-22.04
             packages: libcap-dev
           - target: x86_64-unknown-linux-musl
             runner: ubuntu-latest
