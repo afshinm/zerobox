@@ -122,11 +122,13 @@ jobs:
           - target: x86_64-apple-darwin
             runner: macos-latest
           - target: aarch64-unknown-linux-gnu
-            runner: ubuntu-22.04-arm
+            runner: ubuntu-24.04-arm
             packages: libcap-dev
+            glibc: "2.31"
           - target: x86_64-unknown-linux-gnu
-            runner: ubuntu-22.04
+            runner: ubuntu-latest
             packages: libcap-dev
+            glibc: "2.31"
           - target: x86_64-unknown-linux-musl
             runner: ubuntu-latest
             packages: musl-tools
@@ -176,13 +178,24 @@ jobs:
           TARGET_CFLAGS=$(echo "${{ matrix.target }}" | tr '-' '_')
           GNU_ARCH=$(gcc -dumpmachine)
           echo "CFLAGS_${TARGET_CFLAGS}=-idirafter /usr/include -idirafter /usr/include/${GNU_ARCH}" >> "$GITHUB_ENV"
+      - uses: mlugg/setup-zig@v2
+        if: matrix.glibc
+        with:
+          version: 0.13.0
+      - name: Install cargo-zigbuild
+        if: matrix.glibc
+        run: pip install cargo-zigbuild
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
+      - name: Build (zigbuild, glibc ${{ matrix.glibc }})
+        if: matrix.glibc
+        run: cargo zigbuild --profile dist --target ${{ matrix.target }}.${{ matrix.glibc }} -p zerobox
       - name: Build
+        if: ${{ !matrix.glibc }}
         run: cargo build --profile dist --target ${{ matrix.target }} -p zerobox
       - name: Package
         run: |
