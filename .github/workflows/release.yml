@@ -1,7 +1,7 @@
 # Release pipeline:
-# 1. Push to main → changesets action opens "Version Packages" PR
-# 2. Merge that PR → changesets action detects release, we tag
-# 3. Tag push → new workflow run: build binaries, GitHub Release, npm publish
+# 1. Push changeset to main → changesets action opens "Version Packages" PR
+# 2. Merge that PR → changesets detects no changesets remain, version is new
+# 3. Same run: sync → test → build → GitHub Release → publish npm + crates.io
 
 name: Release
 permissions:
@@ -11,20 +11,19 @@ permissions:
 on:
   push:
     branches: [main]
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+*"
 
 jobs:
-  # ── Changesets: open version PR or detect published release ──
+  # ── Changesets: open version PR or detect release ──
   changesets:
     name: Changesets
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
     outputs:
-      published: ${{ steps.changesets.outputs.published }}
-      hasChangesets: ${{ steps.changesets.outputs.hasChangesets }}
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.check.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -36,49 +35,32 @@ jobs:
       - id: changesets
         uses: changesets/action@v1
         with:
-          # Version command: bump JS versions, then sync into Cargo.toml.
           version: pnpm run version
           publish: echo "skip-publish"
           commit: "chore: version packages"
           title: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # ── Tag: create git tag after changesets merges the version PR ──
-  tag:
-    name: Tag Release
-    needs: changesets
-    if: needs.changesets.outputs.hasChangesets == 'false'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - name: Create and push tag (if not already tagged)
+      - name: Check if release needed
+        id: check
+        if: steps.changesets.outputs.hasChangesets == 'false'
         run: |
           VERSION=$(node -p "require('./packages/zerobox/package.json').version")
           TAG="v$VERSION"
           if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists, skipping"
-            exit 0
+            echo "Tag $TAG already exists, skipping release"
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New version $VERSION, will release"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           fi
-          echo "Tagging $TAG"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "$TAG"
-          git push origin "$TAG"
-
-  # ══════════════════════════════════════════════════════════════
-  # Everything below runs on tag push (separate workflow run)
-  # ══════════════════════════════════════════════════════════════
 
   # ── Sync upstream Codex crates ──
   sync:
     name: Sync Upstream
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: changesets
+    if: needs.changesets.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -93,7 +75,6 @@ jobs:
   test:
     name: Test before release
     needs: sync
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -191,7 +172,7 @@ jobs:
   # ── GitHub Release ──
   github-release:
     name: GitHub Release
-    needs: build
+    needs: [changesets, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -204,8 +185,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            --title "$GITHUB_REF_NAME" \
+          gh release create "v${{ needs.changesets.outputs.version }}" \
+            --title "v${{ needs.changesets.outputs.version }}" \
             --generate-notes \
             artifacts/*.tar.gz
 
