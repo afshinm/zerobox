@@ -147,6 +147,12 @@ jobs:
       - name: Install system deps
         if: matrix.packages
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.packages }}
+      - name: Symlink libcap for zigbuild
+        if: matrix.glibc
+        run: |
+          LIBDIR="/usr/lib/$(gcc -dumpmachine)"
+          sudo ln -sf "$LIBDIR/libcap.so" /usr/lib/libcap.so
+          sudo ln -sf "$LIBDIR/libcap.a" /usr/lib/libcap.a
       - name: Build libcap for musl
         if: matrix.musl-libcap
         run: |
@@ -194,8 +200,6 @@ jobs:
       - name: Build (zigbuild, glibc ${{ matrix.glibc }})
         if: matrix.glibc
         run: cargo zigbuild --profile dist --target ${{ matrix.target }}.${{ matrix.glibc }} -p zerobox
-        env:
-          LIBRARY_PATH: /usr/lib/${{ runner.arch == 'ARM64' && 'aarch64-linux-gnu' || 'x86_64-linux-gnu' }}
       - name: Build
         if: ${{ !matrix.glibc }}
         run: cargo build --profile dist --target ${{ matrix.target }} -p zerobox
