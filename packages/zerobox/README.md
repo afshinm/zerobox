@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>zerobox</h1>
+  <h1>🫙 zerobox</h1>
   <p><strong>Run any command in a sandbox. Control what it can read, write, and connect to.</strong></p>
   <p>
     <a href="https://www.npmjs.com/package/zerobox" target="_blank">

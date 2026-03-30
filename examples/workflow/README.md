@@ -58,13 +58,13 @@ Inside the sandbox, `$API_TOKEN` contains a random placeholder. The proxy substi
 ```
 Running sandboxed workflow pipeline...
 
-  step 1/5: read input (69 chars)
-  step 2/5: fetched httpbin.org (HTTP 200)
-  step 3/5: fetch without network permission: blocked
-  step 4/5: transformed
-  step 5/5: wrote output to /tmp/zerobox-wf-output.txt
+  ✓ read input
+  ✓ fetch httpbin.org with secret
+  ✓ fetch without permission is blocked
+  ✓ transform produces summary
+  ✓ write output
 
-Done: Workflow makes async functions durable. Zerobox makes each step safe. (verified: HTTP 200)
+5 passed, 0 failed
 ```
 
 ## Pipeline

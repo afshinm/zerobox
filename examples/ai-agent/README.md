@@ -45,8 +45,13 @@ Inside the sandbox, `$API_TOKEN` contains a random placeholder. The proxy substi
 ## Expected output
 
 ```
-✓ readFile({"path":"/tmp/zerobox-demo-input.txt"})
-✓ writeFile({"path":"/tmp/zerobox-demo-output.txt","content":"..."})
-✓ fetchUrl({"url":"https://httpbin.org/get"})
-✗ fetchUrl({"url":"https://example.com"}) → fetch failed
+  ✓ readFile(/tmp/zerobox-demo-input.txt)
+  ✓ writeFile(/tmp/zerobox-demo-output.txt)
+  ✓ fetchUrl(https://httpbin.org/get)
+  ✓ fetchUrl(https://example.com) blocked
+
+=== Agent Response ===
+...
+
+4 passed, 0 failed
 ```
