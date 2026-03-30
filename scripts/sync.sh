@@ -116,6 +116,17 @@ if [ -f "$PATCH" ]; then
     echo "==> Applying zerobox upstream patches..."
     cd "$ROOT"
     patch -p1 < "$PATCH"
+    # Format patched files to match rustfmt expectations.
+    if command -v cargo >/dev/null 2>&1 && command -v rustfmt >/dev/null 2>&1; then
+        echo "    formatting patched files"
+        cargo fmt -- \
+            upstream/network-proxy/src/certs.rs \
+            upstream/network-proxy/src/http_proxy.rs \
+            upstream/network-proxy/src/lib.rs \
+            upstream/network-proxy/src/mitm.rs \
+            upstream/network-proxy/src/runtime.rs \
+            2>/dev/null || true
+    fi
     cd -
 fi
 
