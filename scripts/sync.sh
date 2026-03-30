@@ -108,6 +108,17 @@ if [ -f "$WIN_TOML" ] && grep -q 'path = "\.\./protocol"' "$WIN_TOML"; then
     fi
 fi
 
+# ── Apply zerobox patches to upstream ──
+# These add the RequestHeaderTransformer hook for secret substitution
+# and enable MITM in Full mode. See the patch file for details.
+PATCH="$SCRIPT_DIR/upstream-secret-substitution.patch"
+if [ -f "$PATCH" ]; then
+    echo "==> Applying zerobox upstream patches..."
+    cd "$ROOT"
+    patch -p1 < "$PATCH"
+    cd -
+fi
+
 # ── Save version ──
 {
     echo "$REF"
