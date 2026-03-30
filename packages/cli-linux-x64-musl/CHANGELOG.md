@@ -1,5 +1,11 @@
 # @zerobox/cli-linux-x64-musl
 
+## 0.1.7
+
+### Patch Changes
+
+- [`62d8afd`](https://github.com/afshinm/zerobox/commit/62d8afd1e8e842eb98a4da66173092223fe5e633) Thanks [@afshinm](https://github.com/afshinm)! - Update readme and examples
+
 ## 0.1.6
 
 ### Patch Changes
