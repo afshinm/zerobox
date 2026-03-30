@@ -1,5 +1,11 @@
 # @zerobox/cli-linux-arm64
 
+## 0.1.6
+
+### Patch Changes
+
+- [`fcf6278`](https://github.com/afshinm/zerobox/commit/fcf6278326650e5bf27b0128e060031f73a740d2) Thanks [@afshinm](https://github.com/afshinm)! - Env and secret management
+
 ## 0.1.5
 
 ### Patch Changes
