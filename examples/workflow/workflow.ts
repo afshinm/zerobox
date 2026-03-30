@@ -6,6 +6,9 @@
  * and retryable — if the process crashes, it resumes from the last
  * completed step.
  *
+ * The fetchPage step demonstrates secrets: the API token is never
+ * visible inside the sandbox. The proxy injects it for httpbin.org only.
+ *
  * Usage:
  *   ZEROBOX_BIN=../../target/release/zerobox pnpm start
  */
@@ -13,17 +16,34 @@
 import { writeFileSync } from "node:fs";
 import { Sandbox } from "zerobox";
 
+let passed = 0;
+let failed = 0;
+
+function assert(name: string, condition: boolean, detail?: string) {
+  if (condition) {
+    console.log(`  \x1b[32m✓\x1b[0m ${name}`);
+    passed++;
+  } else {
+    console.log(`  \x1b[31m✗\x1b[0m ${name}${detail ? ` (${detail})` : ""}`);
+    failed++;
+  }
+}
+
 // ── Sandboxes (one per permission profile) ──
 
 const readOnly = Sandbox.create();
 const writable = Sandbox.create({ allowWrite: ["/tmp"] });
-const network = Sandbox.create({ allowNet: ["example.com"] });
+const network = Sandbox.create({
+  secrets: {
+    API_TOKEN: {
+      value: "demo-secret-token",
+      hosts: ["httpbin.org"],
+    },
+  },
+});
 const blocked = Sandbox.create(); // no network, no writes
 
 // ── Steps ──
-// Each step is an isolated, retryable unit of work.
-// The "use step" directive makes the Workflow runtime record its
-// inputs and outputs so replays skip already-completed steps.
 
 async function readInput(path: string) {
   "use step";
@@ -38,7 +58,16 @@ async function fetchPage(url: string) {
   "use step";
 
   const output = await network
-    .exec("curl", ["-s", "-o", "/dev/null", "-w", "%{http_code}", url])
+    .exec("curl", [
+      "-s",
+      "-H",
+      "Authorization: Bearer $API_TOKEN",
+      "-o",
+      "/dev/null",
+      "-w",
+      "%{http_code}",
+      url,
+    ])
     .text();
   return { status: parseInt(output.trim(), 10) };
 }
@@ -74,27 +103,24 @@ async function writeOutput(path: string, content: string) {
 }
 
 // ── Workflow ──
-// The "use workflow" directive makes this function durable.
-// If the process restarts, execution resumes after the last
-// completed step instead of re-running everything.
 
 export async function pipeline(inputPath: string, outputPath: string) {
   "use workflow";
 
   const { content } = await readInput(inputPath);
-  console.log("  step 1/5: read input (%d chars)", content.length);
+  assert("read input", content.length > 0, `got ${content.length} chars`);
 
-  const { status } = await fetchPage("https://example.com");
-  console.log("  step 2/5: fetched example.com (HTTP %d)", status);
+  const { status } = await fetchPage("https://httpbin.org/get");
+  assert("fetch httpbin.org with secret", status === 200, `HTTP ${status}`);
 
-  const { blocked } = await blockedFetch("https://example.com");
-  console.log("  step 3/5: fetch without network permission: %s", blocked ? "blocked" : "allowed");
+  const { blocked: isBlocked } = await blockedFetch("https://httpbin.org/get");
+  assert("fetch without permission is blocked", isBlocked);
 
   const { summary } = await transform(content, status);
-  console.log("  step 4/5: transformed");
+  assert("transform produces summary", summary.length > 0);
 
-  await writeOutput(outputPath, summary);
-  console.log("  step 5/5: wrote output to %s", outputPath);
+  const result = await writeOutput(outputPath, summary);
+  assert("write output", result.written);
 
   return { summary };
 }
@@ -108,4 +134,6 @@ writeFileSync(INPUT, "Workflow makes async functions durable. Zerobox makes each
 
 console.log("Running sandboxed workflow pipeline...\n");
 const result = await pipeline(INPUT, OUTPUT);
-console.log("\nDone:", result.summary);
+
+console.log(`\n${passed} passed, ${failed} failed`);
+if (failed > 0) process.exit(1);

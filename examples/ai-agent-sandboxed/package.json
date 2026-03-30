@@ -1,0 +1,19 @@
+{
+  "name": "zerobox-ai-agent-sandboxed-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "zerobox --secret OPENAI_API_KEY=$OPENAI_API_KEY --secret-host OPENAI_API_KEY=api.openai.com --allow-write=/tmp -- node --use-env-proxy --import tsx/esm agent.ts"
+  },
+  "dependencies": {
+    "ai": "^4.0.0",
+    "@ai-sdk/openai": "^1.0.0",
+    "zerobox": "workspace:*",
+    "zod": "^3.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "@types/node": "^22.0.0"
+  }
+}

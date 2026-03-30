@@ -12,5 +12,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["zerobox-ai-agent-example", "zerobox-workflow-example"]
+  "ignore": ["zerobox-ai-agent-example", "zerobox-workflow-example", "zerobox-ai-agent-sandboxed-example"]
 }

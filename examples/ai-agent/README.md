@@ -2,7 +2,7 @@
 
 An AI agent using Vercel AI SDK where each tool call runs inside its own zerobox sandbox.
 
-The agent process runs normally. Only the dangerous operations (file I/O, network) are sandboxed with specific permissions per tool.
+The agent process runs normally. Only the dangerous operations (file I/O, network) are sandboxed with specific permissions. The `fetchUrl` tool demonstrates **secret management**: the API token is never visible inside the sandbox — the proxy injects the real value only for approved hosts.
 
 ## Setup
 
@@ -25,25 +25,28 @@ The agent has three tools, each with its own sandbox:
 |------|---------|-------------|
 | `readFile` | `Sandbox.create()` | Read-only (default). No writes, no network. |
 | `writeFile` | `Sandbox.create({ allowWrite: ["/tmp"] })` | Writes to `/tmp` only. No network. |
-| `fetchUrl` | `Sandbox.create({ allowNet: ["example.com"] })` | Network to `example.com` only. No writes. |
+| `fetchUrl` | `Sandbox.create({ secrets: { API_TOKEN: { value: "...", hosts: ["httpbin.org"] } } })` | Network to httpbin.org only via secret. Token injected by proxy. |
 
-Each tool uses `sandbox.js` to run inline JavaScript inside the sandbox:
+The `fetchUrl` tool uses secrets:
 
 ```ts
-const reader = Sandbox.create();
-const data = await reader.js`
-  const content = require("fs").readFileSync("/tmp/input.txt", "utf8");
-  console.log(JSON.stringify({ content }));
-`.json();
+const fetcher = Sandbox.create({
+  secrets: {
+    API_TOKEN: {
+      value: "demo-token-for-httpbin",
+      hosts: ["httpbin.org"],
+    },
+  },
+});
 ```
 
-The agent asks the LLM to read a file, write a summary, fetch a URL, and try to fetch a blocked domain. The sandbox enforces the permissions at the OS level.
+Inside the sandbox, `$API_TOKEN` contains a random placeholder. The proxy substitutes the real value only in HTTP headers sent to `httpbin.org`.
 
 ## Expected output
 
 ```
 ✓ readFile({"path":"/tmp/zerobox-demo-input.txt"})
 ✓ writeFile({"path":"/tmp/zerobox-demo-output.txt","content":"..."})
-✓ fetchUrl({"url":"https://example.com"})
-✗ fetchUrl({"url":"https://evil.example.net"}) → fetch failed
+✓ fetchUrl({"url":"https://httpbin.org/get"})
+✗ fetchUrl({"url":"https://example.com"}) → fetch failed
 ```

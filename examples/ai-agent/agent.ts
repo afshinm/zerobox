@@ -5,6 +5,10 @@
  * itself runs normally. Only the dangerous operations (file I/O, network)
  * are sandboxed with specific permissions.
  *
+ * The fetchUrl tool demonstrates secrets: the API key is never visible
+ * inside the sandbox. The proxy injects the real value only for requests
+ * to the approved host.
+ *
  * Usage:
  *   OPENAI_API_KEY=sk-... ZEROBOX_BIN=../../target/release/zerobox npx tsx agent.ts
  */
@@ -15,10 +19,30 @@ import { writeFileSync } from "node:fs";
 import { Sandbox } from "zerobox";
 import { z } from "zod";
 
+let passed = 0;
+let failed = 0;
+
+function assert(name: string, condition: boolean, detail?: string) {
+  if (condition) {
+    console.log(`  \x1b[32m✓\x1b[0m ${name}`);
+    passed++;
+  } else {
+    console.log(`  \x1b[31m✗\x1b[0m ${name}${detail ? ` (${detail})` : ""}`);
+    failed++;
+  }
+}
+
 // Each tool gets its own sandbox with the minimum permissions it needs.
-const reader = Sandbox.create(); // read-only (default)
-const writer = Sandbox.create({ allowWrite: ["/tmp"] }); // writes to /tmp only
-const fetcher = Sandbox.create({ allowNet: ["example.com"] }); // one domain only
+const reader = Sandbox.create();
+const writer = Sandbox.create({ allowWrite: ["/tmp"] });
+const fetcher = Sandbox.create({
+  secrets: {
+    API_TOKEN: {
+      value: "demo-token-for-httpbin",
+      hosts: ["httpbin.org"],
+    },
+  },
+});
 
 // Setup: create input file for the agent to read.
 writeFileSync("/tmp/zerobox-demo-input.txt", "Zerobox is a cross-platform process sandbox.");
@@ -38,6 +62,7 @@ const result = await generateText({
             console.log(JSON.stringify({ success: false, error: e.message }));
           }
         `.json<{ success: boolean; content?: string; error?: string }>();
+        assert(`readFile(${path})`, r.success, r.error);
         return r;
       },
     }),
@@ -55,6 +80,7 @@ const result = await generateText({
             console.log(JSON.stringify({ success: false, error: e.message }));
           }
         `.json<{ success: boolean; error?: string }>();
+        assert(`writeFile(${path})`, r.success, r.error);
         return r;
       },
     }),
@@ -64,13 +90,29 @@ const result = await generateText({
       parameters: z.object({ url: z.string() }),
       execute: async ({ url }) => {
         const result = await fetcher
-          .exec("curl", ["-s", "--max-time", "5", "-o", "/dev/null", "-w", "%{http_code}", url])
+          .exec("curl", [
+            "-s",
+            "--max-time",
+            "5",
+            "-H",
+            "Authorization: Bearer $API_TOKEN",
+            "-o",
+            "/dev/null",
+            "-w",
+            "%{http_code}",
+            url,
+          ])
           .output();
         const code = result.stdout.trim();
-        if (result.code === 0 && code === "200") {
-          return { success: true, status: 200 };
+        const success = result.code === 0 && code === "200";
+        // httpbin.org should succeed (secret host), anything else should fail.
+        const isHttpbin = url.includes("httpbin.org");
+        if (isHttpbin) {
+          assert(`fetchUrl(${url})`, success, `HTTP ${code}`);
+        } else {
+          assert(`fetchUrl(${url}) blocked`, !success, `expected blocked, got HTTP ${code}`);
         }
-        return { success: false, error: "fetch failed" };
+        return success ? { success: true, status: 200 } : { success: false, error: "fetch failed" };
       },
     }),
   },
@@ -78,8 +120,8 @@ const result = await generateText({
   prompt: `You have access to file and network tools. Do the following in order:
 1. Read the file at /tmp/zerobox-demo-input.txt
 2. Write a one-line summary to /tmp/zerobox-demo-output.txt
-3. Fetch https://example.com and report the status code
-4. Try to fetch https://evil.example.net and report what happens
+3. Fetch https://httpbin.org/get and report the status code
+4. Try to fetch https://example.com and report what happens (it should fail — the sandbox only allows httpbin.org)
 
 After each step, report whether it succeeded or failed and why.`,
 });
@@ -87,15 +129,5 @@ After each step, report whether it succeeded or failed and why.`,
 console.log("\n=== Agent Response ===");
 console.log(result.text);
 
-console.log("\n=== Tool Calls ===");
-for (const step of result.steps) {
-  for (const call of step.toolCalls) {
-    const toolResult = step.toolResults.find((r) => r.toolCallId === call.toolCallId);
-    const outcome = toolResult?.result as
-      | { success: boolean; error?: string }
-      | undefined;
-    const status = outcome?.success ? "✓" : "✗";
-    const detail = outcome?.error ? ` → ${outcome.error}` : "";
-    console.log(`  ${status} ${call.toolName}(${JSON.stringify(call.args)})${detail}`);
-  }
-}
+console.log(`\n${passed} passed, ${failed} failed`);
+if (failed > 0) process.exit(1);

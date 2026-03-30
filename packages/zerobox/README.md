@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🫙 zerobox</h1>
+  <h1>zerobox</h1>
   <p><strong>Run any command in a sandbox. Control what it can read, write, and connect to.</strong></p>
   <p>
     <a href="https://www.npmjs.com/package/zerobox" target="_blank">
@@ -18,11 +18,13 @@
 
 Cross-platform process sandboxing powered by [OpenAI Codex](https://github.com/openai/codex)'s production sandbox runtime. Uses seatbelt on macOS and bubblewrap + seccomp on Linux.
 
-- 🔒 **Deny by default.** Writes and network are blocked unless you allow them.
+- 🔒 **Deny by default.** Writes, network, and environment variables are blocked unless you allow them.
 - 📁 **File access control.** Allow or deny reads and writes to specific paths.
 - 🌐 **Network filtering.** Allow or deny by domain, powered by a real HTTP/SOCKS proxy.
+- 🔑 **Secret management.** Pass API keys to specific hosts without exposing them to the sandboxed process.
+- 🧹 **Clean environment.** Only essential env vars (PATH, HOME, etc.) are inherited by default.
 - 🧩 **TypeScript SDK.** `import { Sandbox } from "zerobox"` with a Deno-style API.
-- 🖥️ **Cross-platform.** macOS, Linux, and Windows.
+- 🖥️ **Cross-platform.** macOS and Linux. Windows support planned.
 - 📦 **Single binary.** No runtime dependencies, no Docker, no VMs.
 
 <p align="center">
@@ -31,45 +33,193 @@ Cross-platform process sandboxing powered by [OpenAI Codex](https://github.com/o
 
 ## Install
 
+### Shell (macOS / Linux)
+
 ```bash
-# Shell (macOS / Linux)
 curl -fsSL https://raw.githubusercontent.com/afshinm/zerobox/main/install.sh | sh
+```
 
-# npm
+### npm
+
+```bash
 npm install -g zerobox
+```
 
-# From source
+### From source
+
+```bash
 git clone https://github.com/afshinm/zerobox && cd zerobox
 ./scripts/sync.sh && cargo build --release -p zerobox
 ```
 
 ## Quick start
 
+Run a command with no writes and no network (the default):
+
 ```bash
-# Writes and network are blocked by default
 zerobox -- node -e "console.log('hello')"
+```
 
-# Allow writes to a directory
+Allow writes to a directory:
+
+```bash
 zerobox --allow-write=. -- node script.js
+```
 
-# Allow network to specific domains
+Allow network to specific domains:
+
+```bash
 zerobox --allow-net=api.openai.com -- node agent.js
+```
+
+Pass a secret to a specific host (the process never sees the real value):
+
+```bash
+zerobox --secret OPENAI_API_KEY=sk-proj-123 --secret-host OPENAI_API_KEY=api.openai.com -- node agent.js
+```
+
+Same thing with the TypeScript SDK:
+
+```ts
+import { Sandbox } from "zerobox";
+
+const sandbox = Sandbox.create({
+  secrets: {
+    OPENAI_API_KEY: {
+      value: process.env.OPENAI_API_KEY,
+      hosts: ["api.openai.com"],
+    },
+  },
+});
+
+const output = await sandbox.sh`node agent.js`.text();
+```
+
+## Secrets
+
+Secrets are API keys, tokens, or credentials that should never be visible inside the sandbox. The sandboxed process sees a random placeholder in the environment variable. The real value is substituted at the network proxy level, only for approved hosts.
+
+```
+sandbox process: echo $OPENAI_API_KEY
+  -> ZEROBOX_SECRET_a1b2c3d4e5...  (placeholder)
+
+sandbox process: curl -H "Authorization: Bearer $OPENAI_API_KEY" https://api.openai.com/...
+  -> proxy intercepts, replaces placeholder with real key
+  -> server receives: Authorization: Bearer sk-proj-123
+```
+
+### CLI
+
+Pass a secret with `--secret` and restrict it to specific hosts with `--secret-host`:
+
+```bash
+zerobox --secret OPENAI_API_KEY=sk-proj-123 --secret-host OPENAI_API_KEY=api.openai.com -- node app.js
+```
+
+Without `--secret-host`, the secret is substituted for all hosts:
+
+```bash
+zerobox --secret TOKEN=abc123 -- node app.js
+```
+
+Multiple secrets with different hosts:
+
+```bash
+zerobox \
+  --secret OPENAI_API_KEY=sk-proj-123 --secret-host OPENAI_API_KEY=api.openai.com \
+  --secret GITHUB_TOKEN=ghp-456 --secret-host GITHUB_TOKEN=api.github.com \
+  -- node app.js
+```
+
+### Node.js proxy support
+
+Node.js `fetch` does not respect `HTTPS_PROXY` by default. When running Node.js inside a sandbox with secrets, add `--use-env-proxy`:
+
+```bash
+zerobox --secret API_KEY=sk-123 --secret-host API_KEY=api.openai.com \
+  -- node --use-env-proxy app.js
+```
+
+Programs that use `curl`, Python `requests`, or other HTTP clients that respect proxy env vars work without this flag.
+
+### TypeScript SDK
+
+```ts
+import { Sandbox } from "zerobox";
+
+const sandbox = Sandbox.create({
+  secrets: {
+    OPENAI_API_KEY: {
+      value: process.env.OPENAI_API_KEY,
+      hosts: ["api.openai.com"],
+    },
+    GITHUB_TOKEN: {
+      value: process.env.GITHUB_TOKEN,
+      hosts: ["api.github.com"],
+    },
+  },
+});
+
+await sandbox.sh`node agent.js`.text();
+```
+
+## Environment variables
+
+By default, only essential variables are inherited: `PATH`, `HOME`, `USER`, `SHELL`, `TERM`, `LANG`. Everything else is blocked.
+
+### Inherit all parent env vars
+
+```bash
+zerobox --allow-env -- node app.js
+```
+
+### Inherit specific vars only
+
+```bash
+zerobox --allow-env=PATH,HOME,DATABASE_URL -- node app.js
+```
+
+### Block specific vars
+
+```bash
+zerobox --allow-env --deny-env=AWS_SECRET_ACCESS_KEY -- node app.js
+```
+
+### Set explicit env vars
+
+```bash
+zerobox --env NODE_ENV=production --env DEBUG=false -- node app.js
+```
+
+### TypeScript SDK
+
+```ts
+const sandbox = Sandbox.create({
+  env: { NODE_ENV: "production" },
+  allowEnv: ["PATH", "HOME"],
+  denyEnv: ["AWS_SECRET_ACCESS_KEY"],
+});
 ```
 
 ## Examples
 
 ### Run AI-generated code safely
 
-An LLM generates code. You need to execute it without risking file corruption, data exfiltration, or network abuse.
+An LLM generates code. Run it without risking file corruption or data exfiltration.
 
 ```bash
-# LLM writes code to /tmp/task.py. Run it with no writes, no network.
 zerobox -- python3 /tmp/task.py
+```
 
-# Allow writes only to an output directory
+Allow writes only to an output directory:
+
+```bash
 zerobox --allow-write=/tmp/output -- python3 /tmp/task.py
+```
 
-# Allow the script to call a specific API
+Allow the script to call a specific API:
+
+```bash
 zerobox --allow-write=/tmp/output --allow-net=api.openai.com -- python3 /tmp/task.py
 ```
 
@@ -87,20 +237,6 @@ const result = await sandbox.sh`python3 /tmp/task.py`.output();
 console.log(result.code, result.stdout);
 ```
 
-### Sandbox a browser agent
-
-Use [LightPanda](https://lightpanda.io), a headless browser, for fully sandboxed web browsing. The agent can only reach the domains you allow.
-
-```bash
-# Fetch a page as markdown (only example.com is reachable)
-zerobox --allow-net=example.com -- lightpanda fetch --dump markdown https://example.com
-
-# Allow write access for saving results
-zerobox --allow-net=example.com --allow-write=/tmp -- lightpanda fetch --dump html https://example.com
-```
-
-> **Note:** GUI browsers like Chrome and Firefox cannot run inside the sandbox. They require macOS WindowServer access and Unix socket IPC that the sandbox blocks by design. Use a headless engine like LightPanda, or run the browser outside the sandbox and connect via CDP.
-
 ### Restrict LLM tool calls
 
 Each tool call can be sandboxed individually. The agent runs normally. Only the dangerous operations are sandboxed.
@@ -108,24 +244,20 @@ Each tool call can be sandboxed individually. The agent runs normally. Only the 
 ```ts
 import { Sandbox } from "zerobox";
 
-// Each tool gets its own sandbox with minimum permissions.
-const reader = Sandbox.create();                               // read-only
-const writer = Sandbox.create({ allowWrite: ["/tmp"] });       // writes to /tmp
-const fetcher = Sandbox.create({ allowNet: ["example.com"] }); // one domain
+const reader = Sandbox.create();
+const writer = Sandbox.create({ allowWrite: ["/tmp"] });
+const fetcher = Sandbox.create({ allowNet: ["example.com"] });
 
-// Read a file inside the sandbox
 const data = await reader.js`
   const content = require("fs").readFileSync("/tmp/input.txt", "utf8");
   console.log(JSON.stringify({ content }));
 `.json();
 
-// Write a file (only /tmp is writable)
 await writer.js`
   require("fs").writeFileSync("/tmp/output.txt", "result");
   console.log("ok");
 `.text();
 
-// Fetch a URL (only example.com is reachable)
 const result = await fetcher.js`
   const res = await fetch("https://example.com");
   console.log(JSON.stringify({ status: res.status }));
@@ -133,7 +265,8 @@ const result = await fetcher.js`
 ```
 
 Full working examples:
-- [`examples/ai-agent`](examples/ai-agent) -- Vercel AI SDK with sandboxed tools
+- [`examples/ai-agent-sandboxed`](examples/ai-agent-sandboxed) -- Entire agent process sandboxed with secrets (API key never visible)
+- [`examples/ai-agent`](examples/ai-agent) -- Vercel AI SDK with per-tool sandboxing and secrets
 - [`examples/workflow`](examples/workflow) -- [Vercel Workflow](https://useworkflow.dev/) with sandboxed durable steps
 
 ### Protect your repo during builds
@@ -141,47 +274,64 @@ Full working examples:
 Run package installs and build scripts without risking your `.git` history or config files.
 
 ```bash
-# npm install can write to node_modules but not .git or .env
 zerobox --allow-write=./node_modules,./package-lock.json --deny-write=./.git,./.env -- npm install
+```
 
-# Run a build script with network access for downloading deps
+Run a build script with network access:
+
+```bash
 zerobox --allow-write=./dist --allow-net -- npm run build
+```
 
-# Run tests with no network (catch accidental external calls)
+Run tests with no network (catch accidental external calls):
+
+```bash
 zerobox --allow-write=/tmp -- npm test
 ```
 
-## SDK (TypeScript)
+## SDK reference
 
 ```bash
 npm install zerobox
 ```
 
+### Shell commands
+
 ```ts
 import { Sandbox } from "zerobox";
 
-const sandbox = Sandbox.create({
-  allowWrite: ["/tmp"],
-  allowNet: ["example.com"],
-});
-
-// Shell commands via tagged template
+const sandbox = Sandbox.create({ allowWrite: ["/tmp"] });
 const output = await sandbox.sh`echo hello`.text();
+```
 
-// Parse JSON output
+### JSON output
+
+```ts
 const data = await sandbox.sh`cat data.json`.json();
+```
 
-// Raw output (doesn't throw on non-zero exit)
+### Raw output (doesn't throw on non-zero exit)
+
+```ts
 const result = await sandbox.sh`exit 42`.output();
 // { code: 42, stdout: "", stderr: "" }
-
-// Explicit command + args
-await sandbox.exec("node", ["-e", "console.log('hi')"]).text();
-
-// Cancellation
-const controller = new AbortController();
-await sandbox.sh`sleep 60`.text({ signal: controller.signal });
 ```
+
+### Explicit command + args
+
+```ts
+await sandbox.exec("node", ["-e", "console.log('hi')"]).text();
+```
+
+### Inline JavaScript
+
+```ts
+const data = await sandbox.js`
+  console.log(JSON.stringify({ sum: 1 + 2 }));
+`.json();
+```
+
+### Error handling
 
 Non-zero exit codes throw `SandboxCommandError`:
 
@@ -194,9 +344,16 @@ try {
 } catch (e) {
   if (e instanceof SandboxCommandError) {
     console.log(e.code);   // 1
-    console.log(e.stderr);  // error output
+    console.log(e.stderr);
   }
 }
+```
+
+### Cancellation
+
+```ts
+const controller = new AbortController();
+await sandbox.sh`sleep 60`.text({ signal: controller.signal });
 ```
 
 ## Performance
@@ -219,7 +376,7 @@ Sandbox overhead is minimal, typically ~10ms and ~7MB:
 |----------|---------|--------|
 | macOS | Seatbelt (`sandbox-exec`) | Fully supported |
 | Linux | Bubblewrap + Seccomp + Namespaces | Fully supported |
-| Windows | Restricted Tokens + ACLs + Firewall | Supported (not yet tested in CI) |
+| Windows | Restricted Tokens + ACLs + Firewall | Planned |
 
 ## CLI reference
 
@@ -231,7 +388,12 @@ Sandbox overhead is minimal, typically ~10ms and ~7MB:
 | `--deny-write <paths>` | `--deny-write=./.git` | Block writing to these paths. Takes precedence over `--allow-write`. |
 | `--allow-net [domains]` | `--allow-net=example.com` | Allow outbound network. Without a value, allows all domains. Default: no network. |
 | `--deny-net <domains>` | `--deny-net=evil.com` | Block network to these domains. Takes precedence over `--allow-net`. |
-| `-A`, `--allow-all` | `-A` | Grant all permissions. No sandbox enforcement. |
+| `--env <KEY=VALUE>` | `--env NODE_ENV=prod` | Set env var in the sandbox. Can be repeated. |
+| `--allow-env [keys]` | `--allow-env=PATH,HOME` | Inherit parent env vars. Without a value, inherits all. Default: only PATH, HOME, USER, SHELL, TERM, LANG. |
+| `--deny-env <keys>` | `--deny-env=SECRET` | Drop these parent env vars. Takes precedence over `--allow-env`. |
+| `--secret <KEY=VALUE>` | `--secret API_KEY=sk-123` | Pass a secret. The process sees a placeholder; the real value is injected at the proxy for approved hosts. |
+| `--secret-host <KEY=HOSTS>` | `--secret-host API_KEY=api.openai.com` | Restrict a secret to specific hosts. Without this, the secret is substituted for all hosts. |
+| `-A`, `--allow-all` | `-A` | Grant all filesystem and network permissions. Env and secrets still apply. |
 | `--no-sandbox` | `--no-sandbox` | Disable the sandbox entirely. |
 | `-C <dir>` | `-C /workspace` | Set working directory for the sandboxed command. |
 | `-V`, `--version` | `--version` | Print version. |
