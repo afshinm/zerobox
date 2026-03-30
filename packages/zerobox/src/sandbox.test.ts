@@ -313,9 +313,10 @@ console.log(r.join(','))`,
         MY_SECRET: { value: "real-value", hosts: ["httpbin.org"] },
       },
     });
-    const output = await sandbox
-      .sh`curl -sk -H "X-Test: $MY_SECRET" https://httpbin.org/headers`
-      .json<{ headers: Record<string, string> }>();
+    const output =
+      await sandbox.sh`curl -sk -H "X-Test: $MY_SECRET" https://httpbin.org/headers`.json<{
+        headers: Record<string, string>;
+      }>();
     expect(output.headers["X-Test"]).toBe("real-value");
   });
 
@@ -326,9 +327,10 @@ console.log(r.join(','))`,
         MY_SECRET: { value: "real-value", hosts: ["other.com"] },
       },
     });
-    const output = await sandbox
-      .sh`curl -sk -H "X-Test: $MY_SECRET" https://httpbin.org/headers`
-      .json<{ headers: Record<string, string> }>();
+    const output =
+      await sandbox.sh`curl -sk -H "X-Test: $MY_SECRET" https://httpbin.org/headers`.json<{
+        headers: Record<string, string>;
+      }>();
     expect(output.headers["X-Test"]).toMatch(/^ZEROBOX_SECRET_/);
   });
 
@@ -340,9 +342,10 @@ console.log(r.join(','))`,
       },
       allowNet: true,
     });
-    const output = await sandbox
-      .sh`curl -sk -H "X-A: $SECRET_A" -H "X-B: $SECRET_B" https://httpbin.org/headers`
-      .json<{ headers: Record<string, string> }>();
+    const output =
+      await sandbox.sh`curl -sk -H "X-A: $SECRET_A" -H "X-B: $SECRET_B" https://httpbin.org/headers`.json<{
+        headers: Record<string, string>;
+      }>();
     // A is for httpbin.org → substituted. B is for other.com → placeholder.
     expect(output.headers["X-A"]).toBe("value-a");
     expect(output.headers["X-B"]).toMatch(/^ZEROBOX_SECRET_/);
