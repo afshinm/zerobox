@@ -863,12 +863,14 @@ mod secrets {
             "--allow-all",
             "--secret",
             "MY_TOKEN=real-value",
+            "--secret-host",
+            "MY_TOKEN=httpbin.org",
             "--",
             "sh",
             "-c",
             "echo $MY_TOKEN",
         ]);
-        assert!(out.status.success());
+        assert!(out.status.success(), "stderr: {}", stderr(&out));
         let val = stdout(&out).trim().to_string();
         assert!(
             val.starts_with("ZEROBOX_SECRET_"),
@@ -888,14 +890,14 @@ mod secrets {
             "-c",
             "echo $TOKEN",
         ]);
-        assert!(out.status.success());
+        assert!(out.status.success(), "stderr: {}", stderr(&out));
         let val = stdout(&out).trim().to_string();
         assert!(val.starts_with("ZEROBOX_SECRET_"));
     }
 
     #[test]
     fn secret_bad_format_fails() {
-        let out = run(&["--allow-all", "--secret", "NOEQUALS", "--", "echo", "hi"]);
+        let out = run(&["--no-sandbox", "--secret", "NOEQUALS", "--", "echo", "hi"]);
         assert!(!out.status.success());
         assert!(
             stderr(&out).contains("KEY=VALUE"),
@@ -949,16 +951,18 @@ mod secrets {
         // --env and --secret should not interfere with each other.
         let out = run(&[
             "--allow-all",
-            "--env",
-            "FOO=bar",
             "--secret",
             "TOKEN=secret",
+            "--secret-host",
+            "TOKEN=httpbin.org",
+            "--env",
+            "FOO=bar",
             "--",
             "sh",
             "-c",
             "echo FOO=$FOO TOKEN=$TOKEN",
         ]);
-        assert!(out.status.success());
+        assert!(out.status.success(), "stderr: {}", stderr(&out));
         let s = stdout(&out).trim().to_string();
         assert!(s.contains("FOO=bar"), "env should work, got: {s}");
         assert!(

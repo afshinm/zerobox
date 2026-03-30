@@ -259,8 +259,10 @@ console.log(r.join(','))`,
   it("allowEnv with specific keys inherits only those", async () => {
     const sandbox = Sandbox.create({ allowEnv: ["PATH"] });
     const output = await sandbox.sh`env`.text();
-    expect(output).toContain("PATH=");
-    expect(output).not.toContain("HOME=");
+    const lines = output.trim().split("\n");
+    expect(lines.some((l) => l.startsWith("PATH="))).toBe(true);
+    // HOME should not be its own env var (CODEX_HOME is different and OK).
+    expect(lines.some((l) => l.startsWith("HOME="))).toBe(false);
   });
 
   it("denyEnv removes vars", async () => {
