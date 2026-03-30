@@ -577,3 +577,409 @@ fn nonexistent_command_fails() {
     let out = run(&["--", "this-command-does-not-exist-zerobox"]);
     assert!(!out.status.success());
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Environment variables: --env, --allow-env, --deny-env
+// ═══════════════════════════════════════════════════════════════════════════
+
+mod env_vars {
+    use super::*;
+
+    // ── Default: clean env (only essentials) ──
+
+    #[test]
+    fn default_env_has_path() {
+        let out = run(&["--allow-all", "--", "sh", "-c", "echo $PATH"]);
+        assert!(out.status.success());
+        assert!(!stdout(&out).trim().is_empty(), "PATH should be set");
+    }
+
+    #[test]
+    fn default_env_has_home() {
+        let out = run(&["--allow-all", "--", "sh", "-c", "echo $HOME"]);
+        assert!(out.status.success());
+        assert!(!stdout(&out).trim().is_empty(), "HOME should be set");
+    }
+
+    #[test]
+    fn default_env_excludes_non_essential_vars() {
+        // Set a custom env var in parent, verify it does NOT reach the child.
+        let out = Command::new(zerobox_exec())
+            .args(["--allow-all", "--", "sh", "-c", "echo $ZEROBOX_TEST_VAR"])
+            .env("ZEROBOX_TEST_VAR", "should_not_appear")
+            .output()
+            .expect("spawn");
+        assert!(out.status.success());
+        assert_eq!(
+            stdout(&out).trim(),
+            "",
+            "custom var should not be inherited"
+        );
+    }
+
+    #[test]
+    fn default_env_is_minimal() {
+        let out = run(&["--allow-all", "--", "env"]);
+        assert!(out.status.success());
+        let count = stdout(&out).lines().count();
+        assert!(count <= 10, "expected minimal env, got {count} vars");
+    }
+
+    // ── --env KEY=VALUE ──
+
+    #[test]
+    fn env_sets_explicit_var() {
+        let out = run(&[
+            "--allow-all",
+            "--env",
+            "FOO=bar",
+            "--",
+            "sh",
+            "-c",
+            "echo $FOO",
+        ]);
+        assert!(out.status.success());
+        assert_eq!(stdout(&out).trim(), "bar");
+    }
+
+    #[test]
+    fn env_multiple_vars() {
+        let out = run(&[
+            "--allow-all",
+            "--env",
+            "A=1",
+            "--env",
+            "B=2",
+            "--",
+            "sh",
+            "-c",
+            "echo $A $B",
+        ]);
+        assert!(out.status.success());
+        assert_eq!(stdout(&out).trim(), "1 2");
+    }
+
+    #[test]
+    fn env_value_with_equals() {
+        let out = run(&[
+            "--allow-all",
+            "--env",
+            "DATA=key=value=extra",
+            "--",
+            "sh",
+            "-c",
+            "echo $DATA",
+        ]);
+        assert!(out.status.success());
+        assert_eq!(stdout(&out).trim(), "key=value=extra");
+    }
+
+    #[test]
+    fn env_empty_value() {
+        let out = run(&[
+            "--allow-all",
+            "--env",
+            "EMPTY=",
+            "--",
+            "sh",
+            "-c",
+            "echo \"x${EMPTY}x\"",
+        ]);
+        assert!(out.status.success());
+        assert_eq!(stdout(&out).trim(), "xx");
+    }
+
+    #[test]
+    fn env_overrides_inherited() {
+        let out = run(&[
+            "--allow-all",
+            "--allow-env",
+            "--env",
+            "HOME=/custom",
+            "--",
+            "sh",
+            "-c",
+            "echo $HOME",
+        ]);
+        assert!(out.status.success());
+        assert_eq!(stdout(&out).trim(), "/custom");
+    }
+
+    // ── --allow-env (inherit all) ──
+
+    #[test]
+    fn allow_env_bare_inherits_all() {
+        let out = Command::new(zerobox_exec())
+            .args([
+                "--allow-all",
+                "--allow-env",
+                "--",
+                "sh",
+                "-c",
+                "echo $ZEROBOX_TEST_ALL",
+            ])
+            .env("ZEROBOX_TEST_ALL", "visible")
+            .output()
+            .expect("spawn");
+        assert!(out.status.success());
+        assert_eq!(stdout(&out).trim(), "visible");
+    }
+
+    #[test]
+    fn allow_env_bare_has_many_vars() {
+        let out = run(&["--allow-all", "--allow-env", "--", "env"]);
+        assert!(out.status.success());
+        let count = stdout(&out).lines().count();
+        assert!(
+            count > 10,
+            "expected many vars with --allow-env, got {count}"
+        );
+    }
+
+    // ── --allow-env=KEY1,KEY2 ──
+
+    #[test]
+    fn allow_env_specific_keys() {
+        let out = run(&["--allow-all", "--allow-env=PATH", "--", "env"]);
+        assert!(out.status.success());
+        let lines = stdout(&out);
+        assert!(lines.contains("PATH="), "PATH should be present");
+        assert!(!lines.contains("HOME="), "HOME should not be present");
+    }
+
+    #[test]
+    fn allow_env_specific_with_env_override() {
+        // --allow-env=PATH filters to only PATH, but --env adds FOO.
+        let out = run(&[
+            "--allow-all",
+            "--allow-env=PATH",
+            "--env",
+            "FOO=added",
+            "--",
+            "sh",
+            "-c",
+            "echo FOO=$FOO HOME=$HOME",
+        ]);
+        assert!(out.status.success());
+        let s = stdout(&out).trim().to_string();
+        assert!(
+            s.contains("FOO=added"),
+            "explicit --env should survive, got: {s}"
+        );
+        assert!(s.contains("HOME="), "HOME should be empty");
+        assert!(!s.contains("HOME=/"), "HOME should not have a value");
+    }
+
+    // ── --deny-env ──
+
+    #[test]
+    fn deny_env_removes_var() {
+        let out = run(&[
+            "--allow-all",
+            "--allow-env",
+            "--deny-env=HOME",
+            "--",
+            "sh",
+            "-c",
+            "echo \"HOME=$HOME\"",
+        ]);
+        assert!(out.status.success());
+        assert_eq!(stdout(&out).trim(), "HOME=");
+    }
+
+    #[test]
+    fn deny_env_takes_precedence_over_allow() {
+        let out = run(&[
+            "--allow-all",
+            "--allow-env=PATH,HOME",
+            "--deny-env=HOME",
+            "--",
+            "env",
+        ]);
+        assert!(out.status.success());
+        let lines = stdout(&out);
+        assert!(lines.contains("PATH="), "PATH should survive");
+        assert!(!lines.contains("HOME="), "HOME should be denied");
+    }
+
+    #[test]
+    fn deny_env_does_not_block_explicit_env() {
+        // --deny-env=FOO + --env FOO=override → FOO survives.
+        let out = run(&[
+            "--allow-all",
+            "--allow-env",
+            "--deny-env=FOO",
+            "--env",
+            "FOO=override",
+            "--",
+            "sh",
+            "-c",
+            "echo $FOO",
+        ]);
+        assert!(out.status.success());
+        assert_eq!(stdout(&out).trim(), "override");
+    }
+
+    #[test]
+    fn deny_env_multiple_keys() {
+        let out = run(&[
+            "--allow-all",
+            "--allow-env",
+            "--deny-env=HOME,USER",
+            "--",
+            "sh",
+            "-c",
+            "echo \"HOME=$HOME USER=$USER\"",
+        ]);
+        assert!(out.status.success());
+        let s = stdout(&out).trim().to_string();
+        assert_eq!(s, "HOME= USER=");
+    }
+
+    // ── Error cases ──
+
+    #[test]
+    fn env_without_equals_fails() {
+        let out = run(&["--allow-all", "--env", "BADFORMAT", "--", "echo", "hi"]);
+        assert!(!out.status.success());
+        assert!(
+            stderr(&out).contains("KEY=VALUE"),
+            "should hint at format, got: {}",
+            stderr(&out)
+        );
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Secrets: --secret, --secret-host
+// ═══════════════════════════════════════════════════════════════════════════
+
+mod secrets {
+    use super::*;
+
+    #[test]
+    fn secret_sets_placeholder_in_env() {
+        let out = run(&[
+            "--allow-all",
+            "--secret",
+            "MY_TOKEN=real-value",
+            "--",
+            "sh",
+            "-c",
+            "echo $MY_TOKEN",
+        ]);
+        assert!(out.status.success());
+        let val = stdout(&out).trim().to_string();
+        assert!(
+            val.starts_with("ZEROBOX_SECRET_"),
+            "expected placeholder, got: {val}"
+        );
+        assert_ne!(val, "real-value", "real value must not be visible");
+    }
+
+    #[test]
+    fn secret_without_host_works() {
+        let out = run(&[
+            "--allow-all",
+            "--secret",
+            "TOKEN=abc",
+            "--",
+            "sh",
+            "-c",
+            "echo $TOKEN",
+        ]);
+        assert!(out.status.success());
+        let val = stdout(&out).trim().to_string();
+        assert!(val.starts_with("ZEROBOX_SECRET_"));
+    }
+
+    #[test]
+    fn secret_bad_format_fails() {
+        let out = run(&["--allow-all", "--secret", "NOEQUALS", "--", "echo", "hi"]);
+        assert!(!out.status.success());
+        assert!(
+            stderr(&out).contains("KEY=VALUE"),
+            "should hint at format, got: {}",
+            stderr(&out)
+        );
+    }
+
+    #[test]
+    fn secret_duplicate_key_fails() {
+        let out = run(&[
+            "--allow-all",
+            "--secret",
+            "K=v1",
+            "--secret",
+            "K=v2",
+            "--",
+            "echo",
+            "hi",
+        ]);
+        assert!(!out.status.success());
+        assert!(
+            stderr(&out).contains("duplicate"),
+            "should report duplicate, got: {}",
+            stderr(&out)
+        );
+    }
+
+    #[test]
+    fn secret_host_unknown_key_fails() {
+        let out = run(&[
+            "--allow-all",
+            "--secret",
+            "A=val",
+            "--secret-host",
+            "B=host.com",
+            "--",
+            "echo",
+            "hi",
+        ]);
+        assert!(!out.status.success());
+        assert!(
+            stderr(&out).contains("unknown"),
+            "should report unknown key, got: {}",
+            stderr(&out)
+        );
+    }
+
+    #[test]
+    fn secret_combined_with_env() {
+        // --env and --secret should not interfere with each other.
+        let out = run(&[
+            "--allow-all",
+            "--env",
+            "FOO=bar",
+            "--secret",
+            "TOKEN=secret",
+            "--",
+            "sh",
+            "-c",
+            "echo FOO=$FOO TOKEN=$TOKEN",
+        ]);
+        assert!(out.status.success());
+        let s = stdout(&out).trim().to_string();
+        assert!(s.contains("FOO=bar"), "env should work, got: {s}");
+        assert!(
+            s.contains("TOKEN=ZEROBOX_SECRET_"),
+            "secret should be placeholder, got: {s}"
+        );
+    }
+
+    #[test]
+    fn secret_host_only_enables_that_host() {
+        // --secret with --secret-host should ONLY allow the specified host,
+        // not all network traffic. Other hosts must be blocked.
+        let (code, ok) = curl_status(
+            &[
+                "--secret",
+                "TOKEN=val",
+                "--secret-host",
+                "TOKEN=httpbin.org",
+            ],
+            "https://example.com",
+        );
+        assert!(!ok, "example.com should be blocked, got {code}");
+    }
+}

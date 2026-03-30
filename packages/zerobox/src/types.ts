@@ -18,6 +18,25 @@ export interface SandboxOptions {
   cwd?: string;
   /** Disable the sandbox entirely. */
   noSandbox?: boolean;
+  /** Explicit environment variables for the sandbox. */
+  env?: Record<string, string>;
+  /** Inherit parent env vars. true = all (default), string[] = only listed keys. */
+  allowEnv?: boolean | string[];
+  /** Drop these parent env vars. Takes precedence over allowEnv. */
+  denyEnv?: string[];
+  /**
+   * Secrets with host-scoped network access. Each key becomes an env var
+   * in the sandbox. The hosts are merged into network permissions.
+   */
+  secrets?: Record<string, SecretConfig>;
+}
+
+/** Configuration for a secret passed to the sandbox. */
+export interface SecretConfig {
+  /** The secret value (e.g., an API key). */
+  value: string;
+  /** Domains where this secret is needed. Merged into allowNet. */
+  hosts: string[];
 }
 
 /** Raw output from a sandboxed command. */

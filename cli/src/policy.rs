@@ -208,6 +208,11 @@ mod tests {
             allow_all: false,
             cwd: None,
             no_sandbox: false,
+            set_env: vec![],
+            allow_env: None,
+            deny_env: None,
+            secret: vec![],
+            secret_host: vec![],
             command: vec!["true".to_string()],
         }
     }

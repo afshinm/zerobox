@@ -1,5 +1,7 @@
+mod env;
 mod policy;
 mod proxy;
+mod secret;
 
 #[cfg(target_os = "linux")]
 use std::path::Path;
@@ -81,6 +83,34 @@ pub struct Cli {
     #[arg(long)]
     pub no_sandbox: bool,
 
+    /// Set environment variables for the sandboxed command (KEY=VALUE).
+    /// Can be specified multiple times. These always survive env filtering.
+    #[arg(long = "env", value_name = "KEY=VALUE")]
+    pub set_env: Vec<String>,
+
+    /// Inherit parent environment variables (comma-separated).
+    /// By default only PATH, HOME, USER, SHELL, TERM, LANG are inherited.
+    /// Without a value, inherits all. With values, inherits only those.
+    #[arg(long, value_delimiter = ',', num_args = 0..)]
+    pub allow_env: Option<Vec<String>>,
+
+    /// Drop these parent environment variables (comma-separated).
+    /// Takes precedence over --allow-env.
+    #[arg(long, value_delimiter = ',', num_args = 1..)]
+    pub deny_env: Option<Vec<String>>,
+
+    /// Secret key-value pairs (KEY=VALUE). The real value is held by the proxy;
+    /// the sandboxed process sees a random placeholder in the env var.
+    /// Implicitly enables network for hosts specified with --secret-host
+    /// (or all hosts if --secret-host is not set). Can be specified multiple times.
+    #[arg(long = "secret", value_name = "KEY=VALUE")]
+    pub secret: Vec<String>,
+
+    /// Restrict a secret to specific hosts (KEY=host1,host2).
+    /// Without this, the secret is substituted for all hosts.
+    #[arg(long = "secret-host", value_name = "KEY=HOSTS")]
+    pub secret_host: Vec<String>,
+
     /// The command and arguments to run.
     #[arg(trailing_var_arg = true, required = true)]
     pub command: Vec<String>,
@@ -100,8 +130,21 @@ fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
     ExitCode::from(1)
 }
 
+fn main() -> ExitCode {
+    // Set CODEX_HOME before tokio spawns threads (set_var is unsafe with threads).
+    if std::env::var("CODEX_HOME").is_err()
+        && let Some(home) = dirs::home_dir()
+    {
+        let zerobox_home = home.join(".zerobox");
+        let _ = std::fs::create_dir_all(&zerobox_home);
+        // SAFETY: truly single-threaded here — tokio runtime not yet started.
+        unsafe { std::env::set_var("CODEX_HOME", &zerobox_home) };
+    }
+    tokio_main()
+}
+
 #[tokio::main]
-async fn main() -> ExitCode {
+async fn tokio_main() -> ExitCode {
     // Arg0 dispatch: when invoked as "codex-linux-sandbox" (e.g. by bubblewrap
     // re-exec), run the Linux sandbox helper instead of the CLI. This makes
     // zerobox a single binary that doubles as the sandbox helper on Linux.
@@ -118,6 +161,14 @@ async fn main() -> ExitCode {
     }
 
     let cli = Cli::parse();
+
+    let secret_store = match secret::parse_secret_flags(&cli.secret, &cli.secret_host) {
+        Ok(store) => std::sync::Arc::new(store),
+        Err(e) => {
+            eprintln!("error: {e}");
+            return ExitCode::from(1);
+        }
+    };
 
     let cwd = match cli.cwd.clone().map_or_else(std::env::current_dir, Ok) {
         Ok(p) => p,
@@ -141,11 +192,15 @@ async fn main() -> ExitCode {
         get_platform_sandbox(false).unwrap_or(SandboxType::None)
     };
 
-    let fs_policy = build_fs_policy(&resolved, cli.allow_all, net_is_enabled(&cli));
+    let net_enabled = net_is_enabled(&cli) || !secret_store.is_empty();
+    let fs_policy = build_fs_policy(&resolved, cli.allow_all, net_enabled);
     let net_policy = build_net_policy(&cli);
     let legacy_policy = build_legacy_sandbox_policy(&resolved, &cli);
 
-    let proxy = match build_network_proxy(&cli).await {
+    // Ensure Rustls crypto provider is initialized (required for MITM/TLS).
+    codex_utils_rustls_provider::ensure_rustls_crypto_provider();
+
+    let proxy = match build_network_proxy(&cli, &secret_store).await {
         Ok(p) => p,
         Err(e) => {
             eprintln!("error: failed to build network proxy: {e:#}");
@@ -176,13 +231,26 @@ async fn main() -> ExitCode {
         None
     };
 
+    let mut child_env = match env::build_child_env(&cli) {
+        Ok(e) => e,
+        Err(msg) => {
+            eprintln!("error: {msg}");
+            return ExitCode::from(1);
+        }
+    };
+
+    // Inject secret placeholders into child env (real values stay in the proxy).
+    for (key, placeholder) in secret_store.get_env_overrides() {
+        child_env.insert(key, placeholder);
+    }
+
     let manager = SandboxManager::new();
     let request = SandboxTransformRequest {
         command: SandboxCommand {
             program: cli.command[0].clone(),
             args: cli.command[1..].to_vec(),
             cwd: cwd.clone(),
-            env: std::env::vars().collect(),
+            env: child_env,
             additional_permissions: None,
         },
         policy: &legacy_policy,
@@ -231,12 +299,27 @@ async fn main() -> ExitCode {
     if let Some(ref proxy) = proxy {
         proxy.apply_to_env(&mut child_env);
     }
-    if !net_is_enabled(&cli) {
+    if !net_enabled {
         child_env.insert(
             "CODEX_SANDBOX_NETWORK_DISABLED".to_string(),
             "1".to_string(),
         );
     }
+
+    // When MITM is active (secrets configured), inject the proxy CA cert into
+    // the child's trust store so HTTPS clients accept the intercepted certs.
+    if secret_store.requires_mitm()
+        && let Some(ca_path) = secret::mitm_ca_cert_path()
+    {
+        let ca = ca_path.to_string_lossy().to_string();
+        child_env.insert("CURL_CA_BUNDLE".to_string(), ca.clone());
+        child_env.insert("SSL_CERT_FILE".to_string(), ca.clone());
+        child_env.insert("NODE_EXTRA_CA_CERTS".to_string(), ca.clone());
+        child_env.insert("REQUESTS_CA_BUNDLE".to_string(), ca.clone());
+        child_env.insert("CARGO_HTTP_CAINFO".to_string(), ca.clone());
+        child_env.insert("GIT_SSL_CAINFO".to_string(), ca);
+    }
+
     cmd.envs(&child_env);
 
     // Use output() instead of status() to capture and relay stdout/stderr.

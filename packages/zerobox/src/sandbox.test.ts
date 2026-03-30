@@ -222,4 +222,164 @@ console.log(r.join(','))`,
       expect(readFileSync("/tmp/zerobox-sdk-aa", "utf8").trim()).toBe("ok");
     }),
   );
+
+  // ── env vars ──
+
+  it("default env excludes custom parent vars", async () => {
+    const sandbox = Sandbox.create();
+    const output = await sandbox.sh`echo $ZEROBOX_TEST_CUSTOM`.text();
+    expect(output.trim()).toBe("");
+  });
+
+  it("default env includes PATH", async () => {
+    const sandbox = Sandbox.create();
+    const output = await sandbox.sh`echo $PATH`.text();
+    expect(output.trim()).not.toBe("");
+  });
+
+  it("env option sets explicit vars", async () => {
+    const sandbox = Sandbox.create({ env: { MY_VAR: "hello" } });
+    const output = await sandbox.sh`echo $MY_VAR`.text();
+    expect(output.trim()).toBe("hello");
+  });
+
+  it("env option with multiple vars", async () => {
+    const sandbox = Sandbox.create({ env: { A: "1", B: "2" } });
+    const output = await sandbox.sh`echo $A $B`.text();
+    expect(output.trim()).toBe("1 2");
+  });
+
+  it("allowEnv: true inherits all parent vars", async () => {
+    const sandbox = Sandbox.create({ allowEnv: true });
+    const output = await sandbox.sh`env`.text();
+    const count = output.trim().split("\n").length;
+    expect(count).toBeGreaterThan(10);
+  });
+
+  it("allowEnv with specific keys inherits only those", async () => {
+    const sandbox = Sandbox.create({ allowEnv: ["PATH"] });
+    const output = await sandbox.sh`env`.text();
+    expect(output).toContain("PATH=");
+    expect(output).not.toContain("HOME=");
+  });
+
+  it("denyEnv removes vars", async () => {
+    const sandbox = Sandbox.create({ allowEnv: true, denyEnv: ["HOME"] });
+    const output = await sandbox.sh`echo "HOME=$HOME"`.text();
+    expect(output.trim()).toBe("HOME=");
+  });
+
+  it("denyEnv does not block explicit env", async () => {
+    const sandbox = Sandbox.create({ denyEnv: ["FOO"], env: { FOO: "override" } });
+    const output = await sandbox.sh`echo $FOO`.text();
+    expect(output.trim()).toBe("override");
+  });
+
+  it("env value with equals sign", async () => {
+    const sandbox = Sandbox.create({ env: { DATA: "a=b=c" } });
+    const output = await sandbox.sh`echo $DATA`.text();
+    expect(output.trim()).toBe("a=b=c");
+  });
+
+  // ── secrets ──
+
+  it("secret env var contains placeholder, not real value", async () => {
+    const sandbox = Sandbox.create({
+      secrets: {
+        API_KEY: { value: "sk-test-123", hosts: ["example.com"] },
+      },
+    });
+    const output = await sandbox.sh`echo $API_KEY`.text();
+    expect(output.trim()).toMatch(/^ZEROBOX_SECRET_[0-9a-f]{64}$/);
+    expect(output.trim()).not.toBe("sk-test-123");
+  });
+
+  it("secrets auto-enable network for their hosts", async () => {
+    const sandbox = Sandbox.create({
+      secrets: {
+        TOKEN: { value: "t", hosts: ["httpbin.org"] },
+      },
+    });
+    // -k: accept MITM proxy cert (secrets enable MITM for header substitution)
+    const result = await sandbox
+      .exec("curl", ["-sk", "-o", "/dev/null", "-w", "%{http_code}", "https://httpbin.org/get"])
+      .text();
+    expect(result.trim()).toBe("200");
+  });
+
+  it("secret header substituted for matching host", async () => {
+    const sandbox = Sandbox.create({
+      secrets: {
+        MY_SECRET: { value: "real-value", hosts: ["httpbin.org"] },
+      },
+    });
+    const output = await sandbox
+      .sh`curl -sk -H "X-Test: $MY_SECRET" https://httpbin.org/headers`
+      .json<{ headers: Record<string, string> }>();
+    expect(output.headers["X-Test"]).toBe("real-value");
+  });
+
+  it("secret NOT substituted for wrong host", async () => {
+    const sandbox = Sandbox.create({
+      allowNet: true,
+      secrets: {
+        MY_SECRET: { value: "real-value", hosts: ["other.com"] },
+      },
+    });
+    const output = await sandbox
+      .sh`curl -sk -H "X-Test: $MY_SECRET" https://httpbin.org/headers`
+      .json<{ headers: Record<string, string> }>();
+    expect(output.headers["X-Test"]).toMatch(/^ZEROBOX_SECRET_/);
+  });
+
+  it("multiple secrets with different hosts", async () => {
+    const sandbox = Sandbox.create({
+      secrets: {
+        SECRET_A: { value: "value-a", hosts: ["httpbin.org"] },
+        SECRET_B: { value: "value-b", hosts: ["other.com"] },
+      },
+      allowNet: true,
+    });
+    const output = await sandbox
+      .sh`curl -sk -H "X-A: $SECRET_A" -H "X-B: $SECRET_B" https://httpbin.org/headers`
+      .json<{ headers: Record<string, string> }>();
+    // A is for httpbin.org → substituted. B is for other.com → placeholder.
+    expect(output.headers["X-A"]).toBe("value-a");
+    expect(output.headers["X-B"]).toMatch(/^ZEROBOX_SECRET_/);
+  });
+
+  it("secret host restriction blocks other hosts", async () => {
+    const sandbox = Sandbox.create({
+      secrets: {
+        TOKEN: { value: "t", hosts: ["httpbin.org"] },
+      },
+    });
+    // httpbin.org should work (secret host), but example.com should be blocked.
+    const result = await sandbox
+      .exec("curl", [
+        "-sk",
+        "--max-time",
+        "3",
+        "-o",
+        "/dev/null",
+        "-w",
+        "%{http_code}",
+        "https://example.com",
+      ])
+      .output();
+    expect(result.stdout.trim()).not.toBe("200");
+  });
+
+  it("env and secrets work together", async () => {
+    const sandbox = Sandbox.create({
+      env: { MY_VAR: "env-val" },
+      secrets: {
+        MY_SECRET: { value: "secret-val", hosts: ["httpbin.org"] },
+      },
+    });
+    const envOut = await sandbox.sh`echo $MY_VAR`.text();
+    expect(envOut.trim()).toBe("env-val");
+    const secretOut = await sandbox.sh`echo $MY_SECRET`.text();
+    expect(secretOut.trim()).toMatch(/^ZEROBOX_SECRET_/);
+  });
 });

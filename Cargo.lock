@@ -4939,6 +4939,10 @@ dependencies = [
  "codex-protocol",
  "codex-sandboxing",
  "codex-utils-absolute-path",
+ "codex-utils-rustls-provider",
+ "dirs",
+ "getrandom 0.3.4",
+ "rama-http",
  "tokio",
 ]
 
