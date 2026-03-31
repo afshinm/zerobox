@@ -14,7 +14,7 @@
   </p>
 </div>
 
-Cross-platform process sandboxing powered by [OpenAI Codex](https://github.com/openai/codex)'s production sandbox runtime.
+Lightweight, cross-platform process sandboxing powered by [OpenAI Codex](https://github.com/openai/codex)'s sandbox runtime.
 
 - **Deny by default:** Writes, network, and environment variables are blocked unless you allow them
 - **Credential injection:** Pass API keys that the process never sees. Zerobox injects real values only for approved hosts
@@ -26,7 +26,7 @@ Cross-platform process sandboxing powered by [OpenAI Codex](https://github.com/o
 - **Single binary:** No Docker, no VMs, ~10ms overhead
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/afshinm/zerobox/refs/heads/main/packages/zerobox/assets/sandbox-flow.png" alt="zerobox sandbox flow" width="700" />
+  <img src="https://raw.githubusercontent.com/afshinm/zerobox/refs/heads/main/packages/zerobox/assets/sandbox-flow.png" alt="Zerobox architecture" width="800" />
 </p>
 
 ## Install
