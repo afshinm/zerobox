@@ -5,7 +5,7 @@
 # Usage:
 #   ./sync.sh                    # sync from the pinned ref in UPSTREAM_VERSION
 #   ./sync.sh v0.1.2503262      # sync from a specific tag/branch/SHA
-#
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -13,7 +13,6 @@ ROOT="$SCRIPT_DIR/.."
 UPSTREAM_DIR="$ROOT/upstream"
 VERSION_FILE="$ROOT/UPSTREAM_VERSION"
 
-# ── Resolve version ──
 if [ $# -ge 1 ]; then
     REF="$1"
 else
@@ -27,7 +26,6 @@ fi
 
 echo "==> Syncing from openai/codex @ $REF"
 
-# ── Clone into temp dir (avoid shadowing system TMPDIR) ──
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
@@ -45,7 +43,6 @@ fi
 COMMIT_SHA="$(git -C "$WORK_DIR/codex" rev-parse HEAD)"
 echo "==> Resolved to commit $COMMIT_SHA"
 
-# ── Crates to copy ──
 CRATES=(
     sandboxing
     linux-sandbox
@@ -67,7 +64,6 @@ UTILS=(
     rustls-provider
 )
 
-# ── Clean and copy ──
 echo "==> Cleaning upstream/"
 rm -rf "$UPSTREAM_DIR"
 mkdir -p "$UPSTREAM_DIR/utils"
@@ -88,7 +84,6 @@ if [ -d "$SRC/vendor" ]; then
     cp -r "$SRC/vendor" "$UPSTREAM_DIR/vendor"
 fi
 
-# ── Apply minimal patches ──
 echo "==> Applying patches..."
 
 # windows-sandbox-rs uses path-based dep instead of workspace.
@@ -108,7 +103,6 @@ if [ -f "$WIN_TOML" ] && grep -q 'path = "\.\./protocol"' "$WIN_TOML"; then
     fi
 fi
 
-# ── Apply zerobox patches to upstream ──
 # These add the RequestHeaderTransformer hook for secret substitution
 # and enable MITM in Full mode. See the patch file for details.
 PATCH="$SCRIPT_DIR/upstream-secret-substitution.patch"
@@ -130,7 +124,6 @@ if [ -f "$PATCH" ]; then
     cd -
 fi
 
-# ── Save version ──
 {
     echo "$REF"
     echo "# commit: $COMMIT_SHA"
@@ -138,7 +131,3 @@ fi
 } > "$VERSION_FILE"
 
 echo "==> Done. Synced to $REF ($COMMIT_SHA)"
-echo ""
-echo "Next steps:"
-echo "  cargo check"
-echo "  If it fails, update shims/ to match any API changes."

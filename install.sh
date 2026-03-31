@@ -1,10 +1,11 @@
 #!/bin/sh
-# Install zerobox — cross-platform process sandbox.
+# Install Zerobox - Lightweight, cross-platform process sandboxing. Sandbox any command with file, network, and credential controls.
+# GitHub: https://github.com/afshinm/zerobox
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/afshinm/zerobox/main/install.sh | sh
 #
-# Options (env vars):
+# Options:
 #   ZEROBOX_INSTALL  — install directory (default: $HOME/.zerobox)
 #   ZEROBOX_VERSION  — specific version to install (default: latest)
 

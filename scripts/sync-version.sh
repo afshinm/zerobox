@@ -2,7 +2,7 @@
 #
 # Sync the version from packages/zerobox/package.json into Cargo.toml.
 # Called by `pnpm run version` after changesets bumps JS versions.
-#
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

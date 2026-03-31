@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    # ── Upstream Codex crates (synced by sync.sh) ──
     "upstream/sandboxing",
     "upstream/linux-sandbox",
     "upstream/windows-sandbox-rs",
@@ -16,10 +15,10 @@ members = [
     "upstream/utils/home-dir",
     "upstream/utils/rustls-provider",
     "upstream/network-proxy",
-    # ── Our code ──
-    "cli",
-    "shims/core",
-    "shims/git-utils",
+
+    "crates/zerobox",
+    "crates/shims/core",
+    "crates/shims/git-utils",
 ]
 resolver = "2"
 
@@ -30,11 +29,11 @@ license = "Apache-2.0"
 repository = "https://github.com/afshinm/zerobox"
 homepage = "https://github.com/afshinm/zerobox"
 description = "Sandbox any command with file, network, and credential controls."
-keywords = ["sandbox", "security", "isolation", "seatbelt", "bubblewrap"]
+keywords = ["security", "sandbox", "secret-management", "ai-agents", "process-isolation"]
 categories = ["command-line-utilities", "os"]
 
 [workspace.dependencies]
-# ── Upstream Codex crates ──
+# Upstream
 codex-execpolicy = { path = "upstream/execpolicy" }
 codex-linux-sandbox = { path = "upstream/linux-sandbox" }
 codex-process-hardening = { path = "upstream/process-hardening" }
@@ -48,16 +47,13 @@ codex-utils-pty = { path = "upstream/utils/pty" }
 codex-utils-string = { path = "upstream/utils/string" }
 codex-utils-template = { path = "upstream/utils/template" }
 codex-utils-home-dir = { path = "upstream/utils/home-dir" }
-
-# ── Upstream: formerly shimmed, now real ──
 codex-network-proxy = { path = "upstream/network-proxy" }
 codex-utils-rustls-provider = { path = "upstream/utils/rustls-provider" }
 
-# ── Shims (replace heavy Codex deps we don't need) ──
-codex-core = { path = "shims/core" }
-codex-git-utils = { path = "shims/git-utils" }
+# Shims
+codex-core = { path = "crates/shims/core" }
+codex-git-utils = { path = "crates/shims/git-utils" }
 
-# ── External deps: versions pinned to match Codex upstream ──
 anyhow = "1"
 async-trait = "0.1.89"
 base64 = "0.22.1"

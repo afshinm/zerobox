@@ -9,12 +9,20 @@
   },
   "homepage": "https://github.com/afshinm/zerobox",
   "keywords": [
-    "sandbox",
     "security",
-    "isolation",
-    "seatbelt",
-    "bubblewrap",
-    "seccomp"
+    "sandbox",
+    "mcp",
+    "vault",
+    "secret-management",
+    "ai-agents",
+    "security-tools",
+    "openclaw",
+    "process-isolation",
+    "cli",
+    "credential-injection",
+    "llm",
+    "code-execution",
+    "network-filtering"
   ],
   "type": "module",
   "bin": {

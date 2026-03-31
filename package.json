@@ -1,4 +1,5 @@
 {
+  "name": "zerobox-root",
   "private": true,
   "scripts": {
     "build": "pnpm --filter zerobox run build",

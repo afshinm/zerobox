@@ -10,7 +10,7 @@ We will acknowledge your report within 48 hours and provide a timeline for a fix
 
 ## Scope
 
-zerobox relies on OS-level sandboxing mechanisms:
+Zerobox relies on OS-level sandboxing mechanisms:
 
 - **macOS**: Apple's Seatbelt (`sandbox-exec`)
 - **Linux**: Bubblewrap + Seccomp + Linux namespaces
