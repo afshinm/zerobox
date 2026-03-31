@@ -1,15 +1,15 @@
 <div align="center">
-  <h1>🫙 zerobox</h1>
+  <h1>🫙 Zerobox</h1>
   <p><strong>Sandbox any command with file, network, and credential controls.</strong></p>
   <p>
     <a href="https://www.npmjs.com/package/zerobox" target="_blank">
-      <img src="https://img.shields.io/npm/v/zerobox?style=for-the-badge&labelColor=000000" alt="npm version" />
+      <img src="https://img.shields.io/npm/v/zerobox?style=for-the-badge&labelColor=000000" alt="Zerobox npm version" />
     </a>
     <a href="https://github.com/afshinm/zerobox/blob/main/LICENSE" target="_blank">
-      <img src="https://img.shields.io/github/license/afshinm/zerobox?style=for-the-badge&labelColor=000000" alt="license" />
+      <img src="https://img.shields.io/github/license/afshinm/zerobox?style=for-the-badge&labelColor=000000" alt="Zerobox license" />
     </a>
     <a href="https://github.com/afshinm/zerobox/actions/workflows/ci.yml" target="_blank">
-      <img src="https://img.shields.io/github/actions/workflow/status/afshinm/zerobox/ci.yml?style=for-the-badge&labelColor=000000&label=CI" alt="CI status" />
+      <img src="https://img.shields.io/github/actions/workflow/status/afshinm/zerobox/ci.yml?style=for-the-badge&labelColor=000000&label=CI" alt="Zerobox CI status" />
     </a>
   </p>
 </div>
@@ -196,13 +196,13 @@ const sandbox = Sandbox.create({
 
 ### Run AI-generated code safely
 
-An LLM generates code. Run it without risking file corruption or data exfiltration.
+Run AI generated code without risking file corruption or data leaks:
 
 ```bash
 zerobox -- python3 /tmp/task.py
 ```
 
-Allow writes only to an output directory:
+Or allow writes only to an output directory:
 
 ```bash
 zerobox --allow-write=/tmp/output -- python3 /tmp/task.py
