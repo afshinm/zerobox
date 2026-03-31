@@ -76,6 +76,7 @@ mod tests {
             deny_env: deny_env.map(|v| v.into_iter().map(String::from).collect()),
             secret: vec![],
             secret_host: vec![],
+            strict_sandbox: false,
             command: vec!["true".to_string()],
         }
     }

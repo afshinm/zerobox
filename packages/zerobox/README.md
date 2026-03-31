@@ -395,6 +395,7 @@ Sandbox overhead is minimal, typically ~10ms and ~7MB:
 | `--secret-host <KEY=HOSTS>` | `--secret-host API_KEY=api.openai.com` | Restrict a secret to specific hosts. Without this, the secret is substituted for all hosts. |
 | `-A`, `--allow-all` | `-A` | Grant all filesystem and network permissions. Env and secrets still apply. |
 | `--no-sandbox` | `--no-sandbox` | Disable the sandbox entirely. |
+| `--strict-sandbox` | `--strict-sandbox` | Require full sandbox (bubblewrap). Fail instead of falling back to weaker isolation. |
 | `-C <dir>` | `-C /workspace` | Set working directory for the sandboxed command. |
 | `-V`, `--version` | `--version` | Print version. |
 | `-h`, `--help` | `--help` | Print help. |

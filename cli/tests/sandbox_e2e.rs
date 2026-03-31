@@ -987,3 +987,38 @@ mod secrets {
         assert!(!ok, "example.com should be blocked, got {code}");
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// --strict flag
+// ═══════════════════════════════════════════════════════════════════════════
+
+mod strict_flag {
+    use super::*;
+
+    #[test]
+    fn strict_works_when_namespaces_available() {
+        // On CI (real Linux or macOS), namespaces are available.
+        // --strict should succeed, not error.
+        let out = run(&["--strict-sandbox", "--", "echo", "hello"]);
+        assert!(
+            out.status.success(),
+            "strict should work when namespaces are available, stderr: {}",
+            stderr(&out)
+        );
+        assert_eq!(stdout(&out).trim(), "hello");
+    }
+
+    #[test]
+    fn strict_with_allow_write() {
+        let out = run(&[
+            "--strict-sandbox",
+            "--allow-write=/tmp",
+            "--",
+            "sh",
+            "-c",
+            "echo ok > /tmp/zerobox-strict-test && cat /tmp/zerobox-strict-test",
+        ]);
+        assert!(out.status.success(), "stderr: {}", stderr(&out));
+        assert_eq!(stdout(&out).trim(), "ok");
+    }
+}

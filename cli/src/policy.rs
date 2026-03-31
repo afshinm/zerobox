@@ -213,6 +213,7 @@ mod tests {
             deny_env: None,
             secret: vec![],
             secret_host: vec![],
+            strict_sandbox: false,
             command: vec!["true".to_string()],
         }
     }

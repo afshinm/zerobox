@@ -17,6 +17,10 @@ export function buildFlags(options: SandboxOptions): string[] {
     }
   }
 
+  if (options.strictSandbox) {
+    flags.push("--strict-sandbox");
+  }
+
   if (options.allowAll) {
     flags.push("--allow-all");
     // Still emit env/secret flags — allowAll controls fs/net, not env.

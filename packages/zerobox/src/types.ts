@@ -18,6 +18,8 @@ export interface SandboxOptions {
   cwd?: string;
   /** Disable the sandbox entirely. */
   noSandbox?: boolean;
+  /** Require full sandbox. Fail instead of falling back to weaker isolation. */
+  strictSandbox?: boolean;
   /** Explicit environment variables for the sandbox. */
   env?: Record<string, string>;
   /** Inherit parent env vars. true = all (default), string[] = only listed keys. */

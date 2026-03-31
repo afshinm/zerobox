@@ -14,6 +14,12 @@ describe("buildFlags", () => {
     expect(buildFlags({ noSandbox: true, allowWrite: ["/tmp"] })).toEqual(["--no-sandbox"]);
   });
 
+  it("builds --strict-sandbox flag", () => {
+    const flags = buildFlags({ strictSandbox: true, allowWrite: ["/tmp"] });
+    expect(flags).toContain("--strict-sandbox");
+    expect(flags).toContain("--allow-write=/tmp");
+  });
+
   it("builds --allow-read with comma-separated paths", () => {
     expect(buildFlags({ allowRead: ["/tmp", "/data"] })).toEqual(["--allow-read=/tmp,/data"]);
   });

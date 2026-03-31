@@ -22,8 +22,9 @@ use proxy::build_network_proxy;
 
 /// Run a command inside a cross-platform sandbox.
 ///
-/// Permissions are deny-by-default for writes and network. Reads are allowed
-/// everywhere unless restricted with --allow-read=<paths>.
+/// Permissions are deny-by-default for writes, network, and environment
+/// variables. Reads are allowed everywhere unless restricted with
+/// --allow-read=<paths>.
 ///
 /// Deny flags carve out exceptions within allowed paths and always take
 /// precedence over allow flags.
@@ -31,11 +32,9 @@ use proxy::build_network_proxy;
 /// Examples:
 ///   zerobox -- node -e "console.log('hello')"
 ///   zerobox --allow-write=. --deny-write=./.git -- node script.js
-///   zerobox --allow-read=/tmp --allow-write=/tmp -- node script.js
-///   zerobox --allow-net -- curl https://example.com
-///   zerobox --allow-net=example.com,api.example.com -- node script.js
-///   zerobox --allow-net --deny-net=evil.com -- node script.js
-///   zerobox --allow-all -- bash -c "echo anything goes"
+///   zerobox --allow-net=example.com -- node script.js
+///   zerobox --env FOO=bar -- node script.js
+///   zerobox --secret API_KEY=sk-123 --secret-host API_KEY=api.openai.com -- node agent.js
 #[derive(Parser, Debug)]
 #[command(name = "zerobox", version, about, long_about = None)]
 pub struct Cli {
@@ -83,6 +82,11 @@ pub struct Cli {
     #[arg(long)]
     pub no_sandbox: bool,
 
+    /// Require full sandbox (bubblewrap on Linux). Fail instead of falling
+    /// back to weaker isolation (Landlock) when namespaces are unavailable.
+    #[arg(long)]
+    pub strict_sandbox: bool,
+
     /// Set environment variables for the sandboxed command (KEY=VALUE).
     /// Can be specified multiple times. These always survive env filtering.
     #[arg(long = "env", value_name = "KEY=VALUE")]
@@ -128,6 +132,26 @@ fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
         }
     }
     ExitCode::from(1)
+}
+
+/// Check if the current process can create user namespaces (required for bubblewrap).
+/// Returns false inside Docker containers or on kernels with unprivileged_userns_clone=0.
+#[cfg(target_os = "linux")]
+fn can_create_user_namespace() -> bool {
+    use std::process::Command;
+    // Try unshare with user namespace — the lightest possible check.
+    Command::new("unshare")
+        .args(["--user", "--", "true"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn can_create_user_namespace() -> bool {
+    true // Not applicable on macOS/Windows.
 }
 
 fn main() -> ExitCode {
@@ -186,11 +210,56 @@ async fn tokio_main() -> ExitCode {
         }
     };
 
-    let sandbox_type = if cli.no_sandbox || cli.allow_all {
-        SandboxType::None
+    if cli.strict_sandbox && (cli.no_sandbox || cli.allow_all) {
+        eprintln!("error: --strict-sandbox cannot be combined with --no-sandbox or --allow-all");
+        return ExitCode::from(1);
+    }
+
+    let (sandbox_type, use_legacy_landlock) = if cli.no_sandbox || cli.allow_all {
+        (SandboxType::None, false)
     } else {
-        get_platform_sandbox(false).unwrap_or(SandboxType::None)
+        match get_platform_sandbox(false) {
+            Some(SandboxType::LinuxSeccomp) => {
+                if can_create_user_namespace() {
+                    (SandboxType::LinuxSeccomp, false)
+                } else if cli.strict_sandbox {
+                    eprintln!(
+                        "error: --strict-sandbox requires bubblewrap but user namespaces are unavailable.\n\
+                         If running in Docker, start the container with:\n  \
+                         docker run --cap-add SYS_ADMIN --security-opt seccomp=unconfined ..."
+                    );
+                    return ExitCode::from(1);
+                } else {
+                    eprintln!(
+                        "warning: bubblewrap unavailable (no user namespaces), \
+                         using landlock (reduced isolation — no PID/network namespace). \
+                         Writes and network are still blocked by default."
+                    );
+                    (SandboxType::LinuxSeccomp, true)
+                }
+            }
+            other => (other.unwrap_or(SandboxType::None), false),
+        }
     };
+
+    // Landlock fallback doesn't support custom file policies (split policies
+    // require bwrap). Network filtering via the proxy still works.
+    if use_legacy_landlock {
+        let has_custom_policies = cli.allow_read.is_some()
+            || cli.deny_read.is_some()
+            || cli.allow_write.is_some()
+            || cli.deny_write.is_some();
+        if has_custom_policies {
+            eprintln!(
+                "error: custom file permissions (--allow-read, --allow-write, etc.) \
+                 require bubblewrap, which is unavailable in this environment.\n\
+                 The default sandbox (deny writes, deny network) still works.\n\
+                 For full permissions control in Docker, start the container with:\n  \
+                 docker run --cap-add SYS_ADMIN --security-opt seccomp=unconfined ..."
+            );
+            return ExitCode::from(1);
+        }
+    }
 
     let net_enabled = net_is_enabled(&cli) || !secret_store.is_empty();
     let fs_policy = build_fs_policy(&resolved, cli.allow_all, net_enabled);
@@ -263,7 +332,7 @@ async fn tokio_main() -> ExitCode {
         #[cfg(target_os = "macos")]
         macos_seatbelt_profile_extensions: None,
         codex_linux_sandbox_exe: linux_sandbox_exe.as_ref(),
-        use_legacy_landlock: false,
+        use_legacy_landlock,
         windows_sandbox_level: WindowsSandboxLevel::default(),
         windows_sandbox_private_desktop: false,
     };
