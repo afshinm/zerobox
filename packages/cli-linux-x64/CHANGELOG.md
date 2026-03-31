@@ -1,5 +1,11 @@
 # @zerobox/cli-linux-x64
 
+## 0.1.8
+
+### Patch Changes
+
+- [`2e88b35`](https://github.com/afshinm/zerobox/commit/2e88b35b23b13f920ff1179d9b6b363d997a1f4e) Thanks [@afshinm](https://github.com/afshinm)! - Add --strict-sandbox and fallback to no sandbox when bwrap is not available (e.g. in Docker)
+
 ## 0.1.7
 
 ### Patch Changes
