@@ -1,6 +1,6 @@
 <div align="center">
   <h1>🫙 zerobox</h1>
-  <p><strong>Run any command in a sandbox. Control what it can read, write, and connect to.</strong></p>
+  <p><strong>Sandbox any command with file, network, and credential controls.</strong></p>
   <p>
     <a href="https://www.npmjs.com/package/zerobox" target="_blank">
       <img src="https://img.shields.io/npm/v/zerobox?style=for-the-badge&labelColor=000000" alt="npm version" />
@@ -14,18 +14,16 @@
   </p>
 </div>
 
-## Overview
+Cross-platform process sandboxing powered by [OpenAI Codex](https://github.com/openai/codex)'s production sandbox runtime.
 
-Cross-platform process sandboxing powered by [OpenAI Codex](https://github.com/openai/codex)'s production sandbox runtime. Uses seatbelt on macOS and bubblewrap + seccomp on Linux.
-
-- 🔒 **Deny by default.** Writes, network, and environment variables are blocked unless you allow them.
-- 📁 **File access control.** Allow or deny reads and writes to specific paths.
-- 🌐 **Network filtering.** Allow or deny by domain, powered by a real HTTP/SOCKS proxy.
-- 🔑 **Secret management.** Pass API keys to specific hosts without exposing them to the sandboxed process.
-- 🧹 **Clean environment.** Only essential env vars (PATH, HOME, etc.) are inherited by default.
-- 🧩 **TypeScript SDK.** `import { Sandbox } from "zerobox"` with a Deno-style API.
-- 🖥️ **Cross-platform.** macOS and Linux. Windows support planned.
-- 📦 **Single binary.** No runtime dependencies, no Docker, no VMs.
+- **Deny by default.** Writes, network, and environment variables are blocked unless you allow them.
+- **Credential injection.** Pass API keys that the process never sees. The proxy injects real values into HTTP headers only for approved hosts.
+- **File access control.** Allow or deny reads and writes to specific paths.
+- **Network filtering.** Allow or deny outbound traffic by domain.
+- **Clean environment.** Only essential env vars (PATH, HOME, etc.) are inherited by default.
+- **TypeScript SDK.** `import { Sandbox } from "zerobox"` with a Deno-style API.
+- **Cross-platform.** macOS and Linux. Windows support planned.
+- **Single binary.** No Docker, no VMs, ~10ms overhead.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/afshinm/zerobox/refs/heads/main/packages/zerobox/assets/sandbox-flow.png" alt="zerobox sandbox flow" width="700" />
@@ -265,9 +263,9 @@ const result = await fetcher.js`
 ```
 
 Full working examples:
-- [`examples/ai-agent-sandboxed`](examples/ai-agent-sandboxed) -- Entire agent process sandboxed with secrets (API key never visible)
-- [`examples/ai-agent`](examples/ai-agent) -- Vercel AI SDK with per-tool sandboxing and secrets
-- [`examples/workflow`](examples/workflow) -- [Vercel Workflow](https://useworkflow.dev/) with sandboxed durable steps
+- [`examples/ai-agent-sandboxed`](examples/ai-agent-sandboxed) - Entire agent process sandboxed with secrets (API key never visible)
+- [`examples/ai-agent`](examples/ai-agent) - Vercel AI SDK with per-tool sandboxing and secrets
+- [`examples/workflow`](examples/workflow) - [Vercel Workflow](https://useworkflow.dev/) with sandboxed durable steps
 
 ### Protect your repo during builds
 

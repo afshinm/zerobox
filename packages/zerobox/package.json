@@ -1,7 +1,7 @@
 {
   "name": "zerobox",
   "version": "0.1.7",
-  "description": "Run any command in a sandbox with file and network restrictions.",
+  "description": "Sandbox any command with file, network, and credential controls.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
