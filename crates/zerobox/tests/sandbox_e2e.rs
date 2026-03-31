@@ -10,9 +10,18 @@ use std::path::PathBuf;
 use std::process::{Command, Output};
 
 fn zerobox_exec() -> PathBuf {
-    std::env::var("ZEROBOX_EXEC")
+    let path: PathBuf = std::env::var("ZEROBOX_EXEC")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| env!("CARGO_BIN_EXE_zerobox").into())
+        .unwrap_or_else(|_| env!("CARGO_BIN_EXE_zerobox").into());
+    if path.is_relative() {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("workspace root")
+            .join(&path)
+    } else {
+        path
+    }
 }
 
 fn run(args: &[&str]) -> Output {
