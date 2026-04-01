@@ -391,19 +391,27 @@ async fn tokio_main() -> ExitCode {
 
     cmd.envs(&child_env);
 
-    // Use output() instead of status() to capture and relay stdout/stderr.
-    // On Linux bwrap, inherited stdio can lose buffered output from runtimes
-    // like Node.js when the bwrap process exits before the pipe is drained.
-    match cmd.output().await {
-        Ok(output) => {
-            use std::io::Write;
-            let _ = std::io::stdout().write_all(&output.stdout);
-            let _ = std::io::stderr().write_all(&output.stderr);
-            exit_code_from_status(output.status)
+    // Inherit stdio for TTY (interactive), capture for pipes (SDK/scripts).
+    if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
+        match cmd.status().await {
+            Ok(status) => exit_code_from_status(status),
+            Err(e) => {
+                eprintln!("error: failed to execute command: {e}");
+                ExitCode::from(1)
+            }
         }
-        Err(e) => {
-            eprintln!("error: failed to execute command: {e}");
-            ExitCode::from(1)
+    } else {
+        match cmd.output().await {
+            Ok(output) => {
+                use std::io::Write;
+                let _ = std::io::stdout().write_all(&output.stdout);
+                let _ = std::io::stderr().write_all(&output.stderr);
+                exit_code_from_status(output.status)
+            }
+            Err(e) => {
+                eprintln!("error: failed to execute command: {e}");
+                ExitCode::from(1)
+            }
         }
     }
 }
