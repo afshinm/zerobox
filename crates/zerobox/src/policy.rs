@@ -214,6 +214,7 @@ mod tests {
             secret: vec![],
             secret_host: vec![],
             strict_sandbox: false,
+            debug: false,
             command: vec!["true".to_string()],
         }
     }

@@ -20,6 +20,8 @@ export interface SandboxOptions {
   noSandbox?: boolean;
   /** Require full sandbox. Fail instead of falling back to weaker isolation. */
   strictSandbox?: boolean;
+  /** Show sandbox configuration and runtime decisions on stderr. */
+  debug?: boolean;
   /** Explicit environment variables for the sandbox. */
   env?: Record<string, string>;
   /** Inherit parent env vars. true = all (default), string[] = only listed keys. */

@@ -1,7 +1,10 @@
+mod debug;
 mod env;
 mod policy;
 mod proxy;
 mod secret;
+
+use debug::debug_log;
 
 #[cfg(target_os = "linux")]
 use std::path::Path;
@@ -115,6 +118,10 @@ pub struct Cli {
     #[arg(long = "secret-host", value_name = "KEY=HOSTS")]
     pub secret_host: Vec<String>,
 
+    /// Show sandbox configuration and runtime decisions on stderr.
+    #[arg(long)]
+    pub debug: bool,
+
     /// The command and arguments to run.
     #[arg(trailing_var_arg = true, required = true)]
     pub command: Vec<String>,
@@ -185,6 +192,11 @@ async fn tokio_main() -> ExitCode {
     }
 
     let cli = Cli::parse();
+    let dbg = cli.debug;
+
+    if dbg {
+        debug::init_tracing();
+    }
 
     let secret_store = match secret::parse_secret_flags(&cli.secret, &cli.secret_host) {
         Ok(store) => std::sync::Arc::new(store),
@@ -193,6 +205,11 @@ async fn tokio_main() -> ExitCode {
             return ExitCode::from(1);
         }
     };
+
+    debug_log!(dbg, "secrets: {} configured", cli.secret.len());
+    if secret_store.requires_mitm() {
+        debug_log!(dbg, "secrets: MITM enabled for header substitution");
+    }
 
     let cwd = match cli.cwd.clone().map_or_else(std::env::current_dir, Ok) {
         Ok(p) => p,
@@ -209,6 +226,8 @@ async fn tokio_main() -> ExitCode {
             return ExitCode::from(1);
         }
     };
+
+    debug_log!(dbg, "cwd: {}", cwd.display());
 
     if cli.strict_sandbox && (cli.no_sandbox || cli.allow_all) {
         eprintln!("error: --strict-sandbox cannot be combined with --no-sandbox or --allow-all");
@@ -261,15 +280,35 @@ async fn tokio_main() -> ExitCode {
         }
     }
 
+    debug_log!(
+        dbg,
+        "sandbox: {sandbox_type:?} (landlock_fallback={use_legacy_landlock})"
+    );
+
     let net_enabled = net_is_enabled(&cli) || !secret_store.is_empty();
     let fs_policy = build_fs_policy(&resolved, cli.allow_all, net_enabled);
     let net_policy = build_net_policy(&cli);
     let legacy_policy = build_legacy_sandbox_policy(&resolved, &cli);
 
-    // Ensure Rustls crypto provider is initialized (required for MITM/TLS).
+    debug_log!(
+        dbg,
+        "network: {}",
+        if net_enabled { "enabled" } else { "blocked" }
+    );
+    if let Some(ref domains) = cli.allow_net {
+        if domains.is_empty() {
+            debug_log!(dbg, "network: all domains allowed");
+        } else {
+            debug_log!(dbg, "network: allowed domains: {}", domains.join(", "));
+        }
+    }
+    if let Some(ref domains) = cli.deny_net {
+        debug_log!(dbg, "network: denied domains: {}", domains.join(", "));
+    }
+
     codex_utils_rustls_provider::ensure_rustls_crypto_provider();
 
-    let proxy = match build_network_proxy(&cli, &secret_store).await {
+    let proxy = match build_network_proxy(&cli, &secret_store, dbg).await {
         Ok(p) => p,
         Err(e) => {
             eprintln!("error: failed to build network proxy: {e:#}");
@@ -277,17 +316,19 @@ async fn tokio_main() -> ExitCode {
         }
     };
 
-    // Start the proxy listeners (HTTP + SOCKS5). The handle keeps them alive
-    // until dropped. Must be held for the lifetime of the sandboxed process.
     let _proxy_handle = if let Some(ref proxy) = proxy {
         match proxy.run().await {
-            Ok(handle) => Some(handle),
+            Ok(handle) => {
+                debug_log!(dbg, "proxy: active");
+                Some(handle)
+            }
             Err(e) => {
                 eprintln!("error: failed to start network proxy: {e:#}");
                 return ExitCode::from(1);
             }
         }
     } else {
+        debug_log!(dbg, "proxy: none");
         None
     };
 
@@ -312,6 +353,8 @@ async fn tokio_main() -> ExitCode {
     for (key, placeholder) in secret_store.get_env_overrides() {
         child_env.insert(key, placeholder);
     }
+
+    debug_log!(dbg, "env: {} vars passed to child", child_env.len());
 
     let manager = SandboxManager::new();
     let request = SandboxTransformRequest {

@@ -20,6 +20,9 @@ export function buildFlags(options: SandboxOptions): string[] {
   if (options.strictSandbox) {
     flags.push("--strict-sandbox");
   }
+  if (options.debug) {
+    flags.push("--debug");
+  }
 
   if (options.allowAll) {
     flags.push("--allow-all");

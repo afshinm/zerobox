@@ -40,6 +40,7 @@ impl RequestHeaderTransformer for SecretStore {
 pub async fn build_network_proxy(
     cli: &Cli,
     secret_store: &Arc<SecretStore>,
+    debug: bool,
 ) -> Result<Option<NetworkProxy>> {
     let has_secrets = !secret_store.is_empty();
 
@@ -97,6 +98,11 @@ pub async fn build_network_proxy(
 
     if has_secrets {
         proxy_state.set_header_transformer(secret_store.clone());
+    }
+    if debug {
+        proxy_state
+            .set_blocked_request_observer(Some(crate::debug::blocked_observer()))
+            .await;
     }
 
     let proxy = NetworkProxy::builder()
