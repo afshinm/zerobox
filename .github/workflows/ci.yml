@@ -23,6 +23,18 @@ jobs:
           path: upstream/
           retention-days: 1
 
+  deny:
+    name: Cargo Deny
+    needs: sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: upstream
+          path: upstream/
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
   fmt:
     name: Format
     needs: sync
