@@ -1,5 +1,11 @@
 # @zerobox/cli-darwin-x64
 
+## 0.1.9
+
+### Patch Changes
+
+- [`0210b17`](https://github.com/afshinm/zerobox/commit/0210b17ea9e0153fb8e804c06ffd36cda6d71a16) Thanks [@afshinm](https://github.com/afshinm)! - Support TUIs/interactive shells, add --debug mode
+
 ## 0.1.8
 
 ### Patch Changes
