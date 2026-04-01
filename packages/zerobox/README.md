@@ -26,7 +26,9 @@ Lightweight, cross-platform process sandboxing powered by [OpenAI Codex](https:/
 - **Single binary:** No Docker, no VMs, ~10ms overhead
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/afshinm/zerobox/refs/heads/main/packages/zerobox/assets/sandbox-flow.png" alt="Zerobox architecture" width="800" />
+  <a href="https://www.youtube.com/watch?v=wZiPm9BOPCg" target="_blank" title="Watch the video">
+    <img alt="Zerobox Sandbox Flow" src="packages/zerobox/assets/flow.svg" alt="Watch the video" style="width: 100%; max-width: 1135px;" />
+  </a>
 </p>
 
 ## Install
@@ -92,6 +94,12 @@ const sandbox = Sandbox.create({
 
 const output = await sandbox.sh`node agent.js`.text();
 ```
+
+## Architecture
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/afshinm/zerobox/refs/heads/main/packages/zerobox/assets/sandbox-flow.png" alt="Zerobox architecture" width="800" />
+</p>
 
 ## Secrets
 

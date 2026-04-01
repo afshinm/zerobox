@@ -1,0 +1,265 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 760" width="100%" height="100%">
+    <defs>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+        </filter>
+    </defs>
+
+    <style>
+        text { user-select: none; }
+        .flow-line {
+            fill: none;
+            stroke: #2a2a4a;
+            stroke-width: 4;
+            stroke-dasharray: 8 8;
+            animation: flow 1.5s linear infinite;
+        }
+        @keyframes flow {
+            from { stroke-dashoffset: 16; }
+            to { stroke-dashoffset: 0; }
+        }
+        .float { animation: float-anim 4s ease-in-out infinite; }
+        @keyframes float-anim {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
+        }
+    </style>
+
+    <!-- Flow lines -->
+    <path class="flow-line" d="M 220 320 L 400 320" />
+    <path class="flow-line" d="M 530 320 C 630 320, 630 170, 770 170" />
+    <path class="flow-line" d="M 530 320 L 770 320" />
+    <path class="flow-line" d="M 530 320 C 630 320, 630 470, 770 470" />
+    <path class="flow-line" d="M 470 260 L 470 150" />
+
+    <!-- Filesystem -->
+    <g transform="translate(830, 170)">
+        <rect x="-65" y="-38" width="130" height="76" rx="8" fill="#1a1a2e" stroke="#2a2a4a" stroke-width="2" />
+        <rect x="-45" y="-25" width="22" height="6" rx="2" fill="#3a3a5a"/>
+        <rect x="-50" y="-19" width="100" height="32" rx="3" fill="#0a0a1a"/>
+        <rect x="-40" y="-12" width="80" height="4" rx="1" fill="#1a1a2e"/>
+        <rect x="-40" y="-2" width="55" height="4" rx="1" fill="#1a1a2e"/>
+        <circle cx="40" cy="-22" r="3" fill="#22d3ee"><animate attributeName="opacity" values="1;0.2;1" dur="2s" repeatCount="indefinite" /></circle>
+        <text x="0" y="62" fill="#e2e8f0" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle">Filesystem</text>
+        <text x="0" y="80" fill="#22d3ee" font-family="monospace" font-size="12" text-anchor="middle">/tmp/output : allow</text>
+    </g>
+
+    <!-- Network -->
+    <g transform="translate(830, 328)">
+        <rect x="-65" y="-38" width="130" height="76" rx="8" fill="#1a1a2e" stroke="#2a2a4a" stroke-width="2" />
+        <circle cx="0" cy="-5" r="18" fill="none" stroke="#3a3a5a" stroke-width="2"/>
+        <ellipse cx="0" cy="-5" rx="10" ry="18" fill="none" stroke="#3a3a5a" stroke-width="1.5"/>
+        <line x1="-18" y1="-5" x2="18" y2="-5" stroke="#3a3a5a" stroke-width="1.5"/>
+        <circle cx="40" cy="-22" r="3" fill="#818cf8"><animate attributeName="opacity" values="1;0.2;1" dur="2s" repeatCount="indefinite" /></circle>
+        <text x="0" y="62" fill="#e2e8f0" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle">Network</text>
+        <text x="0" y="80" fill="#22d3ee" font-family="monospace" font-size="12" text-anchor="middle">api.openai.com : allow</text>
+        <text x="0" y="95" fill="#fb7185" font-family="monospace" font-size="12" text-anchor="middle">* : deny (default)</text>
+    </g>
+
+    <!-- Env Vars -->
+    <g transform="translate(830, 470)">
+        <rect x="-65" y="-38" width="130" height="76" rx="8" fill="#1a1a2e" stroke="#2a2a4a" stroke-width="2" />
+        <rect x="-40" y="-25" width="80" height="44" rx="4" fill="#0a0a1a"/>
+        <text x="-28" y="-4" fill="#22d3ee" font-family="monospace" font-size="11">$ env</text>
+        <text x="-28" y="10" fill="#6b7280" font-family="monospace" font-size="10">PATH HOME</text>
+        <circle cx="40" cy="-22" r="3" fill="#fbbf24"><animate attributeName="opacity" values="1;0.2;1" dur="2s" repeatCount="indefinite" /></circle>
+        <text x="0" y="62" fill="#e2e8f0" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle">Env Vars</text>
+        <text x="0" y="80" fill="#6b7280" font-family="monospace" font-size="12" text-anchor="middle">Clean: PATH, HOME only</text>
+        <text x="0" y="95" fill="#fbbf24" font-family="monospace" font-size="12" text-anchor="middle">Secrets via Vault</text>
+    </g>
+
+    <g transform="translate(470, 120)">
+        <g opacity="0">
+           <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.786;0.7875;0.86;0.861;1" dur="20s" repeatCount="indefinite"/>
+           <circle cx="0" cy="0" r="35" fill="none" stroke="#fbbf24" stroke-width="3">
+               <animate attributeName="r" values="35;55;35" dur="1s" repeatCount="indefinite"/>
+               <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite"/>
+           </circle>
+        </g>
+        <rect x="-55" y="-32" width="110" height="64" rx="10" fill="#1a1a2e" stroke="#fbbf24" stroke-width="3"/>
+        <rect x="-12" y="-8" width="24" height="18" rx="3" fill="#fbbf24"/>
+        <path d="M -6 -8 L -6 -16 C -6 -22, 6 -22, 6 -16 L 6 -8" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="0" cy="2" r="3" fill="#1a1a2e"/>
+        <text x="0" y="52" fill="#d1d5db" font-family="monospace" font-size="14" font-weight="bold" text-anchor="middle">Credential Vault</text>
+        <text x="0" y="70" fill="#fbbf24" font-family="monospace" font-size="12" text-anchor="middle">OPENAI_API_KEY=sk-***</text>
+    </g>
+
+    <g transform="translate(140, 320)">
+      <g class="float">
+        <rect x="-65" y="-55" width="130" height="110" rx="12" fill="#1a1a2e" stroke="#818cf8" stroke-width="3" />
+        <rect x="-50" y="-40" width="100" height="60" rx="4" fill="#0a0a1a"/>
+        <circle cx="-38" cy="-30" r="3" fill="#fb7185"/>
+        <circle cx="-28" cy="-30" r="3" fill="#fbbf24"/>
+        <circle cx="-18" cy="-30" r="3" fill="#22d3ee"/>
+        <text x="-38" y="-12" fill="#22d3ee" font-family="monospace" font-size="10">$ ./agent</text>
+        <text x="-38" y="0" fill="#6b7280" font-family="monospace" font-size="9">running in</text>
+        <text x="-38" y="12" fill="#818cf8" font-family="monospace" font-size="9">zerobox sandbox</text>
+        <text x="0" y="76" fill="#e2e8f0" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle">Process</text>
+      </g>
+    </g>
+
+    <g transform="translate(465, 320)">
+        <rect x="-70" y="-65" width="140" height="130" rx="12" fill="#1a1a2e" stroke="#22d3ee" stroke-width="3" />
+        <path d="M 0 -44 L 22 -33 L 22 -11 C 22 5, 11 16, 0 22 C -11 16, -22 5, -22 -11 L -22 -33 Z" fill="none" stroke="#22d3ee" stroke-width="2.5"/>
+        <text x="0" y="-8" fill="#22d3ee" font-size="20" font-family="monospace" font-weight="bold" text-anchor="middle">&#x2713;</text>
+        <text x="0" y="38" fill="#d1d5db" font-family="monospace" font-size="13" text-anchor="middle">deny-by-default</text>
+        <text x="0" y="88" fill="#e2e8f0" font-family="monospace" font-size="18" font-weight="bold" text-anchor="middle">zerobox</text>
+    </g>
+
+    <!-- ═══ ANIMATED PACKETS ═══ -->
+
+    <g>
+        <!-- Phase 1: write → ALLOWED -->
+        <g opacity="0" transform="translate(220,320)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#818cf8" filter="url(#glow)" />
+            <text x="0" y="4" fill="#fff" font-size="12" font-family="monospace" font-weight="bold" text-anchor="middle">{ }</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.0001;0.001;0.05;0.051;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 L 180 0" keyPoints="0;0;1;1" keyTimes="0;0.001;0.05;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+        <g opacity="0" transform="translate(530,320)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#818cf8" filter="url(#glow)" />
+            <text x="0" y="4" fill="#fff" font-size="12" font-family="monospace" font-weight="bold" text-anchor="middle">{ }</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.049;0.05;0.10;0.101;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 C 100 0, 100 -150, 240 -150" keyPoints="0;0;1;1" keyTimes="0;0.05;0.10;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+        <g opacity="0" transform="translate(770,170)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#22d3ee" filter="url(#glow)" />
+            <text x="0" y="4.5" fill="#fff" font-size="14" font-family="monospace" font-weight="bold" text-anchor="middle">&#x2713;</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.099;0.10;0.15;0.151;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 C -140 0, -140 150, -240 150" keyPoints="0;0;1;1" keyTimes="0;0.10;0.15;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+        <g opacity="0" transform="translate(400,320)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#22d3ee" filter="url(#glow)" />
+            <text x="0" y="4.5" fill="#fff" font-size="14" font-family="monospace" font-weight="bold" text-anchor="middle">&#x2713;</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.149;0.15;0.20;0.201;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 L -180 0" keyPoints="0;0;1;1" keyTimes="0;0.15;0.20;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+
+        <!-- Phase 2: read → DENIED -->
+        <g opacity="0" transform="translate(220,320)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#818cf8" filter="url(#glow)" />
+            <text x="0" y="4" fill="#fff" font-size="12" font-family="monospace" font-weight="bold" text-anchor="middle">{ }</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.249;0.25;0.30;0.301;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 L 180 0" keyPoints="0;0;1;1" keyTimes="0;0.25;0.30;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+        <g opacity="0" transform="translate(400,320)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#fb7185" filter="url(#glow)" />
+            <text x="0" y="4.5" fill="#fff" font-size="14" font-family="monospace" font-weight="bold" text-anchor="middle">&#x2715;</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.299;0.30;0.35;0.351;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 L -180 0" keyPoints="0;0;1;1" keyTimes="0;0.30;0.35;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+
+        <!-- Phase 3: connect → ALLOWED -->
+        <g opacity="0" transform="translate(220,320)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#818cf8" filter="url(#glow)" />
+            <text x="0" y="4" fill="#fff" font-size="12" font-family="monospace" font-weight="bold" text-anchor="middle">{ }</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.499;0.50;0.55;0.551;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 L 180 0" keyPoints="0;0;1;1" keyTimes="0;0.50;0.55;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+        <g opacity="0" transform="translate(530,320)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#818cf8" filter="url(#glow)" />
+            <text x="0" y="4" fill="#fff" font-size="12" font-family="monospace" font-weight="bold" text-anchor="middle">{ }</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.549;0.55;0.60;0.601;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 L 240 0" keyPoints="0;0;1;1" keyTimes="0;0.55;0.60;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+        <g opacity="0" transform="translate(770,320)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#22d3ee" filter="url(#glow)" />
+            <text x="0" y="4.5" fill="#fff" font-size="14" font-family="monospace" font-weight="bold" text-anchor="middle">&#x2713;</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.599;0.60;0.65;0.651;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 L -240 0" keyPoints="0;0;1;1" keyTimes="0;0.60;0.65;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+        <g opacity="0" transform="translate(400,320)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#22d3ee" filter="url(#glow)" />
+            <text x="0" y="4.5" fill="#fff" font-size="14" font-family="monospace" font-weight="bold" text-anchor="middle">&#x2713;</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.649;0.65;0.70;0.701;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 L -180 0" keyPoints="0;0;1;1" keyTimes="0;0.65;0.70;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+
+        <!-- Phase 4: credential injection -->
+        <g opacity="0" transform="translate(220,320)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#818cf8" filter="url(#glow)" />
+            <text x="0" y="4" fill="#fff" font-size="12" font-family="monospace" font-weight="bold" text-anchor="middle">{ }</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.749;0.75;0.80;0.801;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 L 180 0" keyPoints="0;0;1;1" keyTimes="0;0.75;0.80;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+        <g opacity="0" transform="translate(470,260)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#fbbf24" filter="url(#glow)" />
+            <text x="0" y="5" fill="#fff" font-size="14" font-family="monospace" font-weight="bold" text-anchor="middle">&#x2191;</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.799;0.80;0.85;0.851;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 L 0 -105" keyPoints="0;0;1;1" keyTimes="0;0.80;0.85;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+        <g opacity="0" transform="translate(470,155)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#c084fc" filter="url(#glow)" />
+            <text x="0" y="4" fill="#fff" font-size="14" font-family="monospace" font-weight="bold" text-anchor="middle">&#x2193;</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.849;0.85;0.90;0.901;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 L 0 105" keyPoints="0;0;1;1" keyTimes="0;0.85;0.90;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+        <g opacity="0" transform="translate(530,320)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#c084fc" filter="url(#glow)" />
+            <text x="0" y="4" fill="#fff" font-size="14" font-family="monospace" font-weight="bold" text-anchor="middle">&#x2193;</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.899;0.90;0.95;0.951;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 L 240 0" keyPoints="0;0;1;1" keyTimes="0;0.90;0.95;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+        <g opacity="0" transform="translate(400,320)">
+            <rect x="-16" y="-12" width="32" height="24" rx="4" fill="#22d3ee" filter="url(#glow)" />
+            <text x="0" y="4.5" fill="#fff" font-size="14" font-family="monospace" font-weight="bold" text-anchor="middle">&#x2713;</text>
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.949;0.95;0.999;1;1" dur="20s" repeatCount="indefinite" />
+            <animateMotion path="M 0 0 L -180 0" keyPoints="0;0;1;1" keyTimes="0;0.95;0.999;1" calcMode="linear" dur="20s" repeatCount="indefinite" />
+        </g>
+    </g>
+
+    <g transform="translate(150, 630)">
+        <rect width="700" height="110" rx="8" fill="#0a0a1a" stroke="#1a1a2e" stroke-width="2"/>
+        <text x="20" y="25" fill="#6b7280" font-family="monospace" font-size="13">zerobox policy enforcement log</text>
+
+        <g opacity="0">
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.0001;0.001;0.24;0.241;1" dur="20s" repeatCount="indefinite" />
+            <text x="20" y="55" fill="#818cf8" font-family="monospace" font-size="15">&gt; syscall: write("/tmp/output.txt")</text>
+            <text x="20" y="80" fill="#22d3ee" font-family="monospace" font-size="15" opacity="0">
+                <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.049;0.05;0.24;0.241;1" dur="20s" repeatCount="indefinite" />
+                [ALLOW] path in write allowlist &#x2192; granted
+            </text>
+        </g>
+
+        <g opacity="0">
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.249;0.25;0.49;0.491;1" dur="20s" repeatCount="indefinite" />
+            <text x="20" y="55" fill="#818cf8" font-family="monospace" font-size="15">&gt; syscall: read("/etc/shadow")</text>
+            <text x="20" y="80" fill="#fb7185" font-family="monospace" font-size="15" opacity="0">
+                <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.299;0.30;0.49;0.491;1" dur="20s" repeatCount="indefinite" />
+                [DENY] path not in read allowlist &#x2192; EPERM
+            </text>
+        </g>
+
+        <g opacity="0">
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.499;0.50;0.74;0.741;1" dur="20s" repeatCount="indefinite" />
+            <text x="20" y="55" fill="#818cf8" font-family="monospace" font-size="15">&gt; connect: api.openai.com:443</text>
+            <text x="20" y="80" fill="#22d3ee" font-family="monospace" font-size="15" opacity="0">
+                <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.549;0.55;0.74;0.741;1" dur="20s" repeatCount="indefinite" />
+                [ALLOW] domain in network allowlist &#x2192; connected
+            </text>
+        </g>
+
+        <g opacity="0">
+            <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.749;0.75;0.99;0.991;1" dur="20s" repeatCount="indefinite" />
+            <text x="20" y="40" fill="#818cf8" font-family="monospace" font-size="15">&gt; env: OPENAI_API_KEY</text>
+            <text x="20" y="60" fill="#fbbf24" font-family="monospace" font-size="15" opacity="0">
+                <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.799;0.80;0.99;0.991;1" dur="20s" repeatCount="indefinite" />
+                [INJECT] vault &#x2192; injecting for api.openai.com
+            </text>
+            <text x="20" y="80" fill="#c084fc" font-family="monospace" font-size="15" opacity="0">
+                <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.849;0.85;0.99;0.991;1" dur="20s" repeatCount="indefinite" />
+                [SECURE] injected at network layer, process blind
+            </text>
+            <text x="20" y="100" fill="#22d3ee" font-family="monospace" font-size="15" opacity="0">
+                <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.899;0.90;0.99;0.991;1" dur="20s" repeatCount="indefinite" />
+                [OK] api.openai.com responded 200
+            </text>
+        </g>
+    </g>
+
+</svg>
