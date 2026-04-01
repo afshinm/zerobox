@@ -45,7 +45,7 @@
         <rect x="-40" y="-12" width="80" height="4" rx="1" fill="#1a1a2e"/>
         <rect x="-40" y="-2" width="55" height="4" rx="1" fill="#1a1a2e"/>
         <circle cx="40" cy="-22" r="3" fill="#22d3ee"><animate attributeName="opacity" values="1;0.2;1" dur="2s" repeatCount="indefinite" /></circle>
-        <text x="0" y="62" fill="#e2e8f0" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle">Filesystem</text>
+        <text x="0" y="62" fill="#c9cfd6" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle">Filesystem</text>
         <text x="0" y="80" fill="#22d3ee" font-family="monospace" font-size="12" text-anchor="middle">/tmp/output : allow</text>
     </g>
 
@@ -56,7 +56,7 @@
         <ellipse cx="0" cy="-5" rx="10" ry="18" fill="none" stroke="#3a3a5a" stroke-width="1.5"/>
         <line x1="-18" y1="-5" x2="18" y2="-5" stroke="#3a3a5a" stroke-width="1.5"/>
         <circle cx="40" cy="-22" r="3" fill="#818cf8"><animate attributeName="opacity" values="1;0.2;1" dur="2s" repeatCount="indefinite" /></circle>
-        <text x="0" y="62" fill="#e2e8f0" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle">Network</text>
+        <text x="0" y="62" fill="#c9cfd6" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle">Network</text>
         <text x="0" y="80" fill="#22d3ee" font-family="monospace" font-size="12" text-anchor="middle">api.openai.com : allow</text>
         <text x="0" y="95" fill="#fb7185" font-family="monospace" font-size="12" text-anchor="middle">* : deny (default)</text>
     </g>
@@ -68,7 +68,7 @@
         <text x="-28" y="-4" fill="#22d3ee" font-family="monospace" font-size="11">$ env</text>
         <text x="-28" y="10" fill="#6b7280" font-family="monospace" font-size="10">PATH HOME</text>
         <circle cx="40" cy="-22" r="3" fill="#fbbf24"><animate attributeName="opacity" values="1;0.2;1" dur="2s" repeatCount="indefinite" /></circle>
-        <text x="0" y="62" fill="#e2e8f0" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle">Env Vars</text>
+        <text x="0" y="62" fill="#c9cfd6" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle">Env Vars</text>
         <text x="0" y="80" fill="#6b7280" font-family="monospace" font-size="12" text-anchor="middle">Clean: PATH, HOME only</text>
         <text x="0" y="95" fill="#fbbf24" font-family="monospace" font-size="12" text-anchor="middle">Secrets via Vault</text>
     </g>
@@ -99,7 +99,7 @@
         <text x="-38" y="-12" fill="#22d3ee" font-family="monospace" font-size="10">$ ./agent</text>
         <text x="-38" y="0" fill="#6b7280" font-family="monospace" font-size="9">running in</text>
         <text x="-38" y="12" fill="#818cf8" font-family="monospace" font-size="9">zerobox sandbox</text>
-        <text x="0" y="76" fill="#e2e8f0" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle">Process</text>
+        <text x="0" y="76" fill="#c9cfd6" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle">Process</text>
       </g>
     </g>
 
@@ -108,10 +108,8 @@
         <path d="M 0 -44 L 22 -33 L 22 -11 C 22 5, 11 16, 0 22 C -11 16, -22 5, -22 -11 L -22 -33 Z" fill="none" stroke="#22d3ee" stroke-width="2.5"/>
         <text x="0" y="-8" fill="#22d3ee" font-size="20" font-family="monospace" font-weight="bold" text-anchor="middle">&#x2713;</text>
         <text x="0" y="38" fill="#d1d5db" font-family="monospace" font-size="13" text-anchor="middle">deny-by-default</text>
-        <text x="0" y="88" fill="#e2e8f0" font-family="monospace" font-size="18" font-weight="bold" text-anchor="middle">zerobox</text>
+        <text x="0" y="88" fill="#c9cfd6" font-family="monospace" font-size="18" font-weight="bold" text-anchor="middle">zerobox</text>
     </g>
-
-    <!-- ═══ ANIMATED PACKETS ═══ -->
 
     <g>
         <!-- Phase 1: write → ALLOWED -->
