@@ -191,3 +191,18 @@ jobs:
         env:
           ZEROBOX_BIN: ${{ github.workspace }}/target/release/zerobox
         run: pnpm --filter zerobox run test
+
+  ci:
+    name: CI
+    if: always()
+    needs: [deny, fmt, clippy, test-macos, test-linux, sdk]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        run: |
+          results="${{ join(needs.*.result, ' ') }}"
+          for r in $results; do
+            if [ "$r" != "success" ]; then
+              exit 1
+            fi
+          done
