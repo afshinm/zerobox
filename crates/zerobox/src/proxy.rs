@@ -68,18 +68,18 @@ pub async fn build_network_proxy(
     let bare_allow_net = cli.allow_net.as_ref().is_some_and(|v| v.is_empty());
 
     if bare_allow_net {
-        config.network.allowed_domains = vec!["*".to_string()];
+        config.network.set_allowed_domains(vec!["*".to_string()]);
     } else {
         let mut all_domains: Vec<String> = allow_domains.to_vec();
         all_domains.extend(secret_hosts);
         if all_domains.is_empty() {
-            config.network.allowed_domains = vec!["*".to_string()];
+            config.network.set_allowed_domains(vec!["*".to_string()]);
         } else {
-            config.network.allowed_domains = all_domains;
+            config.network.set_allowed_domains(all_domains);
         }
     }
     if let Some(deny) = &cli.deny_net {
-        config.network.denied_domains = deny.clone();
+        config.network.set_denied_domains(deny.clone());
     }
 
     // When secrets are configured, enable MITM so HTTPS headers can be inspected

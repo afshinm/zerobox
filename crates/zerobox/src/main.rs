@@ -359,7 +359,7 @@ async fn tokio_main() -> ExitCode {
     let manager = SandboxManager::new();
     let request = SandboxTransformRequest {
         command: SandboxCommand {
-            program: cli.command[0].clone(),
+            program: cli.command[0].clone().into(),
             args: cli.command[1..].to_vec(),
             cwd: cwd.clone(),
             env: child_env,
@@ -372,8 +372,6 @@ async fn tokio_main() -> ExitCode {
         enforce_managed_network: proxy.is_some(),
         network: proxy.as_ref(),
         sandbox_policy_cwd: &cwd,
-        #[cfg(target_os = "macos")]
-        macos_seatbelt_profile_extensions: None,
         codex_linux_sandbox_exe: linux_sandbox_exe.as_ref(),
         use_legacy_landlock,
         windows_sandbox_level: WindowsSandboxLevel::default(),
