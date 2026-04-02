@@ -1,5 +1,11 @@
 # @zerobox/cli-linux-arm64-musl
 
+## 0.1.10
+
+### Patch Changes
+
+- [`d5cc633`](https://github.com/afshinm/zerobox/commit/d5cc633fc36f24bba8f19f71e31c7549bad7021a) Thanks [@afshinm](https://github.com/afshinm)! - Upgrade Codex to 0.118.0
+
 ## 0.1.9
 
 ### Patch Changes
