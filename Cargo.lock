@@ -560,6 +560,7 @@ dependencies = [
  "codex-utils-absolute-path",
  "codex-utils-image",
  "codex-utils-string",
+ "codex-utils-template",
  "icu_decimal",
  "icu_locale_core",
  "icu_provider",
@@ -585,7 +586,6 @@ dependencies = [
  "codex-network-proxy",
  "codex-protocol",
  "codex-utils-absolute-path",
- "dirs",
  "dunce",
  "libc",
  "pretty_assertions",
@@ -593,6 +593,7 @@ dependencies = [
  "tempfile",
  "tracing",
  "url",
+ "which",
 ]
 
 [[package]]
@@ -4477,6 +4478,15 @@ name = "weezl"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88"
+
+[[package]]
+name = "which"
+version = "8.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81995fafaaaf6ae47a7d0cc83c67caf92aeb7e5331650ae6ff856f7c0c60c459"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "widestring"
