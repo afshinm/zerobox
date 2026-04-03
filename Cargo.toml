@@ -17,13 +17,14 @@ members = [
     "upstream/network-proxy",
 
     "crates/zerobox",
+    "crates/zerobox-snapshot",
     "crates/shims/core",
     "crates/shims/git-utils",
 ]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.10"
+version = "0.1.9"
 edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/afshinm/zerobox"

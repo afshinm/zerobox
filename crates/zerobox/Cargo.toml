@@ -15,6 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 codex-network-proxy = { workspace = true }
+zerobox-snapshot = { path = "../zerobox-snapshot" }
 codex-sandboxing = { workspace = true }
 codex-protocol = { workspace = true }
 codex-utils-absolute-path = { workspace = true }
@@ -25,6 +26,7 @@ clap = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = ["process", "rt-multi-thread", "macros", "io-util"] }
 chrono = { workspace = true }
 dirs = { workspace = true }
+serde_json = { workspace = true }
 getrandom = "0.3"
 rama-http = { version = "=0.3.0-alpha.4" }
 tracing-subscriber = { version = "0.3", features = ["fmt"] }

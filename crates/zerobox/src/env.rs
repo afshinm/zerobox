@@ -78,6 +78,11 @@ mod tests {
             secret_host: vec![],
             strict_sandbox: false,
             debug: false,
+            snapshot: false,
+            restore: false,
+            snapshot_paths: None,
+            snapshot_exclude: None,
+            subcommand: None,
             command: vec!["true".to_string()],
         }
     }
