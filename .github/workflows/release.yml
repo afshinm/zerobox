@@ -91,7 +91,7 @@ jobs:
       - name: Rust E2E tests
         env:
           ZEROBOX_EXEC: ./target/release/zerobox
-        run: cargo test -p zerobox --test sandbox_e2e
+        run: cargo test -p zerobox --test integration
       - uses: pnpm/action-setup@v4
         with:
           version: 10
