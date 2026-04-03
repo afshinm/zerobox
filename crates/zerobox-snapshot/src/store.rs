@@ -2,13 +2,15 @@
 //!
 //! Layout: `objects/{first 2 hex chars}/{remaining 62 hex chars}`
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use tempfile::NamedTempFile;
 
 use crate::types::ContentHash;
+
+const STREAM_THRESHOLD: u64 = 10 * 1024 * 1024;
 
 const LZ4_HEADER: &[u8; 4] = b"LZ4T";
 const RAW_HEADER: &[u8; 4] = &[0, 0, 0, 0];
@@ -25,9 +27,15 @@ impl ObjectStore {
         Ok(Self { objects_dir })
     }
 
-    /// Hash, compress, and store a file. Reads once to avoid TOCTOU.
-    /// Skips the write if identical content already exists.
+    /// Hash and store a file. Large files are streamed to avoid high memory usage.
     pub fn store_file(&self, path: &Path) -> Result<ContentHash> {
+        let meta = std::fs::metadata(path)
+            .with_context(|| format!("failed to stat {}", path.display()))?;
+
+        if meta.len() > STREAM_THRESHOLD {
+            return self.store_file_streaming(path);
+        }
+
         let content =
             std::fs::read(path).with_context(|| format!("failed to read {}", path.display()))?;
         let content_hash = ContentHash::from_bytes(*blake3::hash(&content).as_bytes());
@@ -38,6 +46,50 @@ impl ObjectStore {
 
         self.write_object(&content_hash, &compress(&content))?;
         Ok(content_hash)
+    }
+
+    fn store_file_streaming(&self, path: &Path) -> Result<ContentHash> {
+        let mut file = std::fs::File::open(path)
+            .with_context(|| format!("failed to open {}", path.display()))?;
+
+        let mut hasher = blake3::Hasher::new();
+        let mut buf = [0u8; 8192];
+        loop {
+            let n = file
+                .read(&mut buf)
+                .with_context(|| format!("failed to read {}", path.display()))?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buf[..n]);
+        }
+        let content_hash = ContentHash::from_bytes(*hasher.finalize().as_bytes());
+
+        if self.has_object(&content_hash) {
+            return Ok(content_hash);
+        }
+
+        let shard_dir = self.objects_dir.join(content_hash.prefix());
+        let obj_path = shard_dir.join(content_hash.suffix());
+        std::fs::create_dir_all(&shard_dir)?;
+
+        let mut tmp = NamedTempFile::new_in(&shard_dir)
+            .with_context(|| format!("failed to create temp file in {}", shard_dir.display()))?;
+        tmp.write_all(RAW_HEADER)?;
+
+        let mut file = std::fs::File::open(path)
+            .with_context(|| format!("failed to reopen {}", path.display()))?;
+        std::io::copy(&mut file, &mut tmp)?;
+        tmp.as_file().sync_all()?;
+
+        match tmp.persist(&obj_path) {
+            Ok(_) => Ok(content_hash),
+            Err(e) if obj_path.exists() => Ok(content_hash),
+            Err(e) => Err(anyhow::anyhow!(
+                "failed to persist object {content_hash}: {}",
+                e.error
+            )),
+        }
     }
 
     /// Store raw bytes. Returns the content hash.
@@ -257,5 +309,18 @@ mod tests {
         assert!(obj_path.exists());
         let parent = obj_path.parent().unwrap();
         assert_eq!(parent.file_name().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn large_file_streamed_and_retrievable() {
+        let (dir, store) = setup();
+        let path = dir.path().join("large.bin");
+        let data = vec![0x42u8; (STREAM_THRESHOLD as usize) + 1];
+        std::fs::write(&path, &data).unwrap();
+
+        let hash = store.store_file(&path).unwrap();
+        let retrieved = store.retrieve(&hash).unwrap();
+        assert_eq!(retrieved.len(), data.len());
+        assert_eq!(retrieved, data);
     }
 }
