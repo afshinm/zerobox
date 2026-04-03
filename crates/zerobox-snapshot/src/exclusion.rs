@@ -37,9 +37,6 @@ pub fn default_exclusions() -> Vec<String> {
         "__pycache__",
         ".venv",
         "target",
-        "build",
-        "dist",
-        "out",
         ".DS_Store",
         "Thumbs.db",
     ]
