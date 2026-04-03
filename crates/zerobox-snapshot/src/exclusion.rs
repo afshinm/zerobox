@@ -108,11 +108,12 @@ impl ExclusionFilter {
     }
 }
 
-/// With `/`: substring match on full path. Without: exact component match.
+/// With `/`: substring match on full path (normalized to `/`). Without: exact component match.
 fn matches_any_pattern(path: &Path, patterns: &[String]) -> bool {
     for pattern in patterns {
         if pattern.contains('/') {
-            if path.to_string_lossy().contains(pattern.as_str()) {
+            let normalized = path.to_string_lossy().replace('\\', "/");
+            if normalized.contains(pattern.as_str()) {
                 return true;
             }
         } else {
@@ -155,6 +156,12 @@ mod tests {
         let filter = make_filter(vec![".git/objects"]);
         assert!(filter.is_excluded(&PathBuf::from("project/.git/objects/ab/cdef")));
         assert!(!filter.is_excluded(&PathBuf::from("project/.git/config")));
+    }
+
+    #[test]
+    fn slash_pattern_matches_with_backslash_separators() {
+        let filter = make_filter(vec![".git/objects"]);
+        assert!(filter.is_excluded(&PathBuf::from("project\\.git\\objects\\ab\\cdef")));
     }
 
     #[test]

@@ -482,7 +482,7 @@ checksum = "e9b18233253483ce2f65329a24072ec414db782531bdbb7d0bbc4bd2ce6b7e21"
 
 [[package]]
 name = "codex-core"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "landlock",
  "seccompiler",
@@ -491,7 +491,7 @@ dependencies = [
 
 [[package]]
 name = "codex-execpolicy"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anyhow",
  "clap",
@@ -508,7 +508,7 @@ dependencies = [
 
 [[package]]
 name = "codex-git-utils"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "schemars 0.8.22",
  "serde",
@@ -517,7 +517,7 @@ dependencies = [
 
 [[package]]
 name = "codex-linux-sandbox"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "cc",
  "clap",
@@ -539,7 +539,7 @@ dependencies = [
 
 [[package]]
 name = "codex-network-proxy"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -570,7 +570,7 @@ dependencies = [
 
 [[package]]
 name = "codex-process-hardening"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "libc",
  "pretty_assertions",
@@ -578,7 +578,7 @@ dependencies = [
 
 [[package]]
 name = "codex-protocol"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anyhow",
  "codex-execpolicy",
@@ -607,7 +607,7 @@ dependencies = [
 
 [[package]]
 name = "codex-sandboxing"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "codex-network-proxy",
  "codex-protocol",
@@ -624,7 +624,7 @@ dependencies = [
 
 [[package]]
 name = "codex-utils-absolute-path"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "dirs",
  "path-absolutize",
@@ -638,7 +638,7 @@ dependencies = [
 
 [[package]]
 name = "codex-utils-cache"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "lru",
  "sha1",
@@ -647,7 +647,7 @@ dependencies = [
 
 [[package]]
 name = "codex-utils-home-dir"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "dirs",
  "pretty_assertions",
@@ -656,7 +656,7 @@ dependencies = [
 
 [[package]]
 name = "codex-utils-image"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "base64",
  "codex-utils-cache",
@@ -668,7 +668,7 @@ dependencies = [
 
 [[package]]
 name = "codex-utils-pty"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anyhow",
  "filedescriptor",
@@ -684,14 +684,14 @@ dependencies = [
 
 [[package]]
 name = "codex-utils-rustls-provider"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "rustls",
 ]
 
 [[package]]
 name = "codex-utils-string"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "pretty_assertions",
  "regex-lite",
@@ -699,14 +699,14 @@ dependencies = [
 
 [[package]]
 name = "codex-utils-template"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "pretty_assertions",
 ]
 
 [[package]]
 name = "codex-windows-sandbox"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anyhow",
  "base64",
@@ -5120,7 +5120,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5143,7 +5143,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox-snapshot"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anyhow",
  "blake3",
