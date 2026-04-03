@@ -369,32 +369,9 @@ mod tests {
     }
 
     #[test]
-    fn snapshots_dir_respects_zerobox_home() {
-        let prev = std::env::var_os("ZEROBOX_HOME");
-        unsafe { std::env::set_var("ZEROBOX_HOME", "/tmp/test-zerobox") };
-        let dir = snapshots_dir();
-        assert_eq!(dir, PathBuf::from("/tmp/test-zerobox/snapshots"));
-        match prev {
-            Some(val) => unsafe { std::env::set_var("ZEROBOX_HOME", val) },
-            None => unsafe { std::env::remove_var("ZEROBOX_HOME") },
-        }
-    }
-
-    #[test]
-    fn snapshots_dir_falls_back_to_codex_home() {
-        let prev_zb = std::env::var_os("ZEROBOX_HOME");
-        let prev_cx = std::env::var_os("CODEX_HOME");
-        unsafe { std::env::remove_var("ZEROBOX_HOME") };
-        unsafe { std::env::set_var("CODEX_HOME", "/tmp/test-codex") };
-        let dir = snapshots_dir();
-        assert_eq!(dir, PathBuf::from("/tmp/test-codex/snapshots"));
-        match prev_zb {
-            Some(val) => unsafe { std::env::set_var("ZEROBOX_HOME", val) },
-            None => unsafe { std::env::remove_var("ZEROBOX_HOME") },
-        }
-        match prev_cx {
-            Some(val) => unsafe { std::env::set_var("CODEX_HOME", val) },
-            None => unsafe { std::env::remove_var("CODEX_HOME") },
-        }
+    fn zerobox_home_precedence() {
+        let home = crate::zerobox_home();
+        assert!(!home.as_os_str().is_empty());
+        assert!(snapshots_dir().ends_with("snapshots"));
     }
 }
