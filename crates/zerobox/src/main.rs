@@ -517,19 +517,21 @@ async fn tokio_main() -> ExitCode {
     if let Some((mut state, baseline)) = snapshot_state {
         let incremental = state.manager.create_incremental(&baseline);
 
-        if let Ok((ref final_manifest, ref changes)) = incremental {
+        if let Ok((_, ref changes)) = incremental {
             snapshot::print_summary(changes);
-
-            let mut meta = snapshot::build_session_metadata(&state, &cli, &baseline);
-            meta.ended = Some(chrono::Utc::now().to_rfc3339());
-            meta.exit_code = raw_exit_code;
-            meta.snapshot_count = state.manager.snapshot_count();
-            meta.merkle_roots.push(final_manifest.merkle_root);
-            if let Err(e) = state.manager.save_session(&meta) {
-                eprintln!("snapshot: failed to save session: {e:#}");
-            }
         } else if let Err(ref e) = incremental {
             eprintln!("snapshot: incremental failed: {e:#}");
+        }
+
+        let mut meta = snapshot::build_session_metadata(&state, &cli, &baseline);
+        meta.ended = Some(chrono::Utc::now().to_rfc3339());
+        meta.exit_code = raw_exit_code;
+        meta.snapshot_count = state.manager.snapshot_count();
+        if let Ok((ref final_manifest, _)) = incremental {
+            meta.merkle_roots.push(final_manifest.merkle_root);
+        }
+        if let Err(e) = state.manager.save_session(&meta) {
+            eprintln!("snapshot: failed to save session: {e:#}");
         }
 
         if cli.restore {

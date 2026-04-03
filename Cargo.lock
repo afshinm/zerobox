@@ -5136,6 +5136,7 @@ dependencies = [
  "getrandom 0.3.4",
  "rama-http",
  "serde_json",
+ "tempfile",
  "tokio",
  "tracing-subscriber",
  "zerobox-snapshot",
