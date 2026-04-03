@@ -158,9 +158,13 @@ fn cmd_list() -> ExitCode {
     let dir = snapshots_dir();
     let entries = match std::fs::read_dir(&dir) {
         Ok(e) => e,
-        Err(_) => {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             eprintln!("No snapshots found.");
             return ExitCode::SUCCESS;
+        }
+        Err(e) => {
+            eprintln!("error: failed to read {}: {e}", dir.display());
+            return ExitCode::from(1);
         }
     };
 
@@ -305,9 +309,13 @@ fn cmd_clean(older_than_days: u64) -> ExitCode {
     let dir = snapshots_dir();
     let entries = match std::fs::read_dir(&dir) {
         Ok(e) => e,
-        Err(_) => {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             eprintln!("No snapshots found.");
             return ExitCode::SUCCESS;
+        }
+        Err(e) => {
+            eprintln!("error: failed to read {}: {e}", dir.display());
+            return ExitCode::from(1);
         }
     };
 
