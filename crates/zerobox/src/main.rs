@@ -515,32 +515,32 @@ async fn tokio_main() -> ExitCode {
     };
 
     if let Some((mut state, baseline)) = snapshot_state {
-        match state.manager.create_incremental(&baseline) {
-            Ok((final_manifest, changes)) => {
-                snapshot::print_summary(&changes);
+        let incremental = state.manager.create_incremental(&baseline);
 
-                if cli.restore && !changes.is_empty() {
-                    match state.manager.restore_to(&baseline) {
-                        Ok(applied) => {
-                            eprintln!("snapshot: restored {} files", applied.len());
-                        }
-                        Err(e) => {
-                            eprintln!("snapshot: restore failed: {e:#}");
-                        }
-                    }
-                }
+        if let Ok((ref final_manifest, ref changes)) = incremental {
+            snapshot::print_summary(changes);
 
-                let mut meta = snapshot::build_session_metadata(&state, &cli, &baseline);
-                meta.ended = Some(chrono::Utc::now().to_rfc3339());
-                meta.exit_code = raw_exit_code;
-                meta.snapshot_count = state.manager.snapshot_count();
-                meta.merkle_roots.push(final_manifest.merkle_root);
-                if let Err(e) = state.manager.save_session(&meta) {
-                    eprintln!("snapshot: failed to save session: {e:#}");
-                }
+            let mut meta = snapshot::build_session_metadata(&state, &cli, &baseline);
+            meta.ended = Some(chrono::Utc::now().to_rfc3339());
+            meta.exit_code = raw_exit_code;
+            meta.snapshot_count = state.manager.snapshot_count();
+            meta.merkle_roots.push(final_manifest.merkle_root);
+            if let Err(e) = state.manager.save_session(&meta) {
+                eprintln!("snapshot: failed to save session: {e:#}");
             }
-            Err(e) => {
-                eprintln!("snapshot: incremental failed: {e:#}");
+        } else if let Err(ref e) = incremental {
+            eprintln!("snapshot: incremental failed: {e:#}");
+        }
+
+        if cli.restore {
+            match state.manager.restore_to(&baseline) {
+                Ok(applied) if !applied.is_empty() => {
+                    eprintln!("snapshot: restored {} files", applied.len());
+                }
+                Err(e) => {
+                    eprintln!("snapshot: restore failed: {e:#}");
+                }
+                _ => {}
             }
         }
     }
