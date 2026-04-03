@@ -29,6 +29,7 @@ impl SnapshotManager {
     ) -> Result<Self> {
         std::fs::create_dir_all(session_dir.join("snapshots"))?;
         std::fs::create_dir_all(session_dir.join("changes"))?;
+        restrict_dir_permissions(&session_dir);
         let store = ObjectStore::new(session_dir.join("cache"))?;
         Ok(Self {
             session_dir,
@@ -446,6 +447,18 @@ fn stream_hash(path: &Path) -> Result<ContentHash> {
 
 fn now_epoch_secs() -> String {
     chrono::Utc::now().timestamp().to_string()
+}
+
+fn restrict_dir_permissions(path: &Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700));
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
 }
 
 fn restore_permissions(path: &Path, mode: u32) {

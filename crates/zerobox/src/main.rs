@@ -540,6 +540,7 @@ async fn tokio_main() -> ExitCode {
                 }
                 Err(e) => {
                     eprintln!("snapshot: restore failed: {e:#}");
+                    return ExitCode::from(1);
                 }
                 _ => {}
             }
