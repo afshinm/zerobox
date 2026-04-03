@@ -115,14 +115,15 @@ fn resolve_tracked_paths(cli: &Cli, cwd: &Path) -> Vec<PathBuf> {
         Some(paths) => paths
             .iter()
             .map(|p| {
-                if p.is_absolute() {
+                let abs = if p.is_absolute() {
                     p.clone()
                 } else {
                     cwd.join(p)
-                }
+                };
+                abs.canonicalize().unwrap_or(abs)
             })
             .collect(),
-        None => vec![cwd.to_path_buf()],
+        None => vec![cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf())],
     }
 }
 

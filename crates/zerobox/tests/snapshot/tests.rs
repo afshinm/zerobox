@@ -489,3 +489,33 @@ fn restore_preserves_command_exit_code() {
         "original"
     );
 }
+
+#[test]
+fn snapshot_path_with_dotdot_works() {
+    let dir = temp_dir();
+    let home = temp_dir();
+    let subdir = dir.path().join("sub");
+    fs::create_dir_all(&subdir).unwrap();
+    fs::write(subdir.join("file.txt"), "original").unwrap();
+
+    // Pass a path containing .. that resolves to subdir.
+    let dotdot_path = format!("{}/sub/../sub", dir.path().display());
+
+    let out = run_with_home(
+        home.path(),
+        &[
+            "--restore",
+            &format!("--snapshot-path={dotdot_path}"),
+            &format!("--allow-write={}", subdir.display()),
+            "--",
+            "sh",
+            "-c",
+            &format!("echo changed > {}/file.txt", subdir.display()),
+        ],
+    );
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(
+        fs::read_to_string(subdir.join("file.txt")).unwrap().trim(),
+        "original"
+    );
+}
