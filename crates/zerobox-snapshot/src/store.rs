@@ -84,7 +84,7 @@ impl ObjectStore {
 
         match tmp.persist(&obj_path) {
             Ok(_) => Ok(content_hash),
-            Err(e) if obj_path.exists() => Ok(content_hash),
+            Err(_) if obj_path.exists() => Ok(content_hash),
             Err(e) => Err(anyhow::anyhow!(
                 "failed to persist object {content_hash}: {}",
                 e.error
