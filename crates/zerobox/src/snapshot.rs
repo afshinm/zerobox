@@ -6,7 +6,8 @@ use std::process::ExitCode;
 use anyhow::Result;
 use zerobox_snapshot::{
     Change, ChangeType, ExclusionConfig, ExclusionFilter, SessionMetadata, SnapshotManager,
-    SnapshotManifest, WalkBudget, default_exclusions,
+    SnapshotManifest, WalkBudget, default_exclusions, dim, format_change_counts,
+    format_change_counts_colored, format_relative_time, truncate_command,
 };
 
 use crate::{Cli, SnapshotAction};
@@ -167,7 +168,7 @@ fn cmd_list() -> ExitCode {
         }
     };
 
-    let mut sessions: Vec<(String, SessionMetadata)> = Vec::new();
+    let mut sessions: Vec<(String, SessionMetadata, Option<Vec<Change>>)> = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
         if !path.is_dir() {
@@ -175,7 +176,12 @@ fn cmd_list() -> ExitCode {
         }
         if let Ok(meta) = SnapshotManager::load_session(&path) {
             let id = entry.file_name().to_string_lossy().to_string();
-            sessions.push((id, meta));
+            let latest = meta.snapshot_count.saturating_sub(1).max(1);
+            let changes_path = path.join(format!("changes/{latest:03}.json"));
+            let changes = std::fs::read_to_string(&changes_path)
+                .ok()
+                .and_then(|json| serde_json::from_str::<Vec<Change>>(&json).ok());
+            sessions.push((id, meta, changes));
         }
     }
 
@@ -186,11 +192,37 @@ fn cmd_list() -> ExitCode {
 
     sessions.sort_by(|a, b| b.1.started.cmp(&a.1.started));
 
-    for (id, meta) in &sessions {
-        let cmd = meta.command.join(" ");
-        let ended = meta.ended.as_deref().unwrap_or("running");
-        println!("{id}  {started} .. {ended}  {cmd}", started = meta.started);
+    let use_color = std::io::IsTerminal::is_terminal(&std::io::stdout());
+    let mut tw = tabwriter::TabWriter::new(std::io::stdout())
+        .padding(2)
+        .ansi(true);
+    use std::io::Write;
+
+    if use_color {
+        let _ = writeln!(
+            tw,
+            "{}\t{}\t{}\t{}",
+            dim("ID"),
+            dim("TIME"),
+            dim("COMMAND"),
+            dim("CHANGES")
+        );
+    } else {
+        let _ = writeln!(tw, "ID\tTIME\tCOMMAND\tCHANGES");
     }
+
+    for (id, meta, changes) in &sessions {
+        let time = format_relative_time(&meta.started);
+        let cmd = truncate_command(&meta.command, 40);
+        let changes_ref = changes.as_deref().unwrap_or(&[]);
+        let summary = if use_color {
+            format_change_counts_colored(changes_ref)
+        } else {
+            format_change_counts(changes_ref)
+        };
+        let _ = writeln!(tw, "{id}\t{time}\t{cmd}\t{summary}");
+    }
+    let _ = tw.flush();
 
     ExitCode::SUCCESS
 }

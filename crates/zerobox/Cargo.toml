@@ -27,6 +27,7 @@ tokio = { workspace = true, features = ["process", "rt-multi-thread", "macros", 
 chrono = { workspace = true }
 dirs = { workspace = true }
 serde_json = { workspace = true }
+tabwriter = "1.4"
 getrandom = "0.3"
 rama-http = { version = "=0.3.0-alpha.4" }
 tracing-subscriber = { version = "0.3", features = ["fmt"] }

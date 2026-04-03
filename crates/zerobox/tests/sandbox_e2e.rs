@@ -1172,7 +1172,7 @@ mod snapshot {
         let list_out = stdout(&list);
         let session_id = list_out
             .lines()
-            .next()
+            .nth(1) // skip header
             .and_then(|l| l.split_whitespace().next())
             .expect("no session in list");
 
