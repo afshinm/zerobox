@@ -1,4 +1,4 @@
-//! Filesystem snapshot and rollback for zerobox sandboxes.
+//! Filesystem snapshot and restore for zerobox sandboxes.
 //!
 //! Architecture inspired by [titor](https://github.com/winfunc/titor)
 

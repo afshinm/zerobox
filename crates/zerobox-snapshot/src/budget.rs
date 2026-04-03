@@ -23,15 +23,15 @@ impl WalkBudget {
     pub fn check(&self, entries: usize, bytes: u64) -> Result<()> {
         if self.max_entries > 0 && entries > self.max_entries {
             bail!(
-                "rollback walk exceeded entry limit ({entries} > {}). \
-                 Add exclusion patterns with --rollback-exclude or disable with --no-rollback.",
+                "snapshot walk exceeded entry limit ({entries} > {}). \
+                 Add exclusion patterns with --snapshot-exclude.",
                 self.max_entries
             );
         }
         if self.max_bytes > 0 && bytes > self.max_bytes {
             bail!(
-                "rollback walk exceeded byte limit ({bytes} > {} bytes). \
-                 Add exclusion patterns with --rollback-exclude or disable with --no-rollback.",
+                "snapshot walk exceeded byte limit ({bytes} > {} bytes). \
+                 Add exclusion patterns with --snapshot-exclude.",
                 self.max_bytes
             );
         }
@@ -44,17 +44,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_budget_allows_small_walks() {
-        let budget = WalkBudget::default();
-        assert!(budget.check(100, 1024).is_ok());
-    }
-
-    #[test]
     fn entry_limit_exceeded() {
         let budget = WalkBudget {
             max_entries: 10,
             max_bytes: 0,
         };
+        assert!(budget.check(10, 0).is_ok());
         assert!(budget.check(11, 0).is_err());
     }
 
@@ -64,15 +59,17 @@ mod tests {
             max_entries: 0,
             max_bytes: 1000,
         };
+        assert!(budget.check(1, 1000).is_ok());
         assert!(budget.check(1, 1001).is_err());
     }
 
     #[test]
-    fn unlimited_budget_always_ok() {
+    fn error_messages_reference_correct_flags() {
         let budget = WalkBudget {
-            max_entries: 0,
+            max_entries: 1,
             max_bytes: 0,
         };
-        assert!(budget.check(999_999, 999_999_999).is_ok());
+        let err = budget.check(2, 0).unwrap_err().to_string();
+        assert!(err.contains("--snapshot-exclude"), "got: {err}");
     }
 }

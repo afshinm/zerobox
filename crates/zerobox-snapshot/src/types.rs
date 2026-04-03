@@ -1,4 +1,4 @@
-//! Core types for snapshot and rollback.
+//! Core types for snapshot and restore.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -115,7 +115,7 @@ pub struct SnapshotManifest {
     pub merkle_root: ContentHash,
 }
 
-/// One sandbox execution's rollback session.
+/// One sandbox execution's snapshot session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionMetadata {
     pub session_id: String,

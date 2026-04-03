@@ -239,9 +239,11 @@ impl SnapshotManager {
                 continue;
             }
 
+            let exclusion = self.exclusion.clone();
             let mut walker = ignore::WalkBuilder::new(tracked);
             walker.git_ignore(self.use_gitignore);
             walker.hidden(false);
+            walker.filter_entry(move |entry| !exclusion.is_excluded(entry.path()));
 
             for entry in walker.build() {
                 let entry = match entry {
@@ -254,9 +256,6 @@ impl SnapshotManager {
 
                 let path = entry.path();
                 if !path.is_file() {
-                    continue;
-                }
-                if self.exclusion.is_excluded(path) {
                     continue;
                 }
 
@@ -284,9 +283,7 @@ impl SnapshotManager {
         let hash = if store {
             self.store.store_file(path)?
         } else {
-            let content = std::fs::read(path)
-                .with_context(|| format!("failed to read {}", path.display()))?;
-            ContentHash::from_bytes(*blake3::hash(&content).as_bytes())
+            stream_hash(path)?
         };
         Ok(FileState {
             hash,
@@ -396,6 +393,23 @@ fn atomic_write(path: &Path, content: &[u8]) -> Result<()> {
     tmp.persist(path)
         .map_err(|e| anyhow::anyhow!("failed to persist {}: {}", path.display(), e.error))?;
     Ok(())
+}
+
+/// Hash a file with BLAKE3 using streaming I/O (constant memory).
+fn stream_hash(path: &Path) -> Result<ContentHash> {
+    let mut file =
+        std::fs::File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
+    let mut hasher = blake3::Hasher::new();
+    let mut buf = [0u8; 8192];
+    loop {
+        let n = std::io::Read::read(&mut file, &mut buf)
+            .with_context(|| format!("failed to read {}", path.display()))?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(ContentHash::from_bytes(*hasher.finalize().as_bytes()))
 }
 
 fn now_epoch_secs() -> String {

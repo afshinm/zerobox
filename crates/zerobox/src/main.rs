@@ -146,6 +146,18 @@ fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
     ExitCode::from(1)
 }
 
+/// Data directory: `$ZEROBOX_HOME` > `$CODEX_HOME` > `~/.zerobox`.
+pub fn zerobox_home() -> PathBuf {
+    std::env::var_os("ZEROBOX_HOME")
+        .or_else(|| std::env::var_os("CODEX_HOME"))
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join(".zerobox")
+        })
+}
+
 /// Check if the current process can create user namespaces (required for bubblewrap).
 /// Returns false inside Docker containers or on kernels with unprivileged_userns_clone=0.
 #[cfg(target_os = "linux")]
@@ -167,14 +179,11 @@ fn can_create_user_namespace() -> bool {
 }
 
 fn main() -> ExitCode {
-    // Set CODEX_HOME before tokio spawns threads (set_var is unsafe with threads).
-    if std::env::var("CODEX_HOME").is_err()
-        && let Some(home) = dirs::home_dir()
-    {
-        let zerobox_home = home.join(".zerobox");
-        let _ = std::fs::create_dir_all(&zerobox_home);
-        // SAFETY: truly single-threaded here — tokio runtime not yet started.
-        unsafe { std::env::set_var("CODEX_HOME", &zerobox_home) };
+    if std::env::var("CODEX_HOME").is_err() {
+        let home = zerobox_home();
+        let _ = std::fs::create_dir_all(&home);
+        // SAFETY: single-threaded here — tokio runtime not yet started.
+        unsafe { std::env::set_var("CODEX_HOME", &home) };
     }
     tokio_main()
 }
@@ -474,12 +483,12 @@ async fn tokio_main() -> ExitCode {
     cmd.envs(&child_env);
 
     // Inherit stdio for TTY (interactive), capture for pipes (SDK/scripts).
-    let exit = if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
+    let (exit, raw_exit_code) = if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
         match cmd.status().await {
-            Ok(status) => exit_code_from_status(status),
+            Ok(status) => (exit_code_from_status(status), status.code()),
             Err(e) => {
                 eprintln!("error: failed to execute command: {e}");
-                ExitCode::from(1)
+                (ExitCode::from(1), Some(1))
             }
         }
     } else {
@@ -488,11 +497,11 @@ async fn tokio_main() -> ExitCode {
                 use std::io::Write;
                 let _ = std::io::stdout().write_all(&output.stdout);
                 let _ = std::io::stderr().write_all(&output.stderr);
-                exit_code_from_status(output.status)
+                (exit_code_from_status(output.status), output.status.code())
             }
             Err(e) => {
                 eprintln!("error: failed to execute command: {e}");
-                ExitCode::from(1)
+                (ExitCode::from(1), Some(1))
             }
         }
     };
@@ -515,6 +524,7 @@ async fn tokio_main() -> ExitCode {
 
                 let mut meta = snapshot::build_session_metadata(&state, &cli, &baseline);
                 meta.ended = Some(chrono::Utc::now().to_rfc3339());
+                meta.exit_code = raw_exit_code;
                 meta.snapshot_count = state.manager.snapshot_count();
                 meta.merkle_roots.push(final_manifest.merkle_root);
                 if let Err(e) = state.manager.save_session(&meta) {
