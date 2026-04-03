@@ -207,7 +207,17 @@ fn cmd_diff(id: &str) -> ExitCode {
         return ExitCode::from(1);
     }
 
-    let changes_path = session_dir.join("changes/001.json");
+    let meta = match SnapshotManager::load_session(&session_dir) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("error: failed to load session: {e}");
+            return ExitCode::from(1);
+        }
+    };
+
+    // Find the latest changes file (snapshot N vs baseline).
+    let latest = meta.snapshot_count.saturating_sub(1).max(1);
+    let changes_path = session_dir.join(format!("changes/{latest:03}.json"));
     if !changes_path.exists() {
         eprintln!("No changes recorded for session {id}.");
         return ExitCode::SUCCESS;

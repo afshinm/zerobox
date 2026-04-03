@@ -85,7 +85,7 @@ pub struct Cli {
     #[arg(long)]
     pub snapshot: bool,
 
-    /// Record and immediately undo all filesystem changes after exit.
+    /// Record and restore tracked files to their pre-execution state after exit.
     /// Implies --snapshot.
     #[arg(long)]
     pub restore: bool,
