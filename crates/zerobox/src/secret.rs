@@ -209,7 +209,7 @@ impl SecretEntry {
     }
 }
 
-/// Returns the MITM CA certificate path (`$ZEROBOX_HOME/proxy/ca.pem`) if it exists.
+/// Returns the MITM CA certificate path (`<zerobox_home>/proxy/ca.pem`) if it exists.
 pub fn mitm_ca_cert_path() -> Option<PathBuf> {
     let path = crate::zerobox_home().join("proxy").join("ca.pem");
     if path.exists() { Some(path) } else { None }

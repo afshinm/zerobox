@@ -357,8 +357,8 @@ fn snapshot_diff_shows_changes() {
 
     let diff = run_with_home(home.path(), &["snapshot", "diff", session_id]);
     assert!(diff.status.success(), "stderr: {}", stderr(&diff));
-    let diff_err = stderr(&diff);
-    assert!(diff_err.contains("1 modified"), "got: {diff_err}");
+    let diff_out = stdout(&diff);
+    assert!(diff_out.contains("1 modified"), "got: {diff_out}");
 }
 
 #[test]
