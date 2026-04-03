@@ -1032,20 +1032,32 @@ mod snapshot {
         tempfile::tempdir().expect("create temp dir")
     }
 
+    fn run_with_home(home: &std::path::Path, args: &[&str]) -> Output {
+        Command::new(zerobox_exec())
+            .args(args)
+            .env("ZEROBOX_HOME", home)
+            .output()
+            .expect("failed to spawn zerobox")
+    }
+
     #[test]
     fn snapshot_records_changes() {
         let dir = temp_dir();
+        let home = temp_dir();
         fs::write(dir.path().join("file.txt"), "original").unwrap();
 
-        let out = run(&[
-            "--snapshot",
-            &format!("--snapshot-path={}", dir.path().display()),
-            &format!("--allow-write={}", dir.path().display()),
-            "--",
-            "sh",
-            "-c",
-            &format!("echo modified > {}/file.txt", dir.path().display()),
-        ]);
+        let out = run_with_home(
+            home.path(),
+            &[
+                "--snapshot",
+                &format!("--snapshot-path={}", dir.path().display()),
+                &format!("--allow-write={}", dir.path().display()),
+                "--",
+                "sh",
+                "-c",
+                &format!("echo modified > {}/file.txt", dir.path().display()),
+            ],
+        );
         assert!(out.status.success(), "stderr: {}", stderr(&out));
         let err = stderr(&out);
         assert!(
@@ -1063,21 +1075,25 @@ mod snapshot {
     #[test]
     fn restore_undoes_changes() {
         let dir = temp_dir();
+        let home = temp_dir();
         fs::write(dir.path().join("file.txt"), "original").unwrap();
 
-        let out = run(&[
-            "--restore",
-            &format!("--snapshot-path={}", dir.path().display()),
-            &format!("--allow-write={}", dir.path().display()),
-            "--",
-            "sh",
-            "-c",
-            &format!(
-                "echo modified > {}/file.txt; echo new > {}/new.txt",
-                dir.path().display(),
-                dir.path().display()
-            ),
-        ]);
+        let out = run_with_home(
+            home.path(),
+            &[
+                "--restore",
+                &format!("--snapshot-path={}", dir.path().display()),
+                &format!("--allow-write={}", dir.path().display()),
+                "--",
+                "sh",
+                "-c",
+                &format!(
+                    "echo modified > {}/file.txt; echo new > {}/new.txt",
+                    dir.path().display(),
+                    dir.path().display()
+                ),
+            ],
+        );
         assert!(out.status.success(), "stderr: {}", stderr(&out));
         let err = stderr(&out);
         assert!(
@@ -1096,14 +1112,18 @@ mod snapshot {
     #[test]
     fn snapshot_no_changes_reports_none() {
         let dir = temp_dir();
+        let home = temp_dir();
         fs::write(dir.path().join("file.txt"), "unchanged").unwrap();
 
-        let out = run(&[
-            "--snapshot",
-            &format!("--snapshot-path={}", dir.path().display()),
-            "--",
-            "true",
-        ]);
+        let out = run_with_home(
+            home.path(),
+            &[
+                "--snapshot",
+                &format!("--snapshot-path={}", dir.path().display()),
+                "--",
+                "true",
+            ],
+        );
         assert!(out.status.success(), "stderr: {}", stderr(&out));
         let err = stderr(&out);
         assert!(err.contains("no changes detected"), "got: {err}");
@@ -1112,34 +1132,30 @@ mod snapshot {
     #[test]
     fn snapshot_session_discoverable_via_list() {
         let dir = temp_dir();
+        let home = temp_dir();
         fs::write(dir.path().join("file.txt"), "data").unwrap();
 
-        let out = run(&[
-            "--snapshot",
-            &format!("--snapshot-path={}", dir.path().display()),
-            &format!("--allow-write={}", dir.path().display()),
-            "--",
-            "sh",
-            "-c",
-            &format!("echo changed > {}/file.txt", dir.path().display()),
-        ]);
+        let out = run_with_home(
+            home.path(),
+            &[
+                "--snapshot",
+                &format!("--snapshot-path={}", dir.path().display()),
+                &format!("--allow-write={}", dir.path().display()),
+                "--",
+                "sh",
+                "-c",
+                &format!("echo changed > {}/file.txt", dir.path().display()),
+            ],
+        );
         assert!(out.status.success(), "stderr: {}", stderr(&out));
 
-        let list = run(&["snapshot", "list"]);
+        let list = run_with_home(home.path(), &["snapshot", "list"]);
         assert!(list.status.success(), "stderr: {}", stderr(&list));
         let list_out = stdout(&list);
         assert!(
             list_out.contains("sh"),
             "expected session in list, got: {list_out}"
         );
-    }
-
-    fn run_with_home(home: &std::path::Path, args: &[&str]) -> Output {
-        Command::new(zerobox_exec())
-            .args(args)
-            .env("ZEROBOX_HOME", home)
-            .output()
-            .expect("failed to spawn zerobox")
     }
 
     #[test]
@@ -1189,19 +1205,23 @@ mod snapshot {
     #[test]
     fn restore_with_excluded_dir_preserves_it() {
         let dir = temp_dir();
+        let home = temp_dir();
         fs::write(dir.path().join("file.txt"), "original").unwrap();
         fs::create_dir_all(dir.path().join(".git")).unwrap();
         fs::write(dir.path().join(".git/HEAD"), "ref: refs/heads/main").unwrap();
 
-        let out = run(&[
-            "--restore",
-            &format!("--snapshot-path={}", dir.path().display()),
-            &format!("--allow-write={}", dir.path().display()),
-            "--",
-            "sh",
-            "-c",
-            &format!("echo modified > {}/file.txt", dir.path().display()),
-        ]);
+        let out = run_with_home(
+            home.path(),
+            &[
+                "--restore",
+                &format!("--snapshot-path={}", dir.path().display()),
+                &format!("--allow-write={}", dir.path().display()),
+                "--",
+                "sh",
+                "-c",
+                &format!("echo modified > {}/file.txt", dir.path().display()),
+            ],
+        );
         assert!(out.status.success(), "stderr: {}", stderr(&out));
         assert_eq!(
             fs::read_to_string(dir.path().join("file.txt"))
