@@ -109,26 +109,54 @@ impl ObjectStore {
         let obj_path = self.object_path(hash);
         let blob = std::fs::read(&obj_path).with_context(|| format!("object not found: {hash}"))?;
         let content = decompress(&blob)?;
-
         let actual = ContentHash::from_bytes(*blake3::hash(&content).as_bytes());
-        if actual != *hash {
-            anyhow::bail!("integrity check failed for {hash}: stored content hashes to {actual}");
-        }
-
+        check_integrity(hash, &actual)?;
         Ok(content)
     }
 
     /// Retrieve content and write it atomically to a target path.
+    /// Raw objects are streamed directly to avoid buffering large files in memory.
     pub fn retrieve_to(&self, hash: &ContentHash, target: &Path) -> Result<()> {
-        let content = self.retrieve(hash)?;
+        let obj_path = self.object_path(hash);
         let parent = target
             .parent()
             .ok_or_else(|| anyhow::anyhow!("no parent for {}", target.display()))?;
         std::fs::create_dir_all(parent)?;
 
+        let mut obj_file =
+            std::fs::File::open(&obj_path).with_context(|| format!("object not found: {hash}"))?;
+
+        let mut header = [0u8; 4];
+        obj_file
+            .read_exact(&mut header)
+            .with_context(|| format!("failed to read header for {hash}"))?;
+
         let mut tmp = NamedTempFile::new_in(parent)
             .with_context(|| format!("failed to create temp file in {}", parent.display()))?;
-        tmp.write_all(&content)?;
+
+        if header == *LZ4_HEADER {
+            let mut compressed = Vec::new();
+            obj_file.read_to_end(&mut compressed)?;
+            let content = lz4_flex::decompress_size_prepended(&compressed)
+                .map_err(|e| anyhow::anyhow!("LZ4 decompression failed: {e}"))?;
+            let actual = ContentHash::from_bytes(*blake3::hash(&content).as_bytes());
+            check_integrity(hash, &actual)?;
+            tmp.write_all(&content)?;
+        } else {
+            let mut hasher = blake3::Hasher::new();
+            let mut buf = [0u8; 8192];
+            loop {
+                let n = obj_file.read(&mut buf)?;
+                if n == 0 {
+                    break;
+                }
+                hasher.update(&buf[..n]);
+                tmp.write_all(&buf[..n])?;
+            }
+            let actual = ContentHash::from_bytes(*hasher.finalize().as_bytes());
+            check_integrity(hash, &actual)?;
+        }
+
         tmp.persist(target).map_err(|e| {
             anyhow::anyhow!("failed to persist to {}: {}", target.display(), e.error)
         })?;
@@ -182,6 +210,13 @@ impl ObjectStore {
 }
 
 /// LZ4 compress with a 4-byte header. Stores raw if the blob is tiny or incompressible.
+fn check_integrity(expected: &ContentHash, actual: &ContentHash) -> Result<()> {
+    if actual != expected {
+        anyhow::bail!("integrity check failed: expected {expected}, got {actual}");
+    }
+    Ok(())
+}
+
 fn compress(content: &[u8]) -> Vec<u8> {
     if content.len() < COMPRESS_THRESHOLD {
         let mut blob = Vec::with_capacity(4 + content.len());
@@ -348,5 +383,56 @@ mod tests {
         let obj_path = store.object_path(&hash);
         std::fs::write(&obj_path, b"XX").unwrap();
         assert!(store.retrieve(&hash).is_err());
+    }
+
+    #[test]
+    fn large_file_retrieve_to_streams() {
+        let (dir, store) = setup();
+        let path = dir.path().join("large.bin");
+        let data = vec![0x42u8; (STREAM_THRESHOLD as usize) + 1];
+        std::fs::write(&path, &data).unwrap();
+
+        let hash = store.store_file(&path).unwrap();
+        let target = dir.path().join("restored_large.bin");
+        store.retrieve_to(&hash, &target).unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), data);
+    }
+
+    #[test]
+    fn retrieve_to_detects_corrupted_raw_object() {
+        let (dir, store) = setup();
+        let path = dir.path().join("large.bin");
+        let data = vec![0x42u8; (STREAM_THRESHOLD as usize) + 1];
+        std::fs::write(&path, &data).unwrap();
+
+        let hash = store.store_file(&path).unwrap();
+        // Corrupt the stored raw object.
+        let obj_path = store.object_path(&hash);
+        let mut blob = std::fs::read(&obj_path).unwrap();
+        blob[100] ^= 0xff;
+        std::fs::write(&obj_path, &blob).unwrap();
+
+        let target = dir.path().join("should_fail.bin");
+        assert!(store.retrieve_to(&hash, &target).is_err());
+        assert!(!target.exists());
+    }
+
+    #[test]
+    fn retrieve_to_detects_corrupted_lz4_object() {
+        let (_dir, store) = setup();
+        let hash = store
+            .store_bytes(b"compress me with enough data to trigger lz4")
+            .unwrap();
+        let obj_path = store.object_path(&hash);
+        let mut blob = std::fs::read(&obj_path).unwrap();
+        // Flip a byte in the compressed payload (after the 4-byte header).
+        if blob.len() > 10 {
+            blob[10] ^= 0xff;
+        }
+        std::fs::write(&obj_path, &blob).unwrap();
+
+        let target = _dir.path().join("should_fail.bin");
+        assert!(store.retrieve_to(&hash, &target).is_err());
+        assert!(!target.exists());
     }
 }
