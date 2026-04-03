@@ -55,7 +55,7 @@ pub fn curl_status(args: &[&str], url: &str) -> (String, bool) {
     full_args.extend([
         "--",
         "curl",
-        "-s",
+        "-sL",
         "--max-time",
         "5",
         "-o",
