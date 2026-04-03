@@ -89,6 +89,11 @@ impl SnapshotManager {
     /// Restore the filesystem to match a manifest. Returns applied changes.
     pub fn restore_to(&self, manifest: &SnapshotManifest) -> Result<Vec<Change>> {
         self.validate_manifest_paths(manifest)?;
+        let canonical_roots: Vec<PathBuf> = self
+            .tracked_paths
+            .iter()
+            .filter_map(|r| r.canonicalize().ok())
+            .collect();
         let current_files = self.walk_current()?;
         let mut applied = Vec::new();
 
@@ -101,6 +106,7 @@ impl SnapshotManager {
             let perms_changed = current.is_some_and(|c| c.permissions != state.permissions);
 
             if content_changed {
+                assert_within_roots(path, &canonical_roots)?;
                 if path.exists() && !path.is_file() {
                     std::fs::remove_dir_all(path).with_context(|| {
                         format!("failed to remove non-file at {}", path.display())
@@ -122,6 +128,7 @@ impl SnapshotManager {
                     new_hash: Some(state.hash),
                 });
             } else if perms_changed {
+                assert_within_roots(path, &canonical_roots)?;
                 restore_permissions(path, state.permissions);
                 applied.push(Change {
                     path: path.clone(),
@@ -309,7 +316,6 @@ impl SnapshotManager {
         )
     }
 
-    /// Reject manifests with `..` traversal or paths outside tracked roots.
     fn validate_manifest_paths(&self, manifest: &SnapshotManifest) -> Result<()> {
         for path in manifest.files.keys() {
             for component in path.components() {
@@ -389,6 +395,26 @@ pub fn compute_changes(
 }
 
 /// Atomic write via temp file + rename in the same directory.
+/// Verify that `path` resolves (via symlinks) to within one of the canonical roots.
+fn assert_within_roots(path: &Path, canonical_roots: &[PathBuf]) -> Result<()> {
+    let parent = match path.parent() {
+        Some(p) if p.exists() => p,
+        _ => return Ok(()),
+    };
+    let resolved = parent
+        .canonicalize()
+        .with_context(|| format!("failed to resolve {}", parent.display()))?;
+    let safe = canonical_roots.iter().any(|r| resolved.starts_with(r));
+    if !safe {
+        bail!(
+            "symlink escape detected: {} resolves to {} which is outside tracked directories",
+            path.display(),
+            resolved.display()
+        );
+    }
+    Ok(())
+}
+
 fn atomic_write(path: &Path, content: &[u8]) -> Result<()> {
     let parent = path.parent().unwrap_or(Path::new("."));
     std::fs::create_dir_all(parent)?;
@@ -1118,5 +1144,27 @@ mod tests {
 
         let restored_mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
         assert_eq!(restored_mode, original_mode);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn restore_rejects_symlink_escape() {
+        let tracked = tempfile::tempdir().unwrap();
+        let external = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tracked.path().join("subdir")).unwrap();
+        std::fs::write(tracked.path().join("subdir/file.txt"), "original").unwrap();
+
+        let session_dir = tempfile::tempdir().unwrap();
+        let mut mgr = make_manager(session_dir.path(), tracked.path());
+        let baseline = mgr.create_baseline().unwrap();
+
+        // Replace subdir with a symlink to an external directory.
+        std::fs::remove_dir_all(tracked.path().join("subdir")).unwrap();
+        std::os::unix::fs::symlink(external.path(), tracked.path().join("subdir")).unwrap();
+
+        let result = mgr.restore_to(&baseline);
+        assert!(result.is_err(), "should reject symlink escape");
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("symlink escape"), "got: {err}");
     }
 }
