@@ -393,11 +393,19 @@ async fn tokio_main() -> ExitCode {
                     Some((state, baseline))
                 }
                 Err(e) => {
+                    if cli.restore {
+                        eprintln!("error: --restore requires snapshot but baseline failed: {e:#}");
+                        return ExitCode::from(1);
+                    }
                     eprintln!("warning: snapshot baseline failed: {e:#}");
                     None
                 }
             },
             Err(e) => {
+                if cli.restore {
+                    eprintln!("error: --restore requires snapshot but setup failed: {e:#}");
+                    return ExitCode::from(1);
+                }
                 eprintln!("warning: snapshot setup failed: {e:#}");
                 None
             }
