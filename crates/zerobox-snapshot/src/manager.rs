@@ -98,6 +98,11 @@ impl SnapshotManager {
                 None => true,
             };
             if needs_restore {
+                if path.exists() && !path.is_file() {
+                    std::fs::remove_dir_all(path).with_context(|| {
+                        format!("failed to remove non-file at {}", path.display())
+                    })?;
+                }
                 self.store.retrieve_to(&state.hash, path)?;
 
                 #[cfg(unix)]
@@ -1046,5 +1051,23 @@ mod tests {
         let (manifest, changes) = mgr.create_incremental(&baseline).unwrap();
         assert!(changes.is_empty());
         assert_eq!(baseline.merkle_root, manifest.merkle_root);
+    }
+
+    #[test]
+    fn restore_replaces_directory_that_replaced_a_file() {
+        let test_dir = setup_test_dir();
+        let session_dir = tempfile::tempdir().unwrap();
+        let mut mgr = make_manager(session_dir.path(), test_dir.path());
+        let baseline = mgr.create_baseline().unwrap();
+
+        let file_path = test_dir.path().join("file1.txt");
+        std::fs::remove_file(&file_path).unwrap();
+        std::fs::create_dir_all(file_path.join("subdir")).unwrap();
+        std::fs::write(file_path.join("subdir/nested.txt"), "nested").unwrap();
+
+        let applied = mgr.restore_to(&baseline).unwrap();
+        assert!(!applied.is_empty());
+        assert!(file_path.is_file());
+        assert_eq!(std::fs::read_to_string(&file_path).unwrap(), "hello");
     }
 }
