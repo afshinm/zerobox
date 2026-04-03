@@ -179,12 +179,11 @@ fn can_create_user_namespace() -> bool {
 }
 
 fn main() -> ExitCode {
-    if std::env::var("CODEX_HOME").is_err() {
-        let home = zerobox_home();
-        let _ = std::fs::create_dir_all(&home);
-        // SAFETY: single-threaded here — tokio runtime not yet started.
-        unsafe { std::env::set_var("CODEX_HOME", &home) };
-    }
+    let home = zerobox_home();
+    let _ = std::fs::create_dir_all(&home);
+    // SAFETY: single-threaded here — tokio runtime not yet started.
+    // Sync CODEX_HOME so upstream code uses the same directory.
+    unsafe { std::env::set_var("CODEX_HOME", &home) };
     tokio_main()
 }
 
