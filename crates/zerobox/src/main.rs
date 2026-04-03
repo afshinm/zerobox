@@ -517,7 +517,7 @@ async fn tokio_main() -> ExitCode {
         let incremental = state.manager.create_incremental(&baseline);
 
         if let Ok((_, ref changes)) = incremental {
-            snapshot::print_summary(changes);
+            snapshot::print_summary_to(changes, &mut std::io::stderr());
         } else if let Err(ref e) = incremental {
             eprintln!("snapshot: incremental failed: {e:#}");
         }

@@ -74,9 +74,9 @@ pub fn build_session_metadata(
     }
 }
 
-pub fn print_summary(changes: &[Change]) {
+pub fn print_summary_to(changes: &[Change], w: &mut dyn std::io::Write) {
     if changes.is_empty() {
-        eprintln!("snapshot: no changes detected");
+        let _ = writeln!(w, "snapshot: no changes detected");
         return;
     }
 
@@ -93,7 +93,8 @@ pub fn print_summary(changes: &[Change]) {
         }
     }
 
-    eprintln!(
+    let _ = writeln!(
+        w,
         "snapshot: {created} created, {modified} modified, {deleted} deleted{}",
         if perms > 0 {
             format!(", {perms} permissions changed")
@@ -103,10 +104,10 @@ pub fn print_summary(changes: &[Change]) {
     );
 
     for change in changes.iter().take(20) {
-        eprintln!("  {} {}", change.change_type, change.path.display());
+        let _ = writeln!(w, "  {} {}", change.change_type, change.path.display());
     }
     if changes.len() > 20 {
-        eprintln!("  ... and {} more", changes.len() - 20);
+        let _ = writeln!(w, "  ... and {} more", changes.len() - 20);
     }
 }
 
@@ -265,7 +266,7 @@ fn cmd_diff(id: &str) -> ExitCode {
     match std::fs::read_to_string(&changes_path) {
         Ok(json) => match serde_json::from_str::<Vec<Change>>(&json) {
             Ok(changes) => {
-                print_summary(&changes);
+                print_summary_to(&changes, &mut std::io::stdout());
                 ExitCode::SUCCESS
             }
             Err(e) => {
@@ -367,7 +368,8 @@ fn cmd_clean(older_than_days: u64) -> ExitCode {
         }
     };
 
-    let cutoff = chrono::Utc::now() - chrono::Duration::days(older_than_days as i64);
+    let days = i64::try_from(older_than_days).unwrap_or(i64::MAX);
+    let cutoff = chrono::Utc::now() - chrono::Duration::days(days);
     let mut removed = 0usize;
 
     for entry in entries.flatten() {
