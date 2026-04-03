@@ -17,6 +17,7 @@ members = [
     "upstream/network-proxy",
 
     "crates/zerobox",
+    "crates/zerobox-snapshot",
     "crates/shims/core",
     "crates/shims/git-utils",
 ]

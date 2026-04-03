@@ -3,6 +3,7 @@ mod env;
 mod policy;
 mod proxy;
 mod secret;
+mod snapshot;
 
 use debug::debug_log;
 
@@ -11,7 +12,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_sandboxing::{
     SandboxCommand, SandboxManager, SandboxTransformRequest, SandboxType, get_platform_sandbox,
@@ -23,57 +24,32 @@ use policy::{
 };
 use proxy::build_network_proxy;
 
-/// Run a command inside a cross-platform sandbox.
-///
-/// Permissions are deny-by-default for writes, network, and environment
-/// variables. Reads are allowed everywhere unless restricted with
-/// --allow-read=<paths>.
-///
-/// Deny flags carve out exceptions within allowed paths and always take
-/// precedence over allow flags.
-///
-/// Examples:
-///   zerobox -- node -e "console.log('hello')"
-///   zerobox --allow-write=. --deny-write=./.git -- node script.js
-///   zerobox --allow-net=example.com -- node script.js
-///   zerobox --env FOO=bar -- node script.js
-///   zerobox --secret API_KEY=sk-123 --secret-host API_KEY=api.openai.com -- node agent.js
+/// Sandbox any command with file, network, and credential controls.
 #[derive(Parser, Debug)]
 #[command(name = "zerobox", version, about, long_about = None)]
 pub struct Cli {
-    /// Restrict readable user data to these paths only (comma-separated).
-    /// System libraries and binaries remain accessible for execution.
-    /// By default all reads are allowed.
+    #[command(subcommand)]
+    pub subcommand: Option<CliSubcommand>,
+
     #[arg(long, value_delimiter = ',', num_args = 1..)]
     pub allow_read: Option<Vec<PathBuf>>,
 
-    /// Block reading from these paths (comma-separated). Takes precedence
-    /// over --allow-read.
     #[arg(long, value_delimiter = ',', num_args = 1..)]
     pub deny_read: Option<Vec<PathBuf>>,
 
-    /// Allow writing to these paths (comma-separated).
-    /// Without a value, allows writing everywhere.
     #[arg(long, value_delimiter = ',', num_args = 0..)]
     pub allow_write: Option<Vec<PathBuf>>,
 
-    /// Block writing to these paths (comma-separated). Takes precedence
-    /// over --allow-write.
     #[arg(long, value_delimiter = ',', num_args = 1..)]
     pub deny_write: Option<Vec<PathBuf>>,
 
-    /// Allow outbound network access. Without a value, allows all domains.
-    /// With values, restricts to specific domains (comma-separated).
-    /// Examples: --allow-net, --allow-net=example.com,api.example.com
     #[arg(long, value_delimiter = ',', num_args = 0..)]
     pub allow_net: Option<Vec<String>>,
 
-    /// Block network access to these domains (comma-separated).
-    /// Takes precedence over --allow-net.
     #[arg(long, value_delimiter = ',', num_args = 1..)]
     pub deny_net: Option<Vec<String>>,
 
-    /// Grant all permissions (no sandbox). Use with caution.
+    /// Grant all permissions.
     #[arg(long, short = 'A')]
     pub allow_all: bool,
 
@@ -81,50 +57,79 @@ pub struct Cli {
     #[arg(long, short = 'C')]
     pub cwd: Option<PathBuf>,
 
-    /// Disable the sandbox entirely (just run the command).
     #[arg(long)]
     pub no_sandbox: bool,
 
-    /// Require full sandbox (bubblewrap on Linux). Fail instead of falling
-    /// back to weaker isolation (Landlock) when namespaces are unavailable.
     #[arg(long)]
     pub strict_sandbox: bool,
 
-    /// Set environment variables for the sandboxed command (KEY=VALUE).
-    /// Can be specified multiple times. These always survive env filtering.
     #[arg(long = "env", value_name = "KEY=VALUE")]
     pub set_env: Vec<String>,
 
-    /// Inherit parent environment variables (comma-separated).
-    /// By default only PATH, HOME, USER, SHELL, TERM, LANG are inherited.
-    /// Without a value, inherits all. With values, inherits only those.
     #[arg(long, value_delimiter = ',', num_args = 0..)]
     pub allow_env: Option<Vec<String>>,
 
-    /// Drop these parent environment variables (comma-separated).
-    /// Takes precedence over --allow-env.
     #[arg(long, value_delimiter = ',', num_args = 1..)]
     pub deny_env: Option<Vec<String>>,
 
-    /// Secret key-value pairs (KEY=VALUE). The real value is held by the proxy;
-    /// the sandboxed process sees a random placeholder in the env var.
-    /// Implicitly enables network for hosts specified with --secret-host
-    /// (or all hosts if --secret-host is not set). Can be specified multiple times.
     #[arg(long = "secret", value_name = "KEY=VALUE")]
     pub secret: Vec<String>,
 
-    /// Restrict a secret to specific hosts (KEY=host1,host2).
-    /// Without this, the secret is substituted for all hosts.
     #[arg(long = "secret-host", value_name = "KEY=HOSTS")]
     pub secret_host: Vec<String>,
 
-    /// Show sandbox configuration and runtime decisions on stderr.
     #[arg(long)]
     pub debug: bool,
 
+    /// Record filesystem changes during execution.
+    #[arg(long)]
+    pub snapshot: bool,
+
+    /// Record and restore tracked files to their pre-execution state after exit.
+    /// Implies --snapshot.
+    #[arg(long)]
+    pub restore: bool,
+
+    #[arg(long = "snapshot-path", value_delimiter = ',', num_args = 1..)]
+    pub snapshot_paths: Option<Vec<std::path::PathBuf>>,
+
+    #[arg(long = "snapshot-exclude", value_delimiter = ',', num_args = 1..)]
+    pub snapshot_exclude: Option<Vec<String>>,
+
     /// The command and arguments to run.
-    #[arg(trailing_var_arg = true, required = true)]
+    #[arg(trailing_var_arg = true)]
     pub command: Vec<String>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum CliSubcommand {
+    /// Manage filesystem snapshots.
+    Snapshot {
+        #[command(subcommand)]
+        action: SnapshotAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum SnapshotAction {
+    /// List snapshot sessions.
+    List,
+    /// Show changes in a session.
+    Diff {
+        /// Session ID.
+        id: String,
+    },
+    /// Restore filesystem to a session's baseline.
+    Restore {
+        /// Session ID.
+        id: String,
+    },
+    /// Remove old snapshot sessions.
+    Clean {
+        /// Remove sessions older than N days.
+        #[arg(long, default_value = "30")]
+        older_than: u64,
+    },
 }
 
 fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
@@ -139,6 +144,18 @@ fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
         }
     }
     ExitCode::from(1)
+}
+
+/// Data directory: `$ZEROBOX_HOME` > `$CODEX_HOME` > `~/.zerobox`.
+pub fn zerobox_home() -> PathBuf {
+    std::env::var_os("ZEROBOX_HOME")
+        .or_else(|| std::env::var_os("CODEX_HOME"))
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join(".zerobox")
+        })
 }
 
 /// Check if the current process can create user namespaces (required for bubblewrap).
@@ -162,15 +179,11 @@ fn can_create_user_namespace() -> bool {
 }
 
 fn main() -> ExitCode {
-    // Set CODEX_HOME before tokio spawns threads (set_var is unsafe with threads).
-    if std::env::var("CODEX_HOME").is_err()
-        && let Some(home) = dirs::home_dir()
-    {
-        let zerobox_home = home.join(".zerobox");
-        let _ = std::fs::create_dir_all(&zerobox_home);
-        // SAFETY: truly single-threaded here — tokio runtime not yet started.
-        unsafe { std::env::set_var("CODEX_HOME", &zerobox_home) };
-    }
+    let home = zerobox_home();
+    let _ = std::fs::create_dir_all(&home);
+    // SAFETY: single-threaded here — tokio runtime not yet started.
+    // Sync CODEX_HOME so upstream code uses the same directory.
+    unsafe { std::env::set_var("CODEX_HOME", &home) };
     tokio_main()
 }
 
@@ -192,6 +205,16 @@ async fn tokio_main() -> ExitCode {
     }
 
     let cli = Cli::parse();
+
+    if let Some(CliSubcommand::Snapshot { action }) = &cli.subcommand {
+        return snapshot::handle_subcommand(action);
+    }
+
+    if cli.command.is_empty() {
+        eprintln!("error: no command specified");
+        return ExitCode::from(1);
+    }
+
     let dbg = cli.debug;
 
     if dbg {
@@ -356,6 +379,40 @@ async fn tokio_main() -> ExitCode {
 
     debug_log!(dbg, "env: {} vars passed to child", child_env.len());
 
+    let do_snapshot = cli.snapshot || cli.restore;
+    let snapshot_state = if do_snapshot {
+        match snapshot::build_snapshot_state(&cli, &cwd) {
+            Ok(mut state) => match state.manager.create_baseline() {
+                Ok(baseline) => {
+                    debug_log!(
+                        dbg,
+                        "snapshot: baseline captured ({} files)",
+                        baseline.files.len()
+                    );
+                    Some((state, baseline))
+                }
+                Err(e) => {
+                    if cli.restore {
+                        eprintln!("error: --restore requires snapshot but baseline failed: {e:#}");
+                        return ExitCode::from(1);
+                    }
+                    eprintln!("warning: snapshot baseline failed: {e:#}");
+                    None
+                }
+            },
+            Err(e) => {
+                if cli.restore {
+                    eprintln!("error: --restore requires snapshot but setup failed: {e:#}");
+                    return ExitCode::from(1);
+                }
+                eprintln!("warning: snapshot setup failed: {e:#}");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     let manager = SandboxManager::new();
     let request = SandboxTransformRequest {
         command: SandboxCommand {
@@ -433,12 +490,12 @@ async fn tokio_main() -> ExitCode {
     cmd.envs(&child_env);
 
     // Inherit stdio for TTY (interactive), capture for pipes (SDK/scripts).
-    if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
+    let (exit, raw_exit_code) = if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
         match cmd.status().await {
-            Ok(status) => exit_code_from_status(status),
+            Ok(status) => (exit_code_from_status(status), status.code()),
             Err(e) => {
                 eprintln!("error: failed to execute command: {e}");
-                ExitCode::from(1)
+                (ExitCode::from(1), Some(1))
             }
         }
     } else {
@@ -447,12 +504,48 @@ async fn tokio_main() -> ExitCode {
                 use std::io::Write;
                 let _ = std::io::stdout().write_all(&output.stdout);
                 let _ = std::io::stderr().write_all(&output.stderr);
-                exit_code_from_status(output.status)
+                (exit_code_from_status(output.status), output.status.code())
             }
             Err(e) => {
                 eprintln!("error: failed to execute command: {e}");
-                ExitCode::from(1)
+                (ExitCode::from(1), Some(1))
+            }
+        }
+    };
+
+    if let Some((mut state, baseline)) = snapshot_state {
+        let incremental = state.manager.create_incremental(&baseline);
+
+        if let Ok((_, ref changes)) = incremental {
+            snapshot::print_summary_to(changes, &mut std::io::stderr());
+        } else if let Err(ref e) = incremental {
+            eprintln!("snapshot: incremental failed: {e:#}");
+        }
+
+        let mut meta = snapshot::build_session_metadata(&state, &cli, &baseline);
+        meta.ended = Some(chrono::Utc::now().to_rfc3339());
+        meta.exit_code = raw_exit_code;
+        meta.snapshot_count = state.manager.snapshot_count();
+        if let Ok((ref final_manifest, _)) = incremental {
+            meta.merkle_roots.push(final_manifest.merkle_root);
+        }
+        if let Err(e) = state.manager.save_session(&meta) {
+            eprintln!("snapshot: failed to save session: {e:#}");
+        }
+
+        if cli.restore {
+            match state.manager.restore_to(&baseline) {
+                Ok(applied) if !applied.is_empty() => {
+                    eprintln!("snapshot: restored {} files", applied.len());
+                }
+                Err(e) => {
+                    eprintln!("snapshot: restore failed: {e:#}");
+                    return ExitCode::from(1);
+                }
+                _ => {}
             }
         }
     }
+
+    exit
 }

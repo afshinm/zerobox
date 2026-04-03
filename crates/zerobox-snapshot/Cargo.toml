@@ -1,0 +1,21 @@
+[package]
+name = "zerobox-snapshot"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Filesystem snapshot and restore for zerobox sandboxes"
+
+[dependencies]
+anyhow = { workspace = true }
+blake3 = "1.8"
+chrono = { workspace = true }
+const-hex = "1.18"
+filetime = "0.2"
+globset = { workspace = true }
+ignore = "0.4"
+lz4_flex = "0.11"
+rs_merkle = "1.5"
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+tracing = { workspace = true }

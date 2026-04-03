@@ -108,7 +108,7 @@ jobs:
       - name: Rust E2E sandbox tests
         env:
           ZEROBOX_EXEC: ./target/release/zerobox
-        run: cargo test -p zerobox --test sandbox_e2e
+        run: cargo test -p zerobox --test integration
 
   test-linux:
     name: Test (Linux)
@@ -140,7 +140,7 @@ jobs:
       - name: Rust E2E sandbox tests
         env:
           ZEROBOX_EXEC: ./target/release/zerobox
-        run: cargo test -p zerobox --test sandbox_e2e
+        run: cargo test -p zerobox --test integration
 
   sdk:
     name: SDK (${{ matrix.os }})
