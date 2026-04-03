@@ -48,6 +48,7 @@ pub fn default_exclusions() -> Vec<String> {
 /// Compiled filter with pre-built glob sets for fast matching.
 #[derive(Clone)]
 pub struct ExclusionFilter {
+    use_gitignore: bool,
     exclude_patterns: Vec<String>,
     exclude_globs: Option<GlobSet>,
     force_include: Vec<String>,
@@ -66,10 +67,15 @@ impl ExclusionFilter {
         };
 
         Ok(Self {
+            use_gitignore: config.use_gitignore,
             exclude_patterns: config.exclude_patterns.clone(),
             exclude_globs,
             force_include: config.force_include.clone(),
         })
+    }
+
+    pub fn use_gitignore(&self) -> bool {
+        self.use_gitignore
     }
 
     /// Priority: force-include > exclude patterns > exclude globs.

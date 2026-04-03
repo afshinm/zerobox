@@ -18,7 +18,6 @@ pub struct SnapshotManager {
     store: ObjectStore,
     budget: WalkBudget,
     snapshot_count: u32,
-    use_gitignore: bool,
 }
 
 impl SnapshotManager {
@@ -27,7 +26,6 @@ impl SnapshotManager {
         tracked_paths: Vec<PathBuf>,
         exclusion: ExclusionFilter,
         budget: WalkBudget,
-        use_gitignore: bool,
     ) -> Result<Self> {
         std::fs::create_dir_all(session_dir.join("snapshots"))?;
         std::fs::create_dir_all(session_dir.join("changes"))?;
@@ -39,7 +37,6 @@ impl SnapshotManager {
             store,
             budget,
             snapshot_count: 0,
-            use_gitignore,
         })
     }
 
@@ -241,7 +238,7 @@ impl SnapshotManager {
 
             let exclusion = self.exclusion.clone();
             let mut walker = ignore::WalkBuilder::new(tracked);
-            walker.git_ignore(self.use_gitignore);
+            walker.git_ignore(self.exclusion.use_gitignore());
             walker.hidden(false);
             walker.filter_entry(move |entry| !exclusion.is_excluded(entry.path()));
 
@@ -449,14 +446,16 @@ mod tests {
     }
 
     fn make_manager(dir: &Path, tracked: &Path) -> SnapshotManager {
-        let config = ExclusionConfig::default();
+        let config = ExclusionConfig {
+            use_gitignore: false,
+            ..ExclusionConfig::default()
+        };
         let filter = ExclusionFilter::new(&config).unwrap();
         SnapshotManager::new(
             dir.join("session"),
             vec![tracked.to_path_buf()],
             filter,
             WalkBudget::default(),
-            false, // no gitignore in tests
         )
         .unwrap()
     }
@@ -631,14 +630,12 @@ mod tests {
             merkle_roots: vec![],
         };
 
-        let config = ExclusionConfig::default();
-        let filter = ExclusionFilter::new(&config).unwrap();
+        let filter = ExclusionFilter::new(&ExclusionConfig::default()).unwrap();
         let mgr = SnapshotManager::new(
             session_dir.path().join("session"),
             vec![],
             filter,
             WalkBudget::default(),
-            false,
         )
         .unwrap();
         mgr.save_session(&meta).unwrap();
@@ -655,8 +652,7 @@ mod tests {
             std::fs::write(test_dir.path().join(format!("f{i}.txt")), "x").unwrap();
         }
         let session_dir = tempfile::tempdir().unwrap();
-        let config = ExclusionConfig::default();
-        let filter = ExclusionFilter::new(&config).unwrap();
+        let filter = ExclusionFilter::new(&ExclusionConfig::default()).unwrap();
         let mut mgr = SnapshotManager::new(
             session_dir.path().join("session"),
             vec![test_dir.path().to_path_buf()],
@@ -665,7 +661,6 @@ mod tests {
                 max_entries: 5,
                 max_bytes: 0,
             },
-            false,
         )
         .unwrap();
         assert!(mgr.create_baseline().is_err());
@@ -691,7 +686,6 @@ mod tests {
             vec![test_dir.path().to_path_buf()],
             filter,
             WalkBudget::default(),
-            false,
         )
         .unwrap();
 
@@ -771,7 +765,6 @@ mod tests {
             vec![tracked.to_path_buf()],
             filter,
             WalkBudget::default(),
-            false,
         )
         .unwrap()
     }
@@ -952,14 +945,12 @@ mod tests {
     #[test]
     fn nonexistent_tracked_path_produces_empty_baseline() {
         let session_dir = tempfile::tempdir().unwrap();
-        let config = ExclusionConfig::default();
-        let filter = ExclusionFilter::new(&config).unwrap();
+        let filter = ExclusionFilter::new(&ExclusionConfig::default()).unwrap();
         let mut mgr = SnapshotManager::new(
             session_dir.path().join("session"),
             vec![PathBuf::from("/nonexistent/path/that/does/not/exist")],
             filter,
             WalkBudget::default(),
-            false,
         )
         .unwrap();
         let baseline = mgr.create_baseline().unwrap();
@@ -973,14 +964,12 @@ mod tests {
         std::fs::write(&file_path, "single").unwrap();
 
         let session_dir = tempfile::tempdir().unwrap();
-        let config = ExclusionConfig::default();
-        let filter = ExclusionFilter::new(&config).unwrap();
+        let filter = ExclusionFilter::new(&ExclusionConfig::default()).unwrap();
         let mut mgr = SnapshotManager::new(
             session_dir.path().join("session"),
             vec![file_path.clone()],
             filter,
             WalkBudget::default(),
-            false,
         )
         .unwrap();
 

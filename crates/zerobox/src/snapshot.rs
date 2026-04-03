@@ -44,7 +44,6 @@ pub fn build_snapshot_state(cli: &Cli, cwd: &Path) -> Result<SnapshotState> {
         tracked_paths.clone(),
         filter,
         WalkBudget::default(),
-        true,
     )?;
 
     Ok(SnapshotState {
@@ -279,7 +278,6 @@ fn cmd_restore(id: &str) -> ExitCode {
         meta.tracked_paths.clone(),
         filter,
         WalkBudget::default(),
-        true,
     ) {
         Ok(m) => m,
         Err(e) => {
