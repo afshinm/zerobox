@@ -93,28 +93,23 @@ impl SnapshotManager {
         let mut applied = Vec::new();
 
         for (path, state) in &manifest.files {
-            let needs_restore = match current_files.get(path) {
-                Some(current) => current.hash != state.hash,
+            let current = current_files.get(path);
+            let content_changed = match current {
+                Some(c) => c.hash != state.hash,
                 None => true,
             };
-            if needs_restore {
+            let perms_changed = current.is_some_and(|c| c.permissions != state.permissions);
+
+            if content_changed {
                 if path.exists() && !path.is_file() {
                     std::fs::remove_dir_all(path).with_context(|| {
                         format!("failed to remove non-file at {}", path.display())
                     })?;
                 }
                 self.store.retrieve_to(&state.hash, path)?;
+                restore_permissions(path, state.permissions);
 
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-                    let perms = std::fs::Permissions::from_mode(state.permissions & 0o0777);
-                    if let Err(e) = std::fs::set_permissions(path, perms) {
-                        tracing::warn!("failed to set permissions on {}: {e}", path.display());
-                    }
-                }
-
-                let change_type = if current_files.contains_key(path) {
+                let change_type = if current.is_some() {
                     ChangeType::Modified
                 } else {
                     ChangeType::Created
@@ -123,7 +118,16 @@ impl SnapshotManager {
                     path: path.clone(),
                     change_type,
                     size_delta: None,
-                    old_hash: current_files.get(path).map(|s| s.hash),
+                    old_hash: current.map(|s| s.hash),
+                    new_hash: Some(state.hash),
+                });
+            } else if perms_changed {
+                restore_permissions(path, state.permissions);
+                applied.push(Change {
+                    path: path.clone(),
+                    change_type: ChangeType::PermissionsChanged,
+                    size_delta: None,
+                    old_hash: current.map(|s| s.hash),
                     new_hash: Some(state.hash),
                 });
             }
@@ -416,6 +420,26 @@ fn stream_hash(path: &Path) -> Result<ContentHash> {
 
 fn now_epoch_secs() -> String {
     chrono::Utc::now().timestamp().to_string()
+}
+
+fn restore_permissions(path: &Path, mode: u32) {
+    #[cfg(unix)]
+    let result = {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode & 0o0777))
+    };
+    #[cfg(not(unix))]
+    let result = {
+        let readonly = mode & 0o222 == 0;
+        std::fs::metadata(path).and_then(|m| {
+            let mut perms = m.permissions();
+            perms.set_readonly(readonly);
+            std::fs::set_permissions(path, perms)
+        })
+    };
+    if let Err(e) = result {
+        tracing::warn!("failed to set permissions on {}: {e}", path.display());
+    }
 }
 
 fn file_mtime(meta: &std::fs::Metadata) -> i64 {
@@ -1069,5 +1093,30 @@ mod tests {
         assert!(!applied.is_empty());
         assert!(file_path.is_file());
         assert_eq!(std::fs::read_to_string(&file_path).unwrap(), "hello");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn restore_reverts_permission_only_change() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let test_dir = setup_test_dir();
+        let session_dir = tempfile::tempdir().unwrap();
+        let mut mgr = make_manager(session_dir.path(), test_dir.path());
+        let baseline = mgr.create_baseline().unwrap();
+
+        let path = test_dir.path().join("file1.txt");
+        let original_mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let applied = mgr.restore_to(&baseline).unwrap();
+        assert!(
+            applied
+                .iter()
+                .any(|c| c.change_type == ChangeType::PermissionsChanged)
+        );
+
+        let restored_mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(restored_mode, original_mode);
     }
 }
