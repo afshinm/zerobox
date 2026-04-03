@@ -12,8 +12,7 @@ pub mod types;
 
 pub use budget::WalkBudget;
 pub use display::{
-    dim, format_change_counts, format_change_counts_colored, format_relative_time, green, red,
-    truncate_command, yellow,
+    dim, format_change_counts, format_change_counts_colored, format_relative_time, truncate_command,
 };
 pub use exclusion::{ExclusionConfig, ExclusionFilter, default_exclusions};
 pub use manager::{SnapshotManager, compute_changes};
