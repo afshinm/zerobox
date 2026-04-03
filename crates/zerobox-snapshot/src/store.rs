@@ -323,4 +323,30 @@ mod tests {
         assert_eq!(retrieved.len(), data.len());
         assert_eq!(retrieved, data);
     }
+
+    #[test]
+    fn retrieve_nonexistent_hash_fails() {
+        let (_dir, store) = setup();
+        let fake = ContentHash::from_bytes([0xaa; 32]);
+        assert!(store.retrieve(&fake).is_err());
+    }
+
+    #[test]
+    fn store_empty_file() {
+        let (dir, store) = setup();
+        let path = dir.path().join("empty.txt");
+        std::fs::write(&path, b"").unwrap();
+        let hash = store.store_file(&path).unwrap();
+        let retrieved = store.retrieve(&hash).unwrap();
+        assert!(retrieved.is_empty());
+    }
+
+    #[test]
+    fn truncated_blob_detected() {
+        let (_dir, store) = setup();
+        let hash = store.store_bytes(b"good data").unwrap();
+        let obj_path = store.object_path(&hash);
+        std::fs::write(&obj_path, b"XX").unwrap();
+        assert!(store.retrieve(&hash).is_err());
+    }
 }

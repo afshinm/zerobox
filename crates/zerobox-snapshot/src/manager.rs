@@ -937,8 +937,125 @@ mod tests {
 
         let baseline = mgr.create_baseline().unwrap();
         let diff = mgr.compute_restore_diff(&baseline).unwrap();
-
-        // No changes — .git should not appear as a deletion candidate.
         assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn empty_directory_produces_empty_baseline() {
+        let test_dir = tempfile::tempdir().unwrap();
+        let session_dir = tempfile::tempdir().unwrap();
+        let mut mgr = make_manager(session_dir.path(), test_dir.path());
+        let baseline = mgr.create_baseline().unwrap();
+        assert!(baseline.files.is_empty());
+    }
+
+    #[test]
+    fn nonexistent_tracked_path_produces_empty_baseline() {
+        let session_dir = tempfile::tempdir().unwrap();
+        let config = ExclusionConfig::default();
+        let filter = ExclusionFilter::new(&config).unwrap();
+        let mut mgr = SnapshotManager::new(
+            session_dir.path().join("session"),
+            vec![PathBuf::from("/nonexistent/path/that/does/not/exist")],
+            filter,
+            WalkBudget::default(),
+            false,
+        )
+        .unwrap();
+        let baseline = mgr.create_baseline().unwrap();
+        assert!(baseline.files.is_empty());
+    }
+
+    #[test]
+    fn tracked_single_file() {
+        let test_dir = tempfile::tempdir().unwrap();
+        let file_path = test_dir.path().join("only.txt");
+        std::fs::write(&file_path, "single").unwrap();
+
+        let session_dir = tempfile::tempdir().unwrap();
+        let config = ExclusionConfig::default();
+        let filter = ExclusionFilter::new(&config).unwrap();
+        let mut mgr = SnapshotManager::new(
+            session_dir.path().join("session"),
+            vec![file_path.clone()],
+            filter,
+            WalkBudget::default(),
+            false,
+        )
+        .unwrap();
+
+        let baseline = mgr.create_baseline().unwrap();
+        assert_eq!(baseline.files.len(), 1);
+        assert!(baseline.files.contains_key(&file_path));
+
+        std::fs::write(&file_path, "changed").unwrap();
+        let (_, changes) = mgr.create_incremental(&baseline).unwrap();
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].change_type, ChangeType::Modified);
+    }
+
+    #[test]
+    fn restore_when_tracked_dir_deleted() {
+        let test_dir = tempfile::tempdir().unwrap();
+        std::fs::write(test_dir.path().join("file.txt"), "original").unwrap();
+
+        let session_dir = tempfile::tempdir().unwrap();
+        let mut mgr = make_manager(session_dir.path(), test_dir.path());
+        let baseline = mgr.create_baseline().unwrap();
+
+        std::fs::remove_dir_all(test_dir.path()).unwrap();
+        let applied = mgr.restore_to(&baseline).unwrap();
+        assert_eq!(applied.len(), 1);
+        assert_eq!(applied[0].change_type, ChangeType::Created);
+        assert_eq!(
+            std::fs::read_to_string(test_dir.path().join("file.txt")).unwrap(),
+            "original"
+        );
+    }
+
+    #[test]
+    fn restore_twice_is_idempotent() {
+        let test_dir = setup_test_dir();
+        let session_dir = tempfile::tempdir().unwrap();
+        let mut mgr = make_manager(session_dir.path(), test_dir.path());
+        let baseline = mgr.create_baseline().unwrap();
+
+        std::fs::write(test_dir.path().join("file1.txt"), "changed").unwrap();
+
+        let first = mgr.restore_to(&baseline).unwrap();
+        assert!(!first.is_empty());
+
+        let second = mgr.restore_to(&baseline).unwrap();
+        assert!(second.is_empty());
+    }
+
+    #[test]
+    fn corrupted_object_store_fails_restore() {
+        let test_dir = setup_test_dir();
+        let session_dir = tempfile::tempdir().unwrap();
+        let mut mgr = make_manager(session_dir.path(), test_dir.path());
+        let baseline = mgr.create_baseline().unwrap();
+
+        std::fs::write(test_dir.path().join("file1.txt"), "changed").unwrap();
+
+        // Corrupt the object store by wiping the cache dir.
+        let cache_dir = session_dir.path().join("session/cache/objects");
+        if cache_dir.exists() {
+            std::fs::remove_dir_all(&cache_dir).unwrap();
+        }
+
+        assert!(mgr.restore_to(&baseline).is_err());
+    }
+
+    #[test]
+    fn incremental_no_changes_produces_empty_diff() {
+        let test_dir = setup_test_dir();
+        let session_dir = tempfile::tempdir().unwrap();
+        let mut mgr = make_manager(session_dir.path(), test_dir.path());
+        let baseline = mgr.create_baseline().unwrap();
+
+        let (manifest, changes) = mgr.create_incremental(&baseline).unwrap();
+        assert!(changes.is_empty());
+        assert_eq!(baseline.merkle_root, manifest.merkle_root);
     }
 }
