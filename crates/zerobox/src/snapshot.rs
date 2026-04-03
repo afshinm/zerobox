@@ -176,11 +176,15 @@ fn cmd_list() -> ExitCode {
         }
         if let Ok(meta) = SnapshotManager::load_session(&path) {
             let id = entry.file_name().to_string_lossy().to_string();
-            let latest = meta.snapshot_count.saturating_sub(1).max(1);
-            let changes_path = path.join(format!("changes/{latest:03}.json"));
-            let changes = std::fs::read_to_string(&changes_path)
-                .ok()
-                .and_then(|json| serde_json::from_str::<Vec<Change>>(&json).ok());
+            let changes = if meta.snapshot_count >= 2 {
+                let latest = meta.snapshot_count - 1;
+                let changes_path = path.join(format!("changes/{latest:03}.json"));
+                std::fs::read_to_string(&changes_path)
+                    .ok()
+                    .and_then(|json| serde_json::from_str::<Vec<Change>>(&json).ok())
+            } else {
+                None
+            };
             sessions.push((id, meta, changes));
         }
     }
@@ -246,8 +250,11 @@ fn cmd_diff(id: &str) -> ExitCode {
         }
     };
 
-    // Find the latest changes file (snapshot N vs baseline).
-    let latest = meta.snapshot_count.saturating_sub(1).max(1);
+    if meta.snapshot_count < 2 {
+        eprintln!("No changes recorded for session {id}.");
+        return ExitCode::SUCCESS;
+    }
+    let latest = meta.snapshot_count - 1;
     let changes_path = session_dir.join(format!("changes/{latest:03}.json"));
     if !changes_path.exists() {
         eprintln!("No changes recorded for session {id}.");
