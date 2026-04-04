@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Base profile for AI coding agents. CWD read/write access, no network by default.",
+  "description": "Base for AI agents. Grants CWD read/write, no network.",
   "use": [
     "secure"
   ],

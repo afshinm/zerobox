@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Block access to macOS keychains and password stores.",
+  "description": "Deny access to macOS keychains and password stores.",
   "platform": "macos",
   "deny_read": [
     "$HOME/Library/Keychains",

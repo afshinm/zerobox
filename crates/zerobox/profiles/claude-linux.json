@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Claude Code Linux-specific state paths.",
+  "description": "Claude state paths on Linux.",
   "platform": "linux",
   "allow_read": [
     "$HOME/.local/share/claude"

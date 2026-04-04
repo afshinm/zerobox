@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Claude Code CLI cache and MCP log directories on Linux.",
+  "description": "Claude CLI cache directory on Linux.",
   "platform": "linux",
   "allow_read": [
     "$HOME/.cache/claude-cli-nodejs"

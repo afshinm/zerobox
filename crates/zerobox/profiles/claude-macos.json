@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Claude Code macOS-specific state and credential paths.",
+  "description": "Claude keychain access on macOS for OAuth.",
   "platform": "macos",
   "allow_read": [
     "$HOME/Library/Keychains/login.keychain-db"

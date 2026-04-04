@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "OpenCode AI coding assistant. Supports multiple LLM providers.",
+  "description": "OpenCode AI coding assistant.",
   "use": [
     "ai-agent",
     "cache-macos",

@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Linux sysfs paths for kernel and device state inspection.",
+  "description": "Read access to Linux sysfs.",
   "platform": "linux",
   "allow_read": [
     "/sys"

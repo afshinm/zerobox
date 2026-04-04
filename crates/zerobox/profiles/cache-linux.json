@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Linux cache directories.",
+  "description": "Read/write access to Linux XDG cache directory.",
   "platform": "linux",
   "allow_read": [
     "$HOME/.cache"

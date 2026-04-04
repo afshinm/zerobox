@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Block access to macOS browser stored data (cookies, saved passwords, sessions).",
+  "description": "Deny access to macOS browser data.",
   "platform": "macos",
   "deny_read": [
     "$HOME/Library/Application Support/Google/Chrome",

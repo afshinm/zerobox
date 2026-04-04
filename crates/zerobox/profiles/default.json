@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Default profile. Grants system path read access for program execution.",
+  "description": "System paths for program execution.",
   "use": [
     "system-read-macos",
     "system-read-linux"

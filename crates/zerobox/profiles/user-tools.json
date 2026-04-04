@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "User-local executables, .desktop files, man pages, and shell completions.",
+  "description": "User-local binaries, man pages, and shell completions.",
   "allow_read": [
     "$HOME/.local/bin",
     "$HOME/.local/share/applications",

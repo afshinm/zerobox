@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "macOS cache, log, and preference directories.",
+  "description": "Read/write access to macOS cache, log, and preference directories.",
   "platform": "macos",
   "allow_read": [
     "$HOME/Library/Preferences",

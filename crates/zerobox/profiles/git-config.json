@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Read access to git configuration files.",
+  "description": "Read access to git configuration.",
   "allow_read": [
     "$HOME/.gitconfig",
     "$HOME/.gitignore_global",

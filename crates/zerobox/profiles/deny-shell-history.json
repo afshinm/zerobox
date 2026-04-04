@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Block access to shell command history files.",
+  "description": "Deny access to shell history files.",
   "deny_read": [
     "$HOME/.bash_history",
     "$HOME/.zsh_history",

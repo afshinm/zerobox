@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Security baseline. Denies access to credentials, browser data, shell history, keychains, and private data. Provides system read/write and common tool paths.",
+  "description": "Deny sensitive paths, allow system read/write and common tools.",
   "use": [
     "default",
     "deny-credentials",

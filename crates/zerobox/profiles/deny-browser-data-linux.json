@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Block access to Linux browser stored data (cookies, saved passwords, sessions).",
+  "description": "Deny access to Linux browser data.",
   "platform": "linux",
   "deny_read": [
     "$HOME/.config/google-chrome",

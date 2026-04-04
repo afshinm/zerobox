@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Block access to shell configuration files that may embed secrets.",
+  "description": "Deny access to shell configuration files.",
   "deny_read": [
     "$HOME/.zshrc",
     "$HOME/.zprofile",

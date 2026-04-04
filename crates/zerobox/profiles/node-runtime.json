@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Node.js runtime and package manager paths.",
+  "description": "Node.js and package manager paths.",
   "allow_read": [
     "$HOME/.nvm",
     "$HOME/.fnm",

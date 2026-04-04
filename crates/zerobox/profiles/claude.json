@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Anthropic Claude Code CLI agent.",
+  "description": "Anthropic Claude CLI agent.",
   "use": [
     "ai-agent",
     "cache-macos",

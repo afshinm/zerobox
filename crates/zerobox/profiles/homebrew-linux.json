@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Homebrew (Linuxbrew) installation paths on Linux.",
+  "description": "Linuxbrew installation paths.",
   "platform": "linux",
   "allow_read": [
     "/home/linuxbrew/.linuxbrew"

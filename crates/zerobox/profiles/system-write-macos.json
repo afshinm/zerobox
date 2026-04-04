@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "macOS system paths requiring write for temp files and devices.",
+  "description": "macOS temp and device write paths.",
   "platform": "macos",
   "allow_write": [
     "/private/tmp",

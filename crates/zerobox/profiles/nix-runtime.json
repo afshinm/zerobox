@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Nix package manager runtime paths.",
+  "description": "Nix package manager paths.",
   "platform": "linux",
   "allow_read": [
     "$HOME/.nix-profile",

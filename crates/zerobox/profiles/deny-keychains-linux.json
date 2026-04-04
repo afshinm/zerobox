@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Block access to Linux keyrings and password stores.",
+  "description": "Deny access to Linux keyrings and password stores.",
   "platform": "linux",
   "deny_read": [
     "$HOME/.password-store",

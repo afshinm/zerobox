@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Linux system paths requiring write for temp files and devices.",
+  "description": "Linux temp and device write paths.",
   "platform": "linux",
   "allow_write": [
     "/tmp",

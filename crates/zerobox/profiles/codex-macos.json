@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Codex macOS-specific state and credential paths.",
+  "description": "Codex keychain access on macOS for OAuth.",
   "platform": "macos",
   "allow_read": [
     "$HOME/Library/Keychains/login.keychain-db"
