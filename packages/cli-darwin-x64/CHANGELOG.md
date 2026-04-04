@@ -1,5 +1,11 @@
 # @zerobox/cli-darwin-x64
 
+## 0.1.11
+
+### Patch Changes
+
+- [#22](https://github.com/afshinm/zerobox/pull/22) [`2a8a3b9`](https://github.com/afshinm/zerobox/commit/2a8a3b9810bafe05f1d1949d1adfe86573407c97) Thanks [@afshinm](https://github.com/afshinm)! - Add Snapshotting, restore and diff
+
 ## 0.1.10
 
 ### Patch Changes
