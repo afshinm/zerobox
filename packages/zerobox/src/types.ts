@@ -22,6 +22,14 @@ export interface SandboxOptions {
   strictSandbox?: boolean;
   /** Show sandbox configuration and runtime decisions on stderr. */
   debug?: boolean;
+  /** Record filesystem changes during execution. */
+  snapshot?: boolean;
+  /** Record and restore tracked files to pre-execution state after exit. */
+  restore?: boolean;
+  /** Paths to track for snapshots (default: cwd). */
+  snapshotPaths?: string[];
+  /** Exclude patterns from snapshots. */
+  snapshotExclude?: string[];
   /** Explicit environment variables for the sandbox. */
   env?: Record<string, string>;
   /** Inherit parent env vars. true = all (default), string[] = only listed keys. */

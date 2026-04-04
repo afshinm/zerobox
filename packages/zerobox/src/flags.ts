@@ -86,5 +86,17 @@ export function buildFlags(options: SandboxOptions): string[] {
     flags.push("-C", options.cwd);
   }
 
+  if (options.restore) {
+    flags.push("--restore");
+  } else if (options.snapshot) {
+    flags.push("--snapshot");
+  }
+  if (options.snapshotPaths?.length) {
+    flags.push(`--snapshot-path=${options.snapshotPaths.join(",")}`);
+  }
+  if (options.snapshotExclude?.length) {
+    flags.push(`--snapshot-exclude=${options.snapshotExclude.join(",")}`);
+  }
+
   return flags;
 }

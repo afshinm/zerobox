@@ -95,6 +95,21 @@ const sandbox = Sandbox.create({
 const output = await sandbox.sh`node agent.js`.text();
 ```
 
+Record filesystem changes and undo them after execution:
+
+```bash
+zerobox --restore --allow-write=. -- npm install
+```
+
+Or record without restoring, then inspect and undo later:
+
+```bash
+zerobox --snapshot --allow-write=. -- npm install
+zerobox snapshot list
+zerobox snapshot diff <session-id>
+zerobox snapshot restore <session-id>
+```
+
 ## Architecture
 
 <p align="center">
@@ -337,6 +352,30 @@ try {
 }
 ```
 
+### Snapshots
+
+```ts
+const sandbox = Sandbox.create({
+  allowWrite: ["."],
+  restore: true,
+});
+
+// Changes are automatically undone after execution.
+await sandbox.sh`npm install`.text();
+```
+
+Record without restoring:
+
+```ts
+const sandbox = Sandbox.create({
+  allowWrite: ["."],
+  snapshot: true,
+  snapshotExclude: ["node_modules"],
+});
+
+await sandbox.sh`npm install`.text();
+```
+
 ### Cancellation
 
 ```ts
@@ -385,9 +424,22 @@ Sandbox overhead is minimal, typically ~10ms and ~7MB:
 | `--no-sandbox` | `--no-sandbox` | Disable the sandbox entirely. |
 | `--strict-sandbox` | `--strict-sandbox` | Require full sandbox (bubblewrap). Fail instead of falling back to weaker isolation. |
 | `--debug` | `--debug` | Print sandbox config and proxy decisions to stderr. |
+| `--snapshot` | `--snapshot` | Record filesystem changes during execution. |
+| `--restore` | `--restore` | Record and restore tracked files to pre-execution state after exit. Implies `--snapshot`. |
+| `--snapshot-path <paths>` | `--snapshot-path=./src` | Paths to track for snapshots (default: cwd). |
+| `--snapshot-exclude <patterns>` | `--snapshot-exclude=build` | Exclude patterns from snapshots. |
 | `-C <dir>` | `-C /workspace` | Set working directory for the sandboxed command. |
 | `-V`, `--version` | `--version` | Print version. |
 | `-h`, `--help` | `--help` | Print help. |
+
+### Snapshot subcommands
+
+| Command | Description |
+|---------|-------------|
+| `zerobox snapshot list` | List recorded sessions. |
+| `zerobox snapshot diff <id>` | Show changes from a session. |
+| `zerobox snapshot restore <id>` | Restore filesystem to a session's baseline. |
+| `zerobox snapshot clean --older-than=<days>` | Remove old snapshot sessions. |
 
 ## License
 
