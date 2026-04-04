@@ -1,4 +1,4 @@
-//! Profile system: named presets of CLI flags with inheritance.
+//! Profile system: named presets of CLI flags with flat composition.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -12,7 +12,7 @@ use crate::{Cli, ProfileAction};
 const MAX_INHERITANCE_DEPTH: usize = 100;
 
 const BUILTIN_PROFILES: &[(&str, &str)] = &[
-    // Deny configs (leaf building blocks)
+    // Deny configs
     (
         "deny-credentials",
         include_str!("../profiles/deny-credentials.json"),
@@ -63,20 +63,16 @@ const BUILTIN_PROFILES: &[(&str, &str)] = &[
         include_str!("../profiles/system-write-linux.json"),
     ),
     (
-        "linux-runtime-state",
-        include_str!("../profiles/linux-runtime-state.json"),
-    ),
-    (
         "linux-sysfs-read",
         include_str!("../profiles/linux-sysfs-read.json"),
-    ),
-    (
-        "linux-temp-read",
-        include_str!("../profiles/linux-temp-read.json"),
     ),
     // Cache configs
     ("cache-macos", include_str!("../profiles/cache-macos.json")),
     ("cache-linux", include_str!("../profiles/cache-linux.json")),
+    (
+        "claude-cache-linux",
+        include_str!("../profiles/claude-cache-linux.json"),
+    ),
     // Runtime configs
     (
         "node-runtime",
@@ -90,7 +86,6 @@ const BUILTIN_PROFILES: &[(&str, &str)] = &[
         "rust-runtime",
         include_str!("../profiles/rust-runtime.json"),
     ),
-    ("go-runtime", include_str!("../profiles/go-runtime.json")),
     (
         "homebrew-macos",
         include_str!("../profiles/homebrew-macos.json"),
@@ -99,42 +94,29 @@ const BUILTIN_PROFILES: &[(&str, &str)] = &[
         "homebrew-linux",
         include_str!("../profiles/homebrew-linux.json"),
     ),
-    (
-        "nix-runtime",
-        include_str!("../profiles/nix-runtime.json"),
-    ),
+    ("nix-runtime", include_str!("../profiles/nix-runtime.json")),
     ("user-tools", include_str!("../profiles/user-tools.json")),
     // Tool and app-specific configs
     ("git-config", include_str!("../profiles/git-config.json")),
     (
-        "vscode-macos",
-        include_str!("../profiles/vscode-macos.json"),
+        "claude-macos",
+        include_str!("../profiles/claude-macos.json"),
     ),
     (
-        "vscode-linux",
-        include_str!("../profiles/vscode-linux.json"),
+        "claude-linux",
+        include_str!("../profiles/claude-linux.json"),
     ),
-    (
-        "claude-code-macos",
-        include_str!("../profiles/claude-code-macos.json"),
-    ),
-    (
-        "claude-code-linux",
-        include_str!("../profiles/claude-code-linux.json"),
-    ),
-    (
-        "codex-macos",
-        include_str!("../profiles/codex-macos.json"),
-    ),
+    ("codex-macos", include_str!("../profiles/codex-macos.json")),
     (
         "opencode-linux",
         include_str!("../profiles/opencode-linux.json"),
     ),
     // Compositions
-    ("hardened", include_str!("../profiles/hardened.json")),
+    ("default", include_str!("../profiles/default.json")),
+    ("secure", include_str!("../profiles/secure.json")),
     ("ai-agent", include_str!("../profiles/ai-agent.json")),
     // App profiles
-    ("claude-code", include_str!("../profiles/claude-code.json")),
+    ("claude", include_str!("../profiles/claude.json")),
     ("codex", include_str!("../profiles/codex.json")),
     ("opencode", include_str!("../profiles/opencode.json")),
     ("openclaw", include_str!("../profiles/openclaw.json")),
@@ -347,37 +329,38 @@ fn platform_matches(profile: &Profile) -> bool {
     }
 }
 
-fn resolve(name: &str, visited: &mut Vec<String>, depth: usize) -> Result<Profile> {
+fn resolve(name: &str, chain: &mut Vec<String>, depth: usize) -> Result<Profile> {
     if depth > MAX_INHERITANCE_DEPTH {
         bail!("profile composition too deep (max {MAX_INHERITANCE_DEPTH})");
     }
-    if visited.contains(&name.to_string()) {
-        bail!("circular profile reference: {}", visited.join(" -> "));
+    if chain.contains(&name.to_string()) {
+        chain.push(name.to_string());
+        bail!("circular profile reference: {}", chain.join(" -> "));
     }
-    visited.push(name.to_string());
+    chain.push(name.to_string());
 
     let profile = load_raw(name)?;
 
-    if !platform_matches(&profile) {
-        return Ok(Profile::default());
-    }
+    let result = if !platform_matches(&profile) {
+        Ok(Profile::default())
+    } else if profile.uses.is_empty() {
+        Ok(profile)
+    } else {
+        let mut merged = Profile::default();
+        for dep_name in &profile.uses {
+            let dep = resolve(dep_name, chain, depth + 1)?;
+            merged = merge_profiles(&merged, &dep);
+        }
+        Ok(merge_profiles(&merged, &profile))
+    };
 
-    if profile.uses.is_empty() {
-        return Ok(profile);
-    }
-
-    let mut merged = Profile::default();
-    for dep_name in &profile.uses {
-        let dep = resolve(dep_name, visited, depth + 1)?;
-        merged = merge_profiles(&merged, &dep);
-    }
-
-    Ok(merge_profiles(&merged, &profile))
+    chain.pop();
+    result
 }
 
 pub fn load_and_apply(name: &str, cli: &mut Cli, cwd: &Path) -> Result<()> {
-    let mut visited = Vec::new();
-    let mut profile = resolve(name, &mut visited, 0)?;
+    let mut chain = Vec::new();
+    let mut profile = resolve(name, &mut chain, 0)?;
 
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
     let tmpdir = std::env::temp_dir();
@@ -389,16 +372,39 @@ pub fn load_and_apply(name: &str, cli: &mut Cli, cwd: &Path) -> Result<()> {
 
 fn apply_to_cli(cli: &mut Cli, profile: &Profile) {
     fn apply_vec(cli_val: &mut Option<Vec<PathBuf>>, profile_val: &Option<Vec<String>>) {
-        if cli_val.is_none()
-            && let Some(pv) = profile_val
-        {
-            *cli_val = Some(pv.iter().map(PathBuf::from).collect());
+        match (cli_val.as_mut(), profile_val) {
+            (Some(cv), Some(pv)) => {
+                // Additive: profile paths first, then CLI paths.
+                let mut merged: Vec<PathBuf> = pv.iter().map(PathBuf::from).collect();
+                for p in cv.iter() {
+                    if !merged.iter().any(|m| m == p) {
+                        merged.push(p.clone());
+                    }
+                }
+                *cli_val = Some(merged);
+            }
+            (None, Some(pv)) => {
+                *cli_val = Some(pv.iter().map(PathBuf::from).collect());
+            }
+            _ => {}
         }
     }
 
     fn apply_str_vec(cli_val: &mut Option<Vec<String>>, profile_val: &Option<Vec<String>>) {
-        if cli_val.is_none() {
-            *cli_val = profile_val.clone();
+        match (cli_val.as_mut(), profile_val) {
+            (Some(cv), Some(pv)) => {
+                let mut merged = pv.clone();
+                for item in cv.iter() {
+                    if !merged.contains(item) {
+                        merged.push(item.clone());
+                    }
+                }
+                *cli_val = Some(merged);
+            }
+            (None, Some(pv)) => {
+                *cli_val = Some(pv.clone());
+            }
+            _ => {}
         }
     }
 
@@ -426,41 +432,34 @@ fn apply_to_cli(cli: &mut Cli, profile: &Profile) {
     apply_bool(&mut cli.restore, profile.restore);
     apply_bool(&mut cli.debug, profile.debug);
 
-    // set_env: profile provides base, CLI --env adds on top.
-    if let Some(ref env_map) = profile.set_env {
-        let mut profile_envs: Vec<String> =
-            env_map.iter().map(|(k, v)| format!("{k}={v}")).collect();
-        // CLI --env entries override profile keys.
-        let cli_keys: Vec<String> = cli
-            .set_env
+    // Merge key=value vecs. CLI keys override matching profile keys.
+    fn merge_kv_vec(cli_val: &mut Vec<String>, profile_entries: Vec<String>) {
+        let cli_keys: Vec<String> = cli_val
             .iter()
             .filter_map(|e| e.split('=').next().map(String::from))
             .collect();
-        profile_envs.retain(|e| {
-            let key = e.split('=').next().unwrap_or("");
-            !cli_keys.contains(&key.to_string())
-        });
-        profile_envs.append(&mut cli.set_env);
-        cli.set_env = profile_envs;
+        let mut merged: Vec<String> = profile_entries
+            .into_iter()
+            .filter(|e| {
+                let key = e.split('=').next().unwrap_or("");
+                !cli_keys.contains(&key.to_string())
+            })
+            .collect();
+        merged.append(cli_val);
+        *cli_val = merged;
     }
 
-    // secret_hosts: merge profile hosts with CLI --secret-host.
+    if let Some(ref env_map) = profile.set_env {
+        let entries = env_map.iter().map(|(k, v)| format!("{k}={v}")).collect();
+        merge_kv_vec(&mut cli.set_env, entries);
+    }
+
     if let Some(ref hosts_map) = profile.secret_hosts {
-        let mut profile_hosts: Vec<String> = hosts_map
+        let entries = hosts_map
             .iter()
             .map(|(k, hosts)| format!("{k}={}", hosts.join(",")))
             .collect();
-        let cli_keys: Vec<String> = cli
-            .secret_host
-            .iter()
-            .filter_map(|e| e.split('=').next().map(String::from))
-            .collect();
-        profile_hosts.retain(|e| {
-            let key = e.split('=').next().unwrap_or("");
-            !cli_keys.contains(&key.to_string())
-        });
-        profile_hosts.append(&mut cli.secret_host);
-        cli.secret_host = profile_hosts;
+        merge_kv_vec(&mut cli.secret_host, entries);
     }
 }
 
@@ -521,8 +520,8 @@ fn cmd_list() -> ExitCode {
 
 fn cmd_show(name: &str) -> ExitCode {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let mut visited = Vec::new();
-    let mut profile = match resolve(name, &mut visited, 0) {
+    let mut chain = Vec::new();
+    let mut profile = match resolve(name, &mut chain, 0) {
         Ok(p) => p,
         Err(e) => {
             eprintln!("error: {e:#}");
@@ -550,10 +549,38 @@ fn cmd_show(name: &str) -> ExitCode {
 mod tests {
     use super::*;
 
+    fn test_cli() -> crate::Cli {
+        crate::Cli {
+            allow_read: None,
+            deny_read: None,
+            allow_write: None,
+            deny_write: None,
+            allow_net: None,
+            deny_net: None,
+            allow_all: false,
+            cwd: None,
+            no_sandbox: false,
+            set_env: vec![],
+            allow_env: None,
+            deny_env: None,
+            secret: vec![],
+            secret_host: vec![],
+            strict_sandbox: false,
+            debug: false,
+            snapshot: false,
+            restore: false,
+            snapshot_paths: None,
+            snapshot_exclude: None,
+            profile: None,
+            subcommand: None,
+            command: vec!["true".to_string()],
+        }
+    }
+
     #[test]
     fn deserialize_use_string() {
-        let p: Profile = serde_json::from_str(r#"{"use": "hardened"}"#).unwrap();
-        assert_eq!(p.uses, vec!["hardened"]);
+        let p: Profile = serde_json::from_str(r#"{"use": "secure"}"#).unwrap();
+        assert_eq!(p.uses, vec!["secure"]);
     }
 
     #[test]
@@ -665,37 +692,135 @@ mod tests {
     }
 
     #[test]
-    fn resolve_builtin_hardened() {
-        let mut visited = Vec::new();
-        let profile = resolve("hardened", &mut visited, 0).unwrap();
+    fn resolve_builtin_secure() {
+        let mut chain = Vec::new();
+        let profile = resolve("secure", &mut chain, 0).unwrap();
         assert_eq!(profile.strict_sandbox, Some(true));
         assert!(profile.deny_read.is_some());
     }
 
     #[test]
-    fn resolve_builtin_ai_agent_uses_hardened() {
-        let mut visited = Vec::new();
-        let profile = resolve("ai-agent", &mut visited, 0).unwrap();
+    fn resolve_builtin_ai_agent_uses_secure() {
+        let mut chain = Vec::new();
+        let profile = resolve("ai-agent", &mut chain, 0).unwrap();
         assert_eq!(profile.strict_sandbox, Some(true));
         assert!(profile.deny_read.is_some());
         assert!(profile.allow_write.is_some());
+        assert!(profile.allow_read.is_some());
     }
 
     #[test]
     fn platform_filtering_skips_non_matching() {
-        let mut visited = Vec::new();
-        let profile = resolve("claude-code", &mut visited, 0).unwrap();
-        // On any platform, should resolve without error.
-        // Platform-specific configs are silently skipped on non-matching OS.
+        let mut chain = Vec::new();
+        let profile = resolve("claude", &mut chain, 0).unwrap();
         assert!(profile.allow_net.is_some());
     }
 
     #[test]
     fn circular_inheritance_detected() {
-        // Can't test with built-ins, but test the mechanism.
-        let mut visited = vec!["a".to_string()];
-        let result = resolve("a", &mut visited, 0);
+        let mut chain = vec!["a".to_string()];
+        let result = resolve("a", &mut chain, 0);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("circular"));
+    }
+
+    #[test]
+    fn default_profile_sets_allow_read() {
+        let mut chain = Vec::new();
+        let profile = resolve("default", &mut chain, 0).unwrap();
+        let paths = profile.allow_read.unwrap();
+        assert!(!paths.is_empty());
+        assert!(paths.contains(&"/bin".to_string()));
+    }
+
+    #[test]
+    fn cli_merge_is_additive() {
+        let mut cli = test_cli();
+        cli.allow_read = Some(vec![PathBuf::from("/extra")]);
+        let profile = Profile {
+            allow_read: Some(vec!["/base".to_string()]),
+            ..Default::default()
+        };
+        apply_to_cli(&mut cli, &profile);
+        let paths = cli.allow_read.unwrap();
+        assert_eq!(paths[0], PathBuf::from("/base"));
+        assert!(paths.contains(&PathBuf::from("/extra")));
+    }
+
+    #[test]
+    fn cli_merge_deduplicates() {
+        let mut cli = test_cli();
+        cli.allow_read = Some(vec![PathBuf::from("/same")]);
+        let profile = Profile {
+            allow_read: Some(vec!["/same".to_string()]),
+            ..Default::default()
+        };
+        apply_to_cli(&mut cli, &profile);
+        let paths = cli.allow_read.unwrap();
+        assert_eq!(paths.len(), 1);
+    }
+
+    #[test]
+    fn merge_host_maps_dedup_append() {
+        let base = Profile {
+            secret_hosts: Some(HashMap::from([(
+                "KEY".into(),
+                vec!["a.com".into(), "b.com".into()],
+            )])),
+            ..Default::default()
+        };
+        let child = Profile {
+            secret_hosts: Some(HashMap::from([
+                ("KEY".into(), vec!["b.com".into(), "c.com".into()]),
+                ("OTHER".into(), vec!["d.com".into()]),
+            ])),
+            ..Default::default()
+        };
+        let merged = merge_profiles(&base, &child);
+        let hosts = merged.secret_hosts.unwrap();
+        assert_eq!(hosts["KEY"], vec!["a.com", "b.com", "c.com"]);
+        assert_eq!(hosts["OTHER"], vec!["d.com"]);
+    }
+
+    #[test]
+    fn template_expansion_all_vars() {
+        let result = expand_templates(
+            "$HOME/code/$CWD/$TMPDIR/file",
+            Path::new("/home/user"),
+            Path::new("/project"),
+            Path::new("/tmp"),
+        );
+        assert_eq!(result, "/home/user/code//project//tmp/file");
+    }
+
+    #[test]
+    fn cli_str_merge_is_additive() {
+        let mut cli = test_cli();
+        cli.allow_net = Some(vec!["cli.com".to_string()]);
+        let profile = Profile {
+            allow_net: Some(vec!["profile.com".to_string()]),
+            ..Default::default()
+        };
+        apply_to_cli(&mut cli, &profile);
+        let domains = cli.allow_net.unwrap();
+        assert_eq!(domains[0], "profile.com");
+        assert!(domains.contains(&"cli.com".to_string()));
+    }
+
+    #[test]
+    fn set_env_cli_overrides_profile_key() {
+        let mut cli = test_cli();
+        cli.set_env = vec!["A=from_cli".to_string()];
+        let profile = Profile {
+            set_env: Some(HashMap::from([
+                ("A".into(), "from_profile".into()),
+                ("B".into(), "kept".into()),
+            ])),
+            ..Default::default()
+        };
+        apply_to_cli(&mut cli, &profile);
+        assert!(cli.set_env.contains(&"A=from_cli".to_string()));
+        assert!(cli.set_env.contains(&"B=kept".to_string()));
+        assert!(!cli.set_env.contains(&"A=from_profile".to_string()));
     }
 }

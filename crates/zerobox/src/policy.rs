@@ -12,7 +12,7 @@ use codex_utils_absolute_path::AbsolutePathBuf;
 
 use crate::Cli;
 
-/// Pre-resolved paths from CLI flags.
+/// Resolved absolute paths from CLI flags.
 pub struct ResolvedPaths {
     pub readable: Option<Vec<AbsolutePathBuf>>,
     pub deny_readable: Vec<AbsolutePathBuf>,
@@ -105,16 +105,8 @@ pub fn build_fs_policy(
 
     match &resolved.readable {
         Some(paths) => {
-            entries.push(FileSystemSandboxEntry {
-                path: FileSystemPath::Special {
-                    value: FileSystemSpecialPath::Minimal,
-                },
-                access: FileSystemAccessMode::Read,
-            });
             entries.extend(make_path_entries(paths, FileSystemAccessMode::Read));
-            // On Linux, bubblewrap creates an isolated mount namespace. The
-            // sandbox helper binary must be readable inside it for the seccomp
-            // re-exec to work. Add the binary's own directory.
+            // Bwrap re-execs the sandbox helper; its directory must be readable.
             if let Ok(exe) = std::env::current_exe()
                 && let Some(dir) = exe.parent()
                 && let Ok(abs) = AbsolutePathBuf::try_from(dir.to_path_buf())
@@ -124,9 +116,7 @@ pub fn build_fs_policy(
                     access: FileSystemAccessMode::Read,
                 });
             }
-            // On systemd-based Linux, /etc/resolv.conf is a symlink to
-            // /run/systemd/resolve/stub-resolv.conf. When network is enabled,
-            // /run must be readable for DNS to work inside the bwrap namespace.
+            // /run is needed for DNS resolution inside bwrap (resolv.conf symlink).
             if net_enabled && let Ok(abs) = AbsolutePathBuf::try_from(PathBuf::from("/run")) {
                 entries.push(FileSystemSandboxEntry {
                     path: FileSystemPath::Path { path: abs },
@@ -225,8 +215,6 @@ mod tests {
         }
     }
 
-    // ── resolve_path ──
-
     #[test]
     fn resolve_path_absolute_unchanged() {
         let result =
@@ -239,8 +227,6 @@ mod tests {
         let result = resolve_path(Path::new("/base/dir"), Path::new("child")).expect("resolve");
         assert_eq!(result.as_path(), Path::new("/base/dir/child"));
     }
-
-    // ── resolve_cli_paths ──
 
     #[test]
     fn resolve_defaults_all_empty() {
@@ -281,8 +267,6 @@ mod tests {
         assert_eq!(resolved.deny_writable.len(), 1);
     }
 
-    // ── build_fs_policy ──
-
     #[test]
     fn fs_policy_allow_all_is_unrestricted() {
         let resolved = ResolvedPaths {
@@ -313,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn fs_policy_allow_read_includes_minimal() {
+    fn fs_policy_allow_read_restricts_to_listed_paths() {
         let resolved = ResolvedPaths {
             readable: Some(vec![
                 AbsolutePathBuf::try_from(PathBuf::from("/tmp")).expect("abs"),
@@ -325,7 +309,8 @@ mod tests {
         };
         let policy = build_fs_policy(&resolved, false, false);
         assert!(!policy.has_full_disk_read_access());
-        assert!(policy.include_platform_defaults());
+        // Profiles control all filesystem paths, not Minimal.
+        assert!(!policy.include_platform_defaults());
     }
 
     #[test]
@@ -340,8 +325,6 @@ mod tests {
         let policy = build_fs_policy(&resolved, false, false);
         assert!(policy.has_full_disk_write_access());
     }
-
-    // ── build_legacy_sandbox_policy ──
 
     #[test]
     fn legacy_allow_all_is_danger() {
@@ -432,8 +415,6 @@ mod tests {
             }
         ));
     }
-
-    // ── net_is_enabled / build_net_policy ──
 
     #[test]
     fn net_disabled_by_default() {

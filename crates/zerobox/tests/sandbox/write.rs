@@ -3,6 +3,9 @@ use crate::support::*;
 #[test]
 fn allow_write_specific_path() {
     let out = run(&[
+        "-C",
+        "/tmp",
+        "--allow-read=/tmp",
         "--allow-write=/tmp",
         "--",
         "node",
@@ -37,6 +40,9 @@ mod deny_write {
         std::fs::create_dir_all(&protected).expect("setup");
 
         let out = run(&[
+            "-C",
+            &dir.display().to_string(),
+            &format!("--allow-read={}", dir.display()),
             &format!("--allow-write={}", dir.display()),
             &format!("--deny-write={}", protected.display()),
             "--",

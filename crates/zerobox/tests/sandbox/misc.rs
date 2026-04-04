@@ -94,6 +94,9 @@ fn deny_read_and_deny_write_combined() {
     std::fs::write(dir.join("public"), "hello").expect("setup");
 
     let out = run(&[
+        "-C",
+        &dir.display().to_string(),
+        &format!("--allow-read={}", dir.display()),
         &format!("--allow-write={}", dir.display()),
         &format!("--deny-write={}", secret.display()),
         "--",
@@ -132,13 +135,29 @@ fn allow_net_domain_with_write_restriction() {
 
 #[test]
 fn exit_code_zero_propagated() {
-    let out = run(&["--", "node", "-e", "process.exit(0)"]);
+    let out = run(&[
+        "--allow-read=/tmp",
+        "-C",
+        "/tmp",
+        "--",
+        "node",
+        "-e",
+        "process.exit(0)",
+    ]);
     assert!(out.status.success());
 }
 
 #[test]
 fn exit_code_nonzero_propagated() {
-    let out = run(&["--", "node", "-e", "process.exit(42)"]);
+    let out = run(&[
+        "--allow-read=/tmp",
+        "-C",
+        "/tmp",
+        "--",
+        "node",
+        "-e",
+        "process.exit(42)",
+    ]);
     assert_eq!(out.status.code(), Some(42));
 }
 

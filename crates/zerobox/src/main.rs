@@ -234,18 +234,26 @@ async fn tokio_main() -> ExitCode {
         return profile::handle_subcommand(action);
     }
 
-    // Apply profile before the rest of the pipeline.
-    if let Some(profile_name) = cli.profile.clone() {
+    // Always load a profile. Use "default" unless the user specified one.
+    // Skip when sandboxing is disabled entirely.
+    let loaded_profile = if !cli.no_sandbox && !cli.allow_all {
+        let name = cli
+            .profile
+            .clone()
+            .unwrap_or_else(|| "default".to_string());
         let cwd = cli
             .cwd
             .clone()
             .map_or_else(std::env::current_dir, Ok)
             .unwrap_or_else(|_| PathBuf::from("."));
-        if let Err(e) = profile::load_and_apply(&profile_name, &mut cli, &cwd) {
-            eprintln!("error: profile '{profile_name}': {e:#}");
+        if let Err(e) = profile::load_and_apply(&name, &mut cli, &cwd) {
+            eprintln!("error: profile '{name}': {e:#}");
             return ExitCode::from(1);
         }
-    }
+        Some(name)
+    } else {
+        None
+    };
 
     if cli.command.is_empty() {
         eprintln!("error: no command specified");
@@ -256,6 +264,10 @@ async fn tokio_main() -> ExitCode {
 
     if dbg {
         debug::init_tracing();
+    }
+
+    if let Some(ref name) = loaded_profile {
+        debug_log!(dbg, "profile: {name}");
     }
 
     let secret_store = match secret::parse_secret_flags(&cli.secret, &cli.secret_host) {
