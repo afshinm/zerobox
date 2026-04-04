@@ -1,0 +1,13 @@
+{
+  "description": "Node.js runtime and package manager paths.",
+  "allow_read": [
+    "$HOME/.nvm",
+    "$HOME/.fnm",
+    "$HOME/.npm",
+    "$HOME/.node",
+    "$HOME/.local/share/fnm",
+    "/usr/local/lib/node_modules",
+    "$HOME/Library/pnpm",
+    "$HOME/.local/share/pnpm"
+  ]
+}

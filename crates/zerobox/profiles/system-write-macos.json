@@ -1,0 +1,5 @@
+{
+  "description": "macOS system paths requiring write for temp files and devices.",
+  "platform": "macos",
+  "allow_write": ["/private/tmp", "/tmp", "/private/var/folders", "/var/folders", "/dev", "$TMPDIR"]
+}

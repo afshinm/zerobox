@@ -1,0 +1,16 @@
+{
+  "description": "Block access to Linux keyrings and password stores.",
+  "platform": "linux",
+  "deny_read": [
+    "$HOME/.password-store",
+    "$HOME/.1password",
+    "$HOME/.op",
+    "$HOME/.local/share/keyrings"
+  ],
+  "deny_write": [
+    "$HOME/.password-store",
+    "$HOME/.1password",
+    "$HOME/.op",
+    "$HOME/.local/share/keyrings"
+  ]
+}

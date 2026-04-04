@@ -1,0 +1,6 @@
+{
+  "description": "Linux cache directories.",
+  "platform": "linux",
+  "allow_read": ["$HOME/.cache"],
+  "allow_write": ["$HOME/.cache"]
+}

@@ -1,0 +1,15 @@
+{
+  "description": "Block access to shell command history files.",
+  "deny_read": [
+    "$HOME/.bash_history",
+    "$HOME/.zsh_history",
+    "$HOME/.history",
+    "$HOME/.python_history"
+  ],
+  "deny_write": [
+    "$HOME/.bash_history",
+    "$HOME/.zsh_history",
+    "$HOME/.history",
+    "$HOME/.python_history"
+  ]
+}

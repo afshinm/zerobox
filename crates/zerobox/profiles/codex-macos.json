@@ -1,0 +1,5 @@
+{
+  "description": "Codex macOS-specific state and credential paths.",
+  "platform": "macos",
+  "allow_read": ["$HOME/Library/Keychains/login.keychain-db"]
+}

@@ -1,0 +1,7 @@
+{
+  "description": "Default profile. Grants system path read access for program execution.",
+  "use": [
+    "system-read-macos",
+    "system-read-linux"
+  ]
+}

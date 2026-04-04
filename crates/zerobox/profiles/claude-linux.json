@@ -1,0 +1,5 @@
+{
+  "description": "Claude Code Linux-specific state paths.",
+  "platform": "linux",
+  "allow_read": ["$HOME/.local/share/claude"]
+}

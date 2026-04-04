@@ -1,0 +1,33 @@
+{
+  "description": "Block access to shell configuration files that may embed secrets.",
+  "deny_read": [
+    "$HOME/.zshrc",
+    "$HOME/.zprofile",
+    "$HOME/.zshenv",
+    "$HOME/.zlogin",
+    "$HOME/.zlogout",
+    "$HOME/.bashrc",
+    "$HOME/.bash_profile",
+    "$HOME/.bash_login",
+    "$HOME/.bash_logout",
+    "$HOME/.profile",
+    "$HOME/.config/fish",
+    "$HOME/.env",
+    "$HOME/.envrc"
+  ],
+  "deny_write": [
+    "$HOME/.zshrc",
+    "$HOME/.zprofile",
+    "$HOME/.zshenv",
+    "$HOME/.zlogin",
+    "$HOME/.zlogout",
+    "$HOME/.bashrc",
+    "$HOME/.bash_profile",
+    "$HOME/.bash_login",
+    "$HOME/.bash_logout",
+    "$HOME/.profile",
+    "$HOME/.config/fish",
+    "$HOME/.env",
+    "$HOME/.envrc"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "description": "Security baseline. Denies access to credentials, browser data, shell history, keychains, and private data. Provides system read/write and common tool paths.",
+  "use": [
+    "default",
+    "deny-credentials",
+    "deny-shell-history",
+    "deny-shell-configs",
+    "deny-keychains-macos",
+    "deny-keychains-linux",
+    "deny-browser-data-macos",
+    "deny-browser-data-linux",
+    "deny-macos-private",
+    "system-write-macos",
+    "system-write-linux",
+    "user-tools",
+    "homebrew-macos",
+    "homebrew-linux"
+  ],
+  "strict_sandbox": true
+}

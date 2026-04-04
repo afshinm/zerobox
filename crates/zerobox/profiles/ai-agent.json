@@ -1,0 +1,6 @@
+{
+  "description": "Base profile for AI coding agents. CWD read/write access, no network by default.",
+  "use": ["secure"],
+  "allow_read": ["$CWD", "$TMPDIR"],
+  "allow_write": ["$CWD", "$TMPDIR"]
+}

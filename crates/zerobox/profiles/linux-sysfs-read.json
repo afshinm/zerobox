@@ -1,0 +1,5 @@
+{
+  "description": "Linux sysfs paths for kernel and device state inspection.",
+  "platform": "linux",
+  "allow_read": ["/sys"]
+}

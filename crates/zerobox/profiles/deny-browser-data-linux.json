@@ -1,0 +1,18 @@
+{
+  "description": "Block access to Linux browser stored data (cookies, saved passwords, sessions).",
+  "platform": "linux",
+  "deny_read": [
+    "$HOME/.config/google-chrome",
+    "$HOME/.config/chromium",
+    "$HOME/.mozilla/firefox",
+    "$HOME/.config/microsoft-edge",
+    "$HOME/.config/BraveSoftware"
+  ],
+  "deny_write": [
+    "$HOME/.config/google-chrome",
+    "$HOME/.config/chromium",
+    "$HOME/.mozilla/firefox",
+    "$HOME/.config/microsoft-edge",
+    "$HOME/.config/BraveSoftware"
+  ]
+}

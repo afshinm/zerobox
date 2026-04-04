@@ -124,6 +124,16 @@ if [ -f "$PATCH" ]; then
     cd -
 fi
 
+# Move non-FS platform defaults from restricted_read_only_platform_defaults.sbpl
+# into the base policy. Profiles now control all filesystem rules.
+PLATFORM_PATCH="$SCRIPT_DIR/upstream-platform-defaults.patch"
+if [ -f "$PLATFORM_PATCH" ]; then
+    echo "==> Applying platform defaults patch..."
+    cd "$ROOT"
+    patch -p0 < "$PLATFORM_PATCH"
+    cd -
+fi
+
 {
     echo "$REF"
     echo "# commit: $COMMIT_SHA"

@@ -1,0 +1,6 @@
+{
+  "description": "macOS cache, log, and preference directories.",
+  "platform": "macos",
+  "allow_read": ["$HOME/Library/Preferences", "$HOME/Library/Caches", "$HOME/Library/Logs"],
+  "allow_write": ["$HOME/Library/Caches", "$HOME/Library/Logs"]
+}

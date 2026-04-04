@@ -1,0 +1,129 @@
+--- upstream/sandboxing/src/seatbelt_base_policy.sbpl	2026-04-04 15:02:38
++++ upstream/sandboxing/src/seatbelt_base_policy.sbpl	2026-04-04 17:28:04
+@@ -10,9 +10,11 @@
+ ; child processes inherit the policy of their parent
+ (allow process-exec)
+ (allow process-fork)
++(allow signal (target self))
+ (allow signal (target same-sandbox))
+ 
+-; process-info
++; process-info (dyld, code signing, getpid)
++(allow process-info* (target self))
+ (allow process-info* (target same-sandbox))
+ 
+ (allow file-write-data
+@@ -79,6 +81,10 @@
+ (allow sysctl-write
+   (sysctl-name "kern.grade_cputype"))
+ 
++; Kernel control sockets (AF_SYSTEM) and routing table (AF_ROUTE).
++; Required by networking programs (curl, git, node) for netsrc lookups.
++(allow system-socket)
++
+ ; IOKit
+ (allow iokit-open
+   (iokit-registry-entry-class "RootDomainUserClient")
+@@ -105,12 +111,101 @@
+     (extension "com.apple.sandbox.pty")))
+ ; PTYs created before entering seatbelt may lack the extension; allow ioctl
+ ; on those slave ttys so interactive shells detect a TTY and remain functional.
++(allow file-ioctl (literal "/dev/tty"))
+ (allow file-ioctl (regex #"^/dev/ttys[0-9]+"))
++(allow file-ioctl (regex #"^/dev/pty[a-z][0-9a-f]+$"))
+ 
+-; allow readonly user preferences
++; POSIX shared memory (needed for Python multiprocessing, libnotify, cfprefs).
+ (allow ipc-posix-shm-read* (ipc-posix-name-prefix "apple.cfprefs."))
++(allow ipc-posix-shm-write-data)
++(allow ipc-posix-shm-write-create)
+ (allow mach-lookup
+   (global-name "com.apple.cfprefsd.daemon")
+   (global-name "com.apple.cfprefsd.agent")
+   (local-name "com.apple.cfprefsd.agent"))
+ (allow user-preference-read)
++
++; ── Non-filesystem platform essentials (moved from restricted defaults) ──
++
++; Allow guarded vnodes.
++(allow system-mac-syscall (mac-policy-name "vnguard"))
++
++; Determine whether a container is expected.
++(allow system-mac-syscall
++  (require-all
++    (mac-policy-name "Sandbox")
++    (mac-syscall-number 67)))
++
++; Allow IPC to analytics, logging, trust, and other system agents.
++(allow mach-lookup
++  (global-name "com.apple.analyticsd")
++  (global-name "com.apple.analyticsd.messagetracer")
++  (global-name "com.apple.appsleep")
++  (global-name "com.apple.bsd.dirhelper")
++  (global-name "com.apple.diagnosticd")
++  (global-name "com.apple.dt.automationmode.reader")
++  (global-name "com.apple.espd")
++  (global-name "com.apple.logd")
++  (global-name "com.apple.logd.events")
++  (global-name "com.apple.runningboard")
++  (global-name "com.apple.secinitd")
++  (global-name "com.apple.system.DirectoryService.libinfo_v1")
++  (global-name "com.apple.system.logger")
++  (global-name "com.apple.system.notification_center")
++  (global-name "com.apple.system.opendirectoryd.membership")
++  (global-name "com.apple.trustd")
++  (global-name "com.apple.trustd.agent")
++  (global-name "com.apple.xpc.activity.unmanaged")
++  (local-name "com.apple.cfprefsd.agent"))
++
++; Allow IPC to the syslog socket for logging.
++(allow network-outbound (literal "/private/var/run/syslog"))
++
++; macOS Notifications
++(allow ipc-posix-shm-read*
++  (ipc-posix-name "apple.shm.notification_center"))
++
++; Audio and power management services.
++(allow mach-lookup (global-name "com.apple.audio.audiohald"))
++(allow mach-lookup (global-name "com.apple.audio.AudioComponentRegistrar"))
++
++; Map system frameworks + dylibs for loader.
++(allow file-map-executable
++  (subpath "/Library/Apple/System/Library/Frameworks")
++  (subpath "/Library/Apple/System/Library/PrivateFrameworks")
++  (subpath "/Library/Apple/usr/lib")
++  (subpath "/System/Library/Extensions")
++  (subpath "/System/Library/Frameworks")
++  (subpath "/System/Library/PrivateFrameworks")
++  (subpath "/System/Library/SubFrameworks")
++  (subpath "/System/iOSSupport/System/Library/Frameworks")
++  (subpath "/System/iOSSupport/System/Library/PrivateFrameworks")
++  (subpath "/System/iOSSupport/System/Library/SubFrameworks")
++  (subpath "/usr/lib"))
++
++; Allow FSIOC_CAS_BSDFLAGS as alternate chflags.
++(allow system-fsctl (fsctl-command FSIOC_CAS_BSDFLAGS))
++
++; Allow processes to get their current working directory.
++(allow file-read* file-test-existence
++  (literal "/"))
++
++; Allow resolution of standard macOS symlinks (/etc -> /private/etc, etc.)
++(allow file-read-metadata file-test-existence
++  (literal "/etc")
++  (literal "/tmp")
++  (literal "/var")
++  (literal "/private/etc/localtime"))
++
++; Allow stat'ing of firmlink parent path components.
++(allow file-read-metadata file-test-existence
++  (path-ancestors "/System/Volumes/Data/private"))
++
++; Allow metadata traversal for firmlink parents.
++(allow file-read-metadata (literal "/System/Volumes") (vnode-type DIRECTORY))
++(allow file-read-metadata (literal "/System/Volumes/Data") (vnode-type DIRECTORY))
++(allow file-read-metadata (literal "/System/Volumes/Data/Users") (vnode-type DIRECTORY))
++
++; App sandbox extensions
++(allow file-read* (extension "com.apple.app-sandbox.read"))
++(allow file-read* file-write* (extension "com.apple.app-sandbox.read-write"))

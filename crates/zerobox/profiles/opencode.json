@@ -1,0 +1,49 @@
+{
+  "description": "OpenCode AI coding assistant. Supports multiple LLM providers.",
+  "use": [
+    "ai-agent",
+    "cache-macos",
+    "cache-linux",
+    "opencode-linux",
+    "node-runtime",
+    "linux-sysfs-read",
+    "git-config"
+  ],
+  "allow_read": [
+    "$CWD/.opencode",
+    "$HOME/.opencode",
+    "$HOME/.opencode.json",
+    "$HOME/.config/opencode",
+    "$HOME/.cache/opencode",
+    "$HOME/.local/share/opencode",
+    "$HOME/.local/share/opentui",
+    "$HOME/.local/state/opencode",
+    "$TMPDIR"
+  ],
+  "allow_write": [
+    "$CWD/.opencode",
+    "$HOME/.opencode",
+    "$HOME/.opencode.json",
+    "$HOME/.config/opencode",
+    "$HOME/.cache/opencode",
+    "$HOME/.local/share/opencode",
+    "$HOME/.local/share/opentui",
+    "$HOME/.local/state/opencode",
+    "$TMPDIR"
+  ],
+  "allow_net": [],
+  "allow_env": [
+    "PATH",
+    "HOME",
+    "USER",
+    "SHELL",
+    "TERM",
+    "LANG",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GROQ_API_KEY",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_OPENAI_ENDPOINT"
+  ]
+}

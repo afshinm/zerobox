@@ -1,0 +1,6 @@
+{
+  "description": "Claude Code CLI cache and MCP log directories on Linux.",
+  "platform": "linux",
+  "allow_read": ["$HOME/.cache/claude-cli-nodejs"],
+  "allow_write": ["$HOME/.cache/claude-cli-nodejs"]
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Python runtime paths (pyenv, conda, uv).",
+  "allow_read": [
+    "$HOME/.pyenv",
+    "$HOME/.local/lib",
+    "$HOME/.local/share/uv",
+    "$HOME/.conda"
+  ]
+}

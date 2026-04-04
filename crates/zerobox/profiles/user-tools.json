@@ -1,0 +1,10 @@
+{
+  "description": "User-local executables, .desktop files, man pages, and shell completions.",
+  "allow_read": [
+    "$HOME/.local/bin",
+    "$HOME/.local/share/applications",
+    "$HOME/.local/share/man",
+    "$HOME/.local/share/bash-completion",
+    "$HOME/.local/share/zsh"
+  ]
+}
