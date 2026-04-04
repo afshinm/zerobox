@@ -105,8 +105,7 @@ describe.skipIf(skip)("Sandbox (e2e)", () => {
 
   it("blocks writes outside allowed paths", async () => {
     const sandbox = Sandbox.create();
-    const result =
-      await sandbox.sh`echo x > /var/zerobox-sdk-wb 2>&1 || echo BLOCKED`.output();
+    const result = await sandbox.sh`echo x > /var/zerobox-sdk-wb 2>&1 || echo BLOCKED`.output();
     expect(result.stdout + result.stderr).toMatch(
       /BLOCKED|Read-only|Permission denied|Operation not permitted/i,
     );

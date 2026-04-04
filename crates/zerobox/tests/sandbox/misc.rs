@@ -133,13 +133,27 @@ fn allow_net_domain_with_write_restriction() {
 
 #[test]
 fn exit_code_zero_propagated() {
-    let out = run(&["--profile", "workspace", "--", "node", "-e", "process.exit(0)"]);
+    let out = run(&[
+        "--profile",
+        "workspace",
+        "--",
+        "node",
+        "-e",
+        "process.exit(0)",
+    ]);
     assert!(out.status.success());
 }
 
 #[test]
 fn exit_code_nonzero_propagated() {
-    let out = run(&["--profile", "workspace", "--", "node", "-e", "process.exit(42)"]);
+    let out = run(&[
+        "--profile",
+        "workspace",
+        "--",
+        "node",
+        "-e",
+        "process.exit(42)",
+    ]);
     assert_eq!(out.status.code(), Some(42));
 }
 
