@@ -531,7 +531,23 @@ fn cmd_list() -> ExitCode {
         let _ = writeln!(tw, "PROFILE\tSOURCE\tDESCRIPTION");
     }
 
+    let user_dir = crate::zerobox_home().join("profiles");
+    let user_names: std::collections::HashSet<String> = std::fs::read_dir(&user_dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
+        .filter_map(|e| {
+            e.path()
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+        })
+        .collect();
+
     for (name, json) in BUILTIN_PROFILES {
+        if user_names.contains(*name) {
+            continue;
+        }
         let desc = serde_json::from_str::<Profile>(json)
             .ok()
             .and_then(|p| p.description)
@@ -539,20 +555,14 @@ fn cmd_list() -> ExitCode {
         let _ = writeln!(tw, "{name}\tbuilt-in\t{desc}");
     }
 
-    let user_dir = crate::zerobox_home().join("profiles");
-    if let Ok(entries) = std::fs::read_dir(&user_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().is_some_and(|e| e == "json") {
-                let name = path.file_stem().unwrap_or_default().to_string_lossy();
-                let desc = std::fs::read_to_string(&path)
-                    .ok()
-                    .and_then(|json| serde_json::from_str::<Profile>(&json).ok())
-                    .and_then(|p| p.description)
-                    .unwrap_or_default();
-                let _ = writeln!(tw, "{name}\tuser\t{desc}");
-            }
-        }
+    for name in &user_names {
+        let path = user_dir.join(format!("{name}.json"));
+        let desc = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|json| serde_json::from_str::<Profile>(&json).ok())
+            .and_then(|p| p.description)
+            .unwrap_or_default();
+        let _ = writeln!(tw, "{name}\tuser\t{desc}");
     }
 
     let _ = tw.flush();
