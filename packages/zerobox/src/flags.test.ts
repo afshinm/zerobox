@@ -2,15 +2,19 @@ import { describe, it, expect } from "vitest";
 import { buildFlags } from "./flags.js";
 
 describe("buildFlags", () => {
-  it("returns empty array for default options", () => {
-    expect(buildFlags({})).toEqual([]);
+  it("defaults to workspace profile", () => {
+    expect(buildFlags({})).toEqual(["--profile", "workspace"]);
   });
 
-  it("returns --allow-all without fs/net flags", () => {
+  it("uses custom profile when specified", () => {
+    expect(buildFlags({ profile: "claude" })).toEqual(["--profile", "claude"]);
+  });
+
+  it("returns --allow-all without fs/net/profile flags", () => {
     expect(buildFlags({ allowAll: true, allowWrite: ["/tmp"] })).toEqual(["--allow-all"]);
   });
 
-  it("returns --no-sandbox and nothing else", () => {
+  it("returns --no-sandbox without profile flags", () => {
     expect(buildFlags({ noSandbox: true, allowWrite: ["/tmp"] })).toEqual(["--no-sandbox"]);
   });
 
@@ -21,45 +25,54 @@ describe("buildFlags", () => {
   });
 
   it("builds --allow-read with comma-separated paths", () => {
-    expect(buildFlags({ allowRead: ["/tmp", "/data"] })).toEqual(["--allow-read=/tmp,/data"]);
+    const flags = buildFlags({ allowRead: ["/tmp", "/data"] });
+    expect(flags).toContain("--allow-read=/tmp,/data");
   });
 
   it("builds --deny-read", () => {
-    expect(buildFlags({ denyRead: ["/secret"] })).toEqual(["--deny-read=/secret"]);
+    const flags = buildFlags({ denyRead: ["/secret"] });
+    expect(flags).toContain("--deny-read=/secret");
   });
 
   it("builds --allow-write with paths", () => {
-    expect(buildFlags({ allowWrite: ["/tmp"] })).toEqual(["--allow-write=/tmp"]);
+    const flags = buildFlags({ allowWrite: ["/tmp"] });
+    expect(flags).toContain("--allow-write=/tmp");
   });
 
   it("builds --deny-write", () => {
-    expect(buildFlags({ denyWrite: [".git"] })).toEqual(["--deny-write=.git"]);
+    const flags = buildFlags({ denyWrite: [".git"] });
+    expect(flags).toContain("--deny-write=.git");
   });
 
   it("builds --allow-net as boolean", () => {
-    expect(buildFlags({ allowNet: true })).toEqual(["--allow-net"]);
+    const flags = buildFlags({ allowNet: true });
+    expect(flags).toContain("--allow-net");
   });
 
   it("builds --allow-net with domains", () => {
-    expect(buildFlags({ allowNet: ["example.com", "api.example.com"] })).toEqual([
-      "--allow-net=example.com,api.example.com",
-    ]);
+    const flags = buildFlags({ allowNet: ["example.com", "api.example.com"] });
+    expect(flags).toContain("--allow-net=example.com,api.example.com");
   });
 
   it("ignores allowNet: false", () => {
-    expect(buildFlags({ allowNet: false })).toEqual([]);
+    const flags = buildFlags({ allowNet: false });
+    expect(flags).not.toContain("--allow-net");
   });
 
   it("ignores empty allowNet array", () => {
-    expect(buildFlags({ allowNet: [] })).toEqual([]);
+    const flags = buildFlags({ allowNet: [] });
+    expect(flags.filter((f) => f.startsWith("--allow-net")).length).toBe(0);
   });
 
   it("builds --deny-net", () => {
-    expect(buildFlags({ denyNet: ["evil.com"] })).toEqual(["--deny-net=evil.com"]);
+    const flags = buildFlags({ denyNet: ["evil.com"] });
+    expect(flags).toContain("--deny-net=evil.com");
   });
 
   it("builds -C for cwd", () => {
-    expect(buildFlags({ cwd: "/workspace" })).toEqual(["-C", "/workspace"]);
+    const flags = buildFlags({ cwd: "/workspace" });
+    expect(flags).toContain("-C");
+    expect(flags).toContain("/workspace");
   });
 
   it("combines multiple flags", () => {
@@ -72,26 +85,28 @@ describe("buildFlags", () => {
       denyNet: ["evil.com"],
       cwd: "/workspace",
     });
-    expect(flags).toEqual([
-      "--allow-read=/tmp",
-      "--deny-read=/tmp/secret",
-      "--allow-write=/tmp",
-      "--deny-write=/tmp/.git",
-      "--allow-net=example.com",
-      "--deny-net=evil.com",
-      "-C",
-      "/workspace",
-    ]);
+    expect(flags).toContain("--profile");
+    expect(flags).toContain("--allow-read=/tmp");
+    expect(flags).toContain("--deny-read=/tmp/secret");
+    expect(flags).toContain("--allow-write=/tmp");
+    expect(flags).toContain("--deny-write=/tmp/.git");
+    expect(flags).toContain("--allow-net=example.com");
+    expect(flags).toContain("--deny-net=evil.com");
+    expect(flags).toContain("-C");
+    expect(flags).toContain("/workspace");
   });
 
   it("skips empty arrays", () => {
-    expect(buildFlags({ allowRead: [], denyRead: [], allowWrite: [], denyWrite: [] })).toEqual([]);
+    const flags = buildFlags({ allowRead: [], denyRead: [], allowWrite: [], denyWrite: [] });
+    expect(flags).toEqual(["--profile", "workspace"]);
   });
 
-  // ── env ──
+  // env
 
   it("builds --env flags", () => {
-    expect(buildFlags({ env: { FOO: "bar" } })).toEqual(["--env", "FOO=bar"]);
+    const flags = buildFlags({ env: { FOO: "bar" } });
+    expect(flags).toContain("--env");
+    expect(flags).toContain("FOO=bar");
   });
 
   it("builds multiple --env flags", () => {
@@ -102,18 +117,21 @@ describe("buildFlags", () => {
   });
 
   it("builds --allow-env as boolean", () => {
-    expect(buildFlags({ allowEnv: true })).toEqual(["--allow-env"]);
+    const flags = buildFlags({ allowEnv: true });
+    expect(flags).toContain("--allow-env");
   });
 
   it("builds --allow-env with keys", () => {
-    expect(buildFlags({ allowEnv: ["PATH", "HOME"] })).toEqual(["--allow-env=PATH,HOME"]);
+    const flags = buildFlags({ allowEnv: ["PATH", "HOME"] });
+    expect(flags).toContain("--allow-env=PATH,HOME");
   });
 
   it("builds --deny-env", () => {
-    expect(buildFlags({ denyEnv: ["SECRET"] })).toEqual(["--deny-env=SECRET"]);
+    const flags = buildFlags({ denyEnv: ["SECRET"] });
+    expect(flags).toContain("--deny-env=SECRET");
   });
 
-  // ── secrets ──
+  // secrets
 
   it("emits --secret and --secret-host flags", () => {
     const flags = buildFlags({
@@ -206,15 +224,16 @@ describe("buildFlags", () => {
     });
     expect(flags).toContain("--secret");
     expect(flags).toContain("--secret-host");
-    // No --allow-net — CLI handles network implicitly for secret hosts.
     expect(flags.filter((f) => f.startsWith("--allow-net")).length).toBe(0);
   });
 
   it("allowEnv: false does not emit flag", () => {
-    expect(buildFlags({ allowEnv: false })).toEqual([]);
+    const flags = buildFlags({ allowEnv: false });
+    expect(flags).not.toContain("--allow-env");
   });
 
   it("allowEnv: [] does not emit flag", () => {
-    expect(buildFlags({ allowEnv: [] })).toEqual([]);
+    const flags = buildFlags({ allowEnv: [] });
+    expect(flags).not.toContain("--allow-env");
   });
 });

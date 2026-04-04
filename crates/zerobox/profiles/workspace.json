@@ -1,6 +1,6 @@
 {
   "$schema": "./schema.json",
-  "description": "Base for AI agents. Grants CWD read/write, no network.",
+  "description": "Secured workspace with CWD read/write access, no network.",
   "use": [
     "secure"
   ],

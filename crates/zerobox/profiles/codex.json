@@ -2,7 +2,7 @@
   "$schema": "./schema.json",
   "description": "OpenAI Codex CLI agent.",
   "use": [
-    "ai-agent",
+    "workspace",
     "cache-macos",
     "cache-linux",
     "codex-macos",

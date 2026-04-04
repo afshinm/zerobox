@@ -115,7 +115,7 @@ const BUILTIN_PROFILES: &[(&str, &str)] = &[
     // Compositions
     ("default", include_str!("../profiles/default.json")),
     ("secure", include_str!("../profiles/secure.json")),
-    ("ai-agent", include_str!("../profiles/ai-agent.json")),
+    ("workspace", include_str!("../profiles/workspace.json")),
     // App profiles
     ("claude", include_str!("../profiles/claude.json")),
     ("codex", include_str!("../profiles/codex.json")),
@@ -729,9 +729,9 @@ mod tests {
     }
 
     #[test]
-    fn resolve_builtin_ai_agent_uses_secure() {
+    fn resolve_builtin_workspace_uses_secure() {
         let mut chain = Vec::new();
-        let profile = resolve("ai-agent", &mut chain, 0).unwrap();
+        let profile = resolve("workspace", &mut chain, 0).unwrap();
         assert_eq!(profile.strict_sandbox, Some(true));
         assert!(profile.deny_read.is_some());
         assert!(profile.allow_write.is_some());

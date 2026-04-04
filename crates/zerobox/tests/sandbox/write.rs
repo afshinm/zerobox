@@ -3,9 +3,8 @@ use crate::support::*;
 #[test]
 fn allow_write_specific_path() {
     let out = run(&[
-        "-C",
-        "/tmp",
-        "--allow-read=/tmp",
+        "--profile",
+        "workspace",
         "--allow-write=/tmp",
         "--",
         "node",
@@ -21,6 +20,8 @@ fn allow_write_specific_path() {
 #[test]
 fn allow_write_does_not_grant_other_paths() {
     let out = run(&[
+        "--profile",
+        "workspace",
         "--allow-write=/tmp",
         "--",
         "node",
@@ -40,9 +41,8 @@ mod deny_write {
         std::fs::create_dir_all(&protected).expect("setup");
 
         let out = run(&[
-            "-C",
-            &dir.display().to_string(),
-            &format!("--allow-read={}", dir.display()),
+            "--profile",
+            "workspace",
             &format!("--allow-write={}", dir.display()),
             &format!("--deny-write={}", protected.display()),
             "--",
@@ -72,6 +72,8 @@ console.log(r.join(','));
         std::fs::create_dir_all(&dir).expect("setup");
 
         let out = run(&[
+            "--profile",
+            "workspace",
             "--allow-write",
             &format!("--deny-write={}", dir.display()),
             "--",

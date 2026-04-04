@@ -2,7 +2,7 @@
   "$schema": "./schema.json",
   "description": "OpenCode AI coding assistant.",
   "use": [
-    "ai-agent",
+    "workspace",
     "cache-macos",
     "cache-linux",
     "opencode-linux",

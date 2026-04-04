@@ -12,22 +12,21 @@ fn default_read_succeeds() {
 fn default_write_blocked() {
     let out = run(&[
         "--",
-        "node",
-        "-e",
-        "try{require('fs').writeFileSync('/tmp/zerobox-e2e-wb','x');process.exit(0)}catch(e){process.exit(1)}",
+        "sh",
+        "-c",
+        "echo x > /tmp/zerobox-e2e-wb 2>/dev/null && echo OK || echo BLOCKED",
     ]);
-    assert!(!out.status.success());
+    assert!(
+        stdout(&out).contains("BLOCKED"),
+        "write should be blocked, got: {}",
+        stdout(&out)
+    );
 }
 
 #[test]
 fn default_network_blocked() {
-    let out = run(&[
-        "--",
-        "node",
-        "-e",
-        "fetch('https://example.com').then(()=>process.exit(0)).catch(()=>process.exit(1))",
-    ]);
-    assert!(!out.status.success());
+    let (code, ok) = curl_status(&[], "https://example.com");
+    assert!(!ok, "network should be blocked, got {code}");
 }
 
 #[test]
@@ -94,9 +93,8 @@ fn deny_read_and_deny_write_combined() {
     std::fs::write(dir.join("public"), "hello").expect("setup");
 
     let out = run(&[
-        "-C",
-        &dir.display().to_string(),
-        &format!("--allow-read={}", dir.display()),
+        "--profile",
+        "workspace",
         &format!("--allow-write={}", dir.display()),
         &format!("--deny-write={}", secret.display()),
         "--",
@@ -135,36 +133,21 @@ fn allow_net_domain_with_write_restriction() {
 
 #[test]
 fn exit_code_zero_propagated() {
-    let out = run(&[
-        "--allow-read=/tmp",
-        "-C",
-        "/tmp",
-        "--",
-        "node",
-        "-e",
-        "process.exit(0)",
-    ]);
+    let out = run(&["--profile", "workspace", "--", "node", "-e", "process.exit(0)"]);
     assert!(out.status.success());
 }
 
 #[test]
 fn exit_code_nonzero_propagated() {
-    let out = run(&[
-        "--allow-read=/tmp",
-        "-C",
-        "/tmp",
-        "--",
-        "node",
-        "-e",
-        "process.exit(42)",
-    ]);
+    let out = run(&["--profile", "workspace", "--", "node", "-e", "process.exit(42)"]);
     assert_eq!(out.status.code(), Some(42));
 }
 
 #[test]
 fn relative_write_path_resolved() {
     let out = run(&[
-        "--allow-write=/tmp",
+        "--profile",
+        "workspace",
         "-C",
         "/tmp",
         "--",

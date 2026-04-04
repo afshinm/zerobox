@@ -26,10 +26,10 @@ export function buildFlags(options: SandboxOptions): string[] {
 
   if (options.allowAll) {
     flags.push("--allow-all");
-    // Still emit env/secret flags — allowAll controls fs/net, not env.
   } else if (options.noSandbox) {
     flags.push("--no-sandbox");
   } else {
+    flags.push("--profile", options.profile ?? "workspace");
     if (options.allowRead?.length) {
       flags.push(`--allow-read=${options.allowRead.join(",")}`);
     }
