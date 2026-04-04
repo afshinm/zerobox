@@ -1,4 +1,5 @@
 {
+  "$schema": "./schema.json",
   "description": "Nix package manager runtime paths.",
   "platform": "linux",
   "allow_read": [

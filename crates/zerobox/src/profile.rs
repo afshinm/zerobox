@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::{Context, Result, bail};
+use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{Cli, ProfileAction};
@@ -122,10 +123,11 @@ const BUILTIN_PROFILES: &[(&str, &str)] = &[
     ("openclaw", include_str!("../profiles/openclaw.json")),
 ];
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Profile {
     #[serde(rename = "$schema", skip_serializing_if = "Option::is_none")]
+    #[schemars(rename = "$schema")]
     pub schema: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -133,6 +135,7 @@ pub struct Profile {
 
     #[serde(default, rename = "use", deserialize_with = "deserialize_use")]
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[schemars(rename = "use", schema_with = "schema_string_or_array")]
     pub uses: Vec<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -162,6 +165,17 @@ pub struct Profile {
     pub snapshot_exclude: Option<Vec<String>>,
 
     pub debug: Option<bool>,
+}
+
+fn schema_string_or_array(_: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
+    serde_json::from_value(serde_json::json!({
+        "description": "Profile(s) to compose from.",
+        "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+        ]
+    }))
+    .unwrap()
 }
 
 fn deserialize_use<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
@@ -467,6 +481,21 @@ pub fn handle_subcommand(action: &ProfileAction) -> ExitCode {
     match action {
         ProfileAction::List => cmd_list(),
         ProfileAction::Show { name } => cmd_show(name),
+        ProfileAction::Schema => cmd_schema(),
+    }
+}
+
+fn cmd_schema() -> ExitCode {
+    let schema = schemars::schema_for!(Profile);
+    match serde_json::to_string_pretty(&schema) {
+        Ok(json) => {
+            println!("{json}");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            ExitCode::from(1)
+        }
     }
 }
 

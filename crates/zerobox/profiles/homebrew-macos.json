@@ -1,5 +1,10 @@
 {
+  "$schema": "./schema.json",
   "description": "Homebrew installation paths on macOS.",
   "platform": "macos",
-  "allow_read": ["/opt/homebrew", "/usr/local/Cellar", "/usr/local/opt"]
+  "allow_read": [
+    "/opt/homebrew",
+    "/usr/local/Cellar",
+    "/usr/local/opt"
+  ]
 }

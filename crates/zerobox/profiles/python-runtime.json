@@ -1,4 +1,5 @@
 {
+  "$schema": "./schema.json",
   "description": "Python runtime paths (pyenv, conda, uv).",
   "allow_read": [
     "$HOME/.pyenv",

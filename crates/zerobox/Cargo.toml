@@ -28,6 +28,7 @@ chrono = { workspace = true }
 dirs = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+schemars = { workspace = true }
 tabwriter = "1.4"
 getrandom = "0.3"
 rama-http = { version = "=0.3.0-alpha.4" }

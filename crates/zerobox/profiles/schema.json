@@ -1,112 +1,187 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://zerobox.sh/schemas/profile-v1.json",
-  "title": "Zerobox Profile",
-  "description": "A named preset of sandbox permissions with optional inheritance.",
+  "title": "Profile",
   "type": "object",
-  "additionalProperties": false,
   "properties": {
     "$schema": {
-      "type": "string",
-      "description": "JSON Schema reference."
-    },
-    "description": {
-      "type": "string",
-      "description": "Human-readable description of the profile."
-    },
-    "extends": {
-      "description": "Base profile(s) to inherit from. Child values override base values.",
-      "oneOf": [
-        { "type": "string" },
-        { "type": "array", "items": { "type": "string" } }
+      "type": [
+        "string",
+        "null"
       ]
     },
-    "allow_read": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Restrict readable paths. Supports $HOME, $CWD, $TMPDIR templates."
-    },
-    "deny_read": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Block reading from these paths. Takes precedence over allow_read."
-    },
-    "allow_write": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Allow writing to these paths. Supports $HOME, $CWD, $TMPDIR templates."
-    },
-    "deny_write": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Block writing to these paths. Takes precedence over allow_write."
-    },
-    "allow_net": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Allow network to these domains. Empty array = allow all network."
-    },
-    "deny_net": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Block network to these domains. Takes precedence over allow_net."
-    },
-    "set_env": {
-      "type": "object",
-      "additionalProperties": { "type": "string" },
-      "description": "Set environment variables in the sandbox."
+    "allow_all": {
+      "type": [
+        "boolean",
+        "null"
+      ]
     },
     "allow_env": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Inherit these parent environment variables."
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
     },
-    "deny_env": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Block these parent environment variables."
+    "allow_net": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
     },
-    "secret_hosts": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "array",
-        "items": { "type": "string" }
-      },
-      "description": "Map secret names to allowed hosts. Values are passed at runtime via --secret, never stored in profiles."
+    "allow_read": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
     },
-    "allow_all": {
-      "type": "boolean",
-      "description": "Grant all filesystem and network permissions."
-    },
-    "no_sandbox": {
-      "type": "boolean",
-      "description": "Disable the sandbox entirely."
-    },
-    "strict_sandbox": {
-      "type": "boolean",
-      "description": "Require full sandbox (bubblewrap). Fail instead of falling back to weaker isolation."
-    },
-    "snapshot": {
-      "type": "boolean",
-      "description": "Record filesystem changes during execution."
-    },
-    "restore": {
-      "type": "boolean",
-      "description": "Restore tracked files to pre-execution state after exit."
-    },
-    "snapshot_paths": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Paths to track for snapshots. Supports $HOME, $CWD, $TMPDIR templates."
-    },
-    "snapshot_exclude": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "Exclude patterns from snapshots."
+    "allow_write": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
     },
     "debug": {
-      "type": "boolean",
-      "description": "Show sandbox configuration and runtime decisions on stderr."
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "deny_env": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "deny_net": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "deny_read": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "deny_write": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "no_sandbox": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "platform": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "restore": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "secret_hosts": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "set_env": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "snapshot": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "snapshot_exclude": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "snapshot_paths": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "strict_sandbox": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "use": {
+      "description": "Profile(s) to compose from.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
     }
-  }
+  },
+  "additionalProperties": false
 }

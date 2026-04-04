@@ -1,4 +1,5 @@
 {
+  "$schema": "./schema.json",
   "description": "Block access to shell configuration files that may embed secrets.",
   "deny_read": [
     "$HOME/.zshrc",

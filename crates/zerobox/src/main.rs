@@ -124,6 +124,8 @@ pub enum CliSubcommand {
 pub enum ProfileAction {
     /// List available profiles.
     List,
+    /// Print the JSON Schema for profile files.
+    Schema,
     /// Show the resolved contents of a profile.
     Show {
         /// Profile name.
@@ -237,10 +239,7 @@ async fn tokio_main() -> ExitCode {
     // Always load a profile. Use "default" unless the user specified one.
     // Skip when sandboxing is disabled entirely.
     let loaded_profile = if !cli.no_sandbox && !cli.allow_all {
-        let name = cli
-            .profile
-            .clone()
-            .unwrap_or_else(|| "default".to_string());
+        let name = cli.profile.clone().unwrap_or_else(|| "default".to_string());
         let cwd = cli
             .cwd
             .clone()

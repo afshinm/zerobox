@@ -1,5 +1,8 @@
 {
+  "$schema": "./schema.json",
   "description": "OpenCode binary directory (Landlock requires directory read to execute binaries).",
   "platform": "linux",
-  "allow_read": ["$HOME/.opencode/bin"]
+  "allow_read": [
+    "$HOME/.opencode/bin"
+  ]
 }

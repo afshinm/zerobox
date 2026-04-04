@@ -1,4 +1,8 @@
 {
+  "$schema": "./schema.json",
   "description": "Rust toolchain paths.",
-  "allow_read": ["$HOME/.cargo", "$HOME/.rustup"]
+  "allow_read": [
+    "$HOME/.cargo",
+    "$HOME/.rustup"
+  ]
 }

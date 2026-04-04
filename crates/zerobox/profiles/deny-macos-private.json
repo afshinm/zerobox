@@ -1,4 +1,5 @@
 {
+  "$schema": "./schema.json",
   "description": "Block access to macOS private data (messages, mail, cookies).",
   "platform": "macos",
   "deny_read": [

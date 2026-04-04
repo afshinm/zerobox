@@ -1,6 +1,11 @@
 {
+  "$schema": "./schema.json",
   "description": "Linux cache directories.",
   "platform": "linux",
-  "allow_read": ["$HOME/.cache"],
-  "allow_write": ["$HOME/.cache"]
+  "allow_read": [
+    "$HOME/.cache"
+  ],
+  "allow_write": [
+    "$HOME/.cache"
+  ]
 }

@@ -1,4 +1,5 @@
 {
+  "$schema": "./schema.json",
   "description": "Anthropic Claude Code CLI agent.",
   "use": [
     "ai-agent",

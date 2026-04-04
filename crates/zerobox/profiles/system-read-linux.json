@@ -1,4 +1,5 @@
 {
+  "$schema": "./schema.json",
   "description": "Linux core system paths required for normal CLI execution.",
   "platform": "linux",
   "allow_read": [

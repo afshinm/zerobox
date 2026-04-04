@@ -1,6 +1,12 @@
 {
+  "$schema": "./schema.json",
   "description": "OpenClaw messaging gateway agent. Connects to user-configured channels.",
-  "use": ["secure", "cache-macos", "cache-linux", "node-runtime"],
+  "use": [
+    "secure",
+    "cache-macos",
+    "cache-linux",
+    "node-runtime"
+  ],
   "allow_read": [
     "$CWD",
     "$HOME/.openclaw",

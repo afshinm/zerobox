@@ -1,4 +1,5 @@
 {
+  "$schema": "./schema.json",
   "description": "Block access to shell command history files.",
   "deny_read": [
     "$HOME/.bash_history",

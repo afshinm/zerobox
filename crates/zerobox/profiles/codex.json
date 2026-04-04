@@ -1,4 +1,5 @@
 {
+  "$schema": "./schema.json",
   "description": "OpenAI Codex CLI agent.",
   "use": [
     "ai-agent",
@@ -12,8 +13,12 @@
     "nix-runtime",
     "git-config"
   ],
-  "allow_read": ["$HOME/.codex"],
-  "allow_write": ["$HOME/.codex"],
+  "allow_read": [
+    "$HOME/.codex"
+  ],
+  "allow_write": [
+    "$HOME/.codex"
+  ],
   "allow_net": [
     "api.openai.com",
     "auth.openai.com",
@@ -67,5 +72,13 @@
     "pkg.go.dev",
     "learn.microsoft.com"
   ],
-  "allow_env": ["PATH", "HOME", "USER", "SHELL", "TERM", "LANG", "OPENAI_API_KEY"]
+  "allow_env": [
+    "PATH",
+    "HOME",
+    "USER",
+    "SHELL",
+    "TERM",
+    "LANG",
+    "OPENAI_API_KEY"
+  ]
 }

@@ -1,4 +1,5 @@
 {
+  "$schema": "./schema.json",
   "description": "macOS system paths required for executables to function.",
   "platform": "macos",
   "allow_read": [

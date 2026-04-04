@@ -1,4 +1,5 @@
 {
+  "$schema": "./schema.json",
   "description": "OpenCode AI coding assistant. Supports multiple LLM providers.",
   "use": [
     "ai-agent",
