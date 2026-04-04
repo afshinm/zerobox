@@ -185,10 +185,9 @@ fn deserialize_use<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Er
         Single(String),
         Multiple(Vec<String>),
     }
-    match Option::<StringOrVec>::deserialize(d)? {
-        Some(StringOrVec::Single(s)) => Ok(vec![s]),
-        Some(StringOrVec::Multiple(v)) => Ok(v),
-        None => Ok(Vec::new()),
+    match StringOrVec::deserialize(d)? {
+        StringOrVec::Single(s) => Ok(vec![s]),
+        StringOrVec::Multiple(v) => Ok(v),
     }
 }
 
@@ -212,6 +211,7 @@ fn expand_profile(p: &mut Profile, home: &Path, cwd: &Path, tmpdir: &Path) {
     expand_vec(&mut p.allow_write, home, cwd, tmpdir);
     expand_vec(&mut p.deny_write, home, cwd, tmpdir);
     expand_vec(&mut p.snapshot_paths, home, cwd, tmpdir);
+    expand_vec(&mut p.snapshot_exclude, home, cwd, tmpdir);
     if let Some(ref mut env) = p.set_env {
         for val in env.values_mut() {
             *val = expand_templates(val, home, cwd, tmpdir);
@@ -302,7 +302,19 @@ fn merge_profiles(base: &Profile, child: &Profile) -> Profile {
     }
 }
 
+fn validate_profile_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.contains('/')
+        && !name.contains('\\')
+        && !name.contains('\0')
+        && !name.contains("..")
+}
+
 fn load_raw(name: &str) -> Result<Profile> {
+    if !validate_profile_name(name) {
+        bail!("invalid profile name: '{name}'");
+    }
+
     // User profiles shadow built-ins.
     let user_path = crate::zerobox_home()
         .join("profiles")
@@ -751,6 +763,17 @@ mod tests {
         let result = resolve("a", &mut chain, 0);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("circular"));
+    }
+
+    #[test]
+    fn rejects_path_traversal_in_profile_name() {
+        assert!(!validate_profile_name("../../../etc"));
+        assert!(!validate_profile_name("foo/bar"));
+        assert!(!validate_profile_name("foo\\bar"));
+        assert!(!validate_profile_name(""));
+        assert!(!validate_profile_name("foo\0bar"));
+        assert!(validate_profile_name("my-profile"));
+        assert!(validate_profile_name("claude"));
     }
 
     #[test]
