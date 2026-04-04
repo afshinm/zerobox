@@ -1,6 +1,7 @@
 mod debug;
 mod env;
 mod policy;
+mod profile;
 mod proxy;
 mod secret;
 mod snapshot;
@@ -81,6 +82,10 @@ pub struct Cli {
     #[arg(long)]
     pub debug: bool,
 
+    /// Use a named profile as the base configuration.
+    #[arg(long)]
+    pub profile: Option<String>,
+
     /// Record filesystem changes during execution.
     #[arg(long)]
     pub snapshot: bool,
@@ -107,6 +112,22 @@ pub enum CliSubcommand {
     Snapshot {
         #[command(subcommand)]
         action: SnapshotAction,
+    },
+    /// Manage sandbox profiles.
+    Profile {
+        #[command(subcommand)]
+        action: ProfileAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ProfileAction {
+    /// List available profiles.
+    List,
+    /// Show the resolved contents of a profile.
+    Show {
+        /// Profile name.
+        name: String,
     },
 }
 
@@ -204,10 +225,26 @@ async fn tokio_main() -> ExitCode {
         }
     }
 
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
 
     if let Some(CliSubcommand::Snapshot { action }) = &cli.subcommand {
         return snapshot::handle_subcommand(action);
+    }
+    if let Some(CliSubcommand::Profile { action }) = &cli.subcommand {
+        return profile::handle_subcommand(action);
+    }
+
+    // Apply profile before the rest of the pipeline.
+    if let Some(profile_name) = cli.profile.clone() {
+        let cwd = cli
+            .cwd
+            .clone()
+            .map_or_else(std::env::current_dir, Ok)
+            .unwrap_or_else(|_| PathBuf::from("."));
+        if let Err(e) = profile::load_and_apply(&profile_name, &mut cli, &cwd) {
+            eprintln!("error: profile '{profile_name}': {e:#}");
+            return ExitCode::from(1);
+        }
     }
 
     if cli.command.is_empty() {

@@ -5150,6 +5150,7 @@ dependencies = [
  "dirs",
  "getrandom 0.3.4",
  "rama-http",
+ "serde",
  "serde_json",
  "tabwriter",
  "tempfile",

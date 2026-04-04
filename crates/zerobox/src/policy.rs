@@ -219,6 +219,7 @@ mod tests {
             restore: false,
             snapshot_paths: None,
             snapshot_exclude: None,
+            profile: None,
             subcommand: None,
             command: vec!["true".to_string()],
         }
