@@ -398,8 +398,12 @@ pub fn load_and_apply(name: &str, cli: &mut Cli, cwd: &Path) -> Result<()> {
 fn apply_to_cli(cli: &mut Cli, profile: &Profile) {
     fn apply_vec(cli_val: &mut Option<Vec<PathBuf>>, profile_val: &Option<Vec<String>>) {
         match (cli_val.as_mut(), profile_val) {
+            // Empty vec = "all" sentinel. Preserve it.
+            (Some(cv), _) if cv.is_empty() => {}
+            (_, Some(pv)) if pv.is_empty() => {
+                *cli_val = Some(Vec::new());
+            }
             (Some(cv), Some(pv)) => {
-                // Additive: profile paths first, then CLI paths.
                 let mut merged: Vec<PathBuf> = pv.iter().map(PathBuf::from).collect();
                 for p in cv.iter() {
                     if !merged.iter().any(|m| m == p) {
@@ -417,6 +421,10 @@ fn apply_to_cli(cli: &mut Cli, profile: &Profile) {
 
     fn apply_str_vec(cli_val: &mut Option<Vec<String>>, profile_val: &Option<Vec<String>>) {
         match (cli_val.as_mut(), profile_val) {
+            (Some(cv), _) if cv.is_empty() => {}
+            (_, Some(pv)) if pv.is_empty() => {
+                *cli_val = Some(Vec::new());
+            }
             (Some(cv), Some(pv)) => {
                 let mut merged = pv.clone();
                 for item in cv.iter() {
@@ -531,7 +539,7 @@ fn cmd_list() -> ExitCode {
     }
 
     let user_dir = crate::zerobox_home().join("profiles");
-    let user_names: std::collections::HashSet<String> = std::fs::read_dir(&user_dir)
+    let user_names: std::collections::BTreeSet<String> = std::fs::read_dir(&user_dir)
         .into_iter()
         .flatten()
         .flatten()

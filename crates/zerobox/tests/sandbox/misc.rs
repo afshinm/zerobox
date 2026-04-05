@@ -16,10 +16,7 @@ fn default_write_blocked_outside_temp() {
         "--",
         "sh",
         "-c",
-        &format!(
-            "echo x > {} 2>/dev/null && echo OK || echo BLOCKED",
-            target
-        ),
+        &format!("echo x > {} 2>/dev/null && echo OK || echo BLOCKED", target),
     ]);
     let _ = std::fs::remove_file(&target);
     assert!(
