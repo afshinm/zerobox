@@ -128,8 +128,7 @@ describe.skipIf(skip)("Sandbox (e2e)", () => {
     const home = process.env.HOME ?? "/tmp";
     const target = `${home}/zerobox-sdk-wb-${Date.now()}`;
     const sandbox = Sandbox.create();
-    const result =
-      await sandbox.sh`echo x > ${target} 2>&1 || echo BLOCKED`.output();
+    const result = await sandbox.sh`echo x > ${target} 2>&1 || echo BLOCKED`.output();
     expect(result.stdout + result.stderr).toMatch(
       /BLOCKED|Read-only|Permission denied|Operation not permitted|No such file/i,
     );
