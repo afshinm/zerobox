@@ -173,6 +173,73 @@ fn relative_write_path_resolved() {
 }
 
 #[test]
+fn default_profile_blocks_home_read() {
+    let home = std::env::var("HOME").expect("HOME not set");
+    let out = run(&["--", "ls", &home]);
+    assert!(
+        !out.status.success(),
+        "home should not be readable with default profile"
+    );
+}
+
+#[test]
+fn default_profile_blocks_home_write() {
+    let home = std::env::var("HOME").expect("HOME not set");
+    let target = format!("{}/zerobox-e2e-write-test", home);
+    let out = run(&[
+        "--",
+        "sh",
+        "-c",
+        &format!(
+            "echo x > {} 2>/dev/null && echo WRITTEN || echo BLOCKED",
+            target
+        ),
+    ]);
+    assert!(
+        !stdout(&out).contains("WRITTEN"),
+        "writes to home should be blocked, got: {}",
+        stdout(&out)
+    );
+    let _ = std::fs::remove_file(&target);
+}
+
+#[test]
+fn workspace_profile_provides_cwd_read_write() {
+    let dir = setup_tmp("ws-cwd");
+    std::fs::write(dir.join("input.txt"), "hello").expect("setup");
+    let out = run(&[
+        "--profile",
+        "workspace",
+        "-C",
+        &dir.display().to_string(),
+        "--",
+        "sh",
+        "-c",
+        "cat input.txt && echo world > output.txt && echo ok",
+    ]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert!(stdout(&out).contains("hello"));
+    assert!(stdout(&out).contains("ok"));
+    assert_eq!(
+        std::fs::read_to_string(dir.join("output.txt"))
+            .unwrap()
+            .trim(),
+        "world"
+    );
+}
+
+#[test]
+fn invalid_profile_name_rejected() {
+    let out = run(&["--profile", "../../../etc/passwd", "--", "echo", "hello"]);
+    assert!(!out.status.success());
+    assert!(
+        stderr(&out).contains("invalid profile name"),
+        "stderr: {}",
+        stderr(&out)
+    );
+}
+
+#[test]
 fn nonexistent_command_fails() {
     let out = run(&["--", "this-command-does-not-exist-zerobox"]);
     assert!(!out.status.success());

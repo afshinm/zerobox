@@ -42,24 +42,6 @@
     "/usr/share/ca-certificates",
     "/lib/terminfo",
     "/etc/terminfo",
-    "/dev/null",
-    "/dev/zero",
-    "/dev/random",
-    "/dev/urandom",
-    "/dev/full",
-    "/dev/tty",
-    "/dev/console",
-    "/dev/stdin",
-    "/dev/stdout",
-    "/dev/stderr",
-    "/dev/fd",
-    "/dev/pts",
-    "/proc/self",
-    "/proc/cpuinfo",
-    "/proc/meminfo",
-    "/proc/stat",
-    "/proc/loadavg",
-    "/proc/version",
-    "/proc/filesystems"
+    "/tmp"
   ]
 }

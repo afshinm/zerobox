@@ -1,13 +1,12 @@
 {
   "$schema": "./schema.json",
-  "description": "macOS temp and device write paths.",
+  "description": "macOS temp write paths.",
   "platform": "macos",
   "allow_write": [
     "/private/tmp",
     "/tmp",
     "/private/var/folders",
     "/var/folders",
-    "/dev",
     "$TMPDIR"
   ]
 }

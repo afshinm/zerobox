@@ -45,7 +45,7 @@ export function verifyBinary(): string {
         `zerobox binary not found at "${bin}". Install the package (npm install zerobox) or set ZEROBOX_BIN.`,
       );
     }
-    // Binary exists but --help failed -- still usable.
+    // Binary exists but --help failed. Still usable.
   }
   return bin;
 }
