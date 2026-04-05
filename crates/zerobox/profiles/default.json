@@ -1,0 +1,21 @@
+{
+  "$schema": "./schema.json",
+  "description": "Default sandbox policy. System paths, deny sensitive paths, common tools.",
+  "use": [
+    "system-read-macos",
+    "system-read-linux",
+    "deny-credentials",
+    "deny-shell-history",
+    "deny-shell-configs",
+    "deny-keychains-macos",
+    "deny-keychains-linux",
+    "deny-browser-data-macos",
+    "deny-browser-data-linux",
+    "deny-macos-private",
+    "system-write-macos",
+    "system-write-linux",
+    "user-tools",
+    "homebrew-macos",
+    "homebrew-linux"
+  ]
+}

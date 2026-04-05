@@ -1,0 +1,19 @@
+{
+  "$schema": "./schema.json",
+  "description": "Deny access to Linux browser data.",
+  "platform": "linux",
+  "deny_read": [
+    "$HOME/.config/google-chrome",
+    "$HOME/.config/chromium",
+    "$HOME/.mozilla/firefox",
+    "$HOME/.config/microsoft-edge",
+    "$HOME/.config/BraveSoftware"
+  ],
+  "deny_write": [
+    "$HOME/.config/google-chrome",
+    "$HOME/.config/chromium",
+    "$HOME/.mozilla/firefox",
+    "$HOME/.config/microsoft-edge",
+    "$HOME/.config/BraveSoftware"
+  ]
+}

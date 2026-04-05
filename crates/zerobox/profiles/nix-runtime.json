@@ -1,0 +1,12 @@
+{
+  "$schema": "./schema.json",
+  "description": "Nix package manager paths.",
+  "platform": "linux",
+  "allow_read": [
+    "$HOME/.nix-profile",
+    "$HOME/.nix-defexpr",
+    "/run/current-system/sw",
+    "/etc/profiles/per-user",
+    "/nix/var/nix/profiles"
+  ]
+}

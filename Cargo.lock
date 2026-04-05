@@ -5150,6 +5150,8 @@ dependencies = [
  "dirs",
  "getrandom 0.3.4",
  "rama-http",
+ "schemars 0.8.22",
+ "serde",
  "serde_json",
  "tabwriter",
  "tempfile",

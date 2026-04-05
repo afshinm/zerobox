@@ -9,25 +9,27 @@ fn default_read_succeeds() {
 }
 
 #[test]
-fn default_write_blocked() {
+fn default_write_blocked_outside_temp() {
+    let home = std::env::var("HOME").expect("HOME not set");
+    let target = format!("{}/zerobox-e2e-write-blocked", home);
     let out = run(&[
         "--",
-        "node",
-        "-e",
-        "try{require('fs').writeFileSync('/tmp/zerobox-e2e-wb','x');process.exit(0)}catch(e){process.exit(1)}",
+        "sh",
+        "-c",
+        &format!("echo x > {} 2>/dev/null && echo OK || echo BLOCKED", target),
     ]);
-    assert!(!out.status.success());
+    let _ = std::fs::remove_file(&target);
+    assert!(
+        stdout(&out).contains("BLOCKED"),
+        "write to home should be blocked, got: {}",
+        stdout(&out)
+    );
 }
 
 #[test]
 fn default_network_blocked() {
-    let out = run(&[
-        "--",
-        "node",
-        "-e",
-        "fetch('https://example.com').then(()=>process.exit(0)).catch(()=>process.exit(1))",
-    ]);
-    assert!(!out.status.success());
+    let (code, ok) = curl_status(&[], "https://example.com");
+    assert!(!ok, "network should be blocked, got {code}");
 }
 
 #[test]
@@ -94,6 +96,8 @@ fn deny_read_and_deny_write_combined() {
     std::fs::write(dir.join("public"), "hello").expect("setup");
 
     let out = run(&[
+        "--profile",
+        "workspace",
         &format!("--allow-write={}", dir.display()),
         &format!("--deny-write={}", secret.display()),
         "--",
@@ -132,20 +136,35 @@ fn allow_net_domain_with_write_restriction() {
 
 #[test]
 fn exit_code_zero_propagated() {
-    let out = run(&["--", "node", "-e", "process.exit(0)"]);
+    let out = run(&[
+        "--profile",
+        "workspace",
+        "--",
+        "node",
+        "-e",
+        "process.exit(0)",
+    ]);
     assert!(out.status.success());
 }
 
 #[test]
 fn exit_code_nonzero_propagated() {
-    let out = run(&["--", "node", "-e", "process.exit(42)"]);
+    let out = run(&[
+        "--profile",
+        "workspace",
+        "--",
+        "node",
+        "-e",
+        "process.exit(42)",
+    ]);
     assert_eq!(out.status.code(), Some(42));
 }
 
 #[test]
 fn relative_write_path_resolved() {
     let out = run(&[
-        "--allow-write=/tmp",
+        "--profile",
+        "workspace",
         "-C",
         "/tmp",
         "--",
@@ -154,6 +173,76 @@ fn relative_write_path_resolved() {
         "require('fs').writeFileSync('/tmp/zerobox-e2e-rel','ok');console.log('ok')",
     ]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
+}
+
+#[test]
+fn default_profile_blocks_home_read() {
+    let home = std::env::var("HOME").expect("HOME not set");
+    let target = format!("{}/zerobox-e2e-read-test", home);
+    std::fs::write(&target, "secret").expect("setup");
+    let out = run(&["--", "cat", &target]);
+    let _ = std::fs::remove_file(&target);
+    assert!(
+        !out.status.success(),
+        "home files should not be readable with default profile"
+    );
+}
+
+#[test]
+fn default_profile_blocks_home_write() {
+    let home = std::env::var("HOME").expect("HOME not set");
+    let target = format!("{}/zerobox-e2e-write-test", home);
+    let out = run(&[
+        "--",
+        "sh",
+        "-c",
+        &format!(
+            "echo x > {} 2>/dev/null && echo WRITTEN || echo BLOCKED",
+            target
+        ),
+    ]);
+    assert!(
+        !stdout(&out).contains("WRITTEN"),
+        "writes to home should be blocked, got: {}",
+        stdout(&out)
+    );
+    let _ = std::fs::remove_file(&target);
+}
+
+#[test]
+fn workspace_profile_provides_cwd_read_write() {
+    let dir = setup_tmp("ws-cwd");
+    std::fs::write(dir.join("input.txt"), "hello").expect("setup");
+    let out = run(&[
+        "--profile",
+        "workspace",
+        "-C",
+        &dir.display().to_string(),
+        "--",
+        "sh",
+        "-c",
+        "cat input.txt && echo world > output.txt && echo ok",
+    ]);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert!(stdout(&out).contains("hello"));
+    assert!(stdout(&out).contains("ok"));
+    assert_eq!(
+        std::fs::read_to_string(dir.join("output.txt"))
+            .unwrap()
+            .trim(),
+        "world"
+    );
+}
+
+#[test]
+fn invalid_profile_name_rejected() {
+    let out = run(&["--profile", "../../../etc/passwd", "--", "echo", "hello"]);
+    assert!(!out.status.success());
+    assert!(
+        stderr(&out).contains("invalid profile name"),
+        "stderr: {}",
+        stderr(&out)
+    );
 }
 
 #[test]

@@ -426,11 +426,16 @@ fn snapshot_without_allow_write_records_no_changes() {
     let home = temp_dir();
     fs::write(dir.path().join("file.txt"), "original").unwrap();
 
+    // Grant read but NOT write to the snapshot path.
     let out = run_with_home(
         home.path(),
         &[
             "--snapshot",
             &format!("--snapshot-path={}", dir.path().display()),
+            "--allow-read",
+            &dir.path().display().to_string(),
+            "--deny-write",
+            &dir.path().display().to_string(),
             "--",
             "sh",
             "-c",

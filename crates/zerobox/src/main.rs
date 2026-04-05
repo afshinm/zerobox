@@ -1,6 +1,7 @@
 mod debug;
 mod env;
 mod policy;
+mod profile;
 mod proxy;
 mod secret;
 mod snapshot;
@@ -81,6 +82,10 @@ pub struct Cli {
     #[arg(long)]
     pub debug: bool,
 
+    /// Use a named profile as the base configuration.
+    #[arg(long)]
+    pub profile: Option<String>,
+
     /// Record filesystem changes during execution.
     #[arg(long)]
     pub snapshot: bool,
@@ -107,6 +112,24 @@ pub enum CliSubcommand {
     Snapshot {
         #[command(subcommand)]
         action: SnapshotAction,
+    },
+    /// Manage sandbox profiles.
+    Profile {
+        #[command(subcommand)]
+        action: ProfileAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ProfileAction {
+    /// List available profiles.
+    List,
+    /// Print the JSON Schema for profile files.
+    Schema,
+    /// Show the resolved contents of a profile.
+    Show {
+        /// Profile name.
+        name: String,
     },
 }
 
@@ -148,14 +171,21 @@ fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
 
 /// Data directory: `$ZEROBOX_HOME` > `$CODEX_HOME` > `~/.zerobox`.
 pub fn zerobox_home() -> PathBuf {
-    std::env::var_os("ZEROBOX_HOME")
+    let path = std::env::var_os("ZEROBOX_HOME")
         .or_else(|| std::env::var_os("CODEX_HOME"))
         .map(PathBuf::from)
         .unwrap_or_else(|| {
             dirs::home_dir()
                 .unwrap_or_else(|| PathBuf::from("."))
                 .join(".zerobox")
-        })
+        });
+    if path.is_absolute() {
+        path
+    } else {
+        std::env::current_dir()
+            .map(|cwd| cwd.join(&path))
+            .unwrap_or(path)
+    }
 }
 
 /// Check if the current process can create user namespaces (required for bubblewrap).
@@ -204,11 +234,32 @@ async fn tokio_main() -> ExitCode {
         }
     }
 
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
 
     if let Some(CliSubcommand::Snapshot { action }) = &cli.subcommand {
         return snapshot::handle_subcommand(action);
     }
+    if let Some(CliSubcommand::Profile { action }) = &cli.subcommand {
+        return profile::handle_subcommand(action);
+    }
+
+    // Always load a profile. Use "default" unless the user specified one.
+    // Skip when sandboxing is disabled entirely.
+    let loaded_profile = if !cli.no_sandbox && !cli.allow_all {
+        let name = cli.profile.clone().unwrap_or_else(|| "default".to_string());
+        let cwd = cli
+            .cwd
+            .clone()
+            .map_or_else(std::env::current_dir, Ok)
+            .unwrap_or_else(|_| PathBuf::from("."));
+        if let Err(e) = profile::load_and_apply(&name, &mut cli, &cwd) {
+            eprintln!("error: profile '{name}': {e:#}");
+            return ExitCode::from(1);
+        }
+        Some(name)
+    } else {
+        None
+    };
 
     if cli.command.is_empty() {
         eprintln!("error: no command specified");
@@ -219,6 +270,10 @@ async fn tokio_main() -> ExitCode {
 
     if dbg {
         debug::init_tracing();
+    }
+
+    if let Some(ref name) = loaded_profile {
+        debug_log!(dbg, "profile: {name}");
     }
 
     let secret_store = match secret::parse_secret_flags(&cli.secret, &cli.secret_host) {

@@ -12,7 +12,7 @@ use codex_utils_absolute_path::AbsolutePathBuf;
 
 use crate::Cli;
 
-/// Pre-resolved paths from CLI flags.
+/// Resolved absolute paths from CLI flags.
 pub struct ResolvedPaths {
     pub readable: Option<Vec<AbsolutePathBuf>>,
     pub deny_readable: Vec<AbsolutePathBuf>,
@@ -105,16 +105,17 @@ pub fn build_fs_policy(
 
     match &resolved.readable {
         Some(paths) => {
+            // Linux: raw platform roots for symlink dirs (/lib, /bin).
+            #[cfg(target_os = "linux")]
             entries.push(FileSystemSandboxEntry {
                 path: FileSystemPath::Special {
                     value: FileSystemSpecialPath::Minimal,
                 },
                 access: FileSystemAccessMode::Read,
             });
+
             entries.extend(make_path_entries(paths, FileSystemAccessMode::Read));
-            // On Linux, bubblewrap creates an isolated mount namespace. The
-            // sandbox helper binary must be readable inside it for the seccomp
-            // re-exec to work. Add the binary's own directory.
+            // Sandbox helper binary directory (bwrap re-exec).
             if let Ok(exe) = std::env::current_exe()
                 && let Some(dir) = exe.parent()
                 && let Ok(abs) = AbsolutePathBuf::try_from(dir.to_path_buf())
@@ -124,9 +125,17 @@ pub fn build_fs_policy(
                     access: FileSystemAccessMode::Read,
                 });
             }
-            // On systemd-based Linux, /etc/resolv.conf is a symlink to
-            // /run/systemd/resolve/stub-resolv.conf. When network is enabled,
-            // /run must be readable for DNS to work inside the bwrap namespace.
+            // Proxy UDS bridge socket directory.
+            if net_enabled {
+                let proxy_socket_dir = crate::zerobox_home().join("tmp");
+                if let Ok(abs) = AbsolutePathBuf::try_from(proxy_socket_dir) {
+                    entries.push(FileSystemSandboxEntry {
+                        path: FileSystemPath::Path { path: abs },
+                        access: FileSystemAccessMode::Read,
+                    });
+                }
+            }
+            // DNS resolution on Linux (resolv.conf symlink target).
             if net_enabled && let Ok(abs) = AbsolutePathBuf::try_from(PathBuf::from("/run")) {
                 entries.push(FileSystemSandboxEntry {
                     path: FileSystemPath::Path { path: abs },
@@ -139,8 +148,29 @@ pub fn build_fs_policy(
         }
     }
 
+    // On Linux, skip deny paths under unmounted parents (already inaccessible).
+    let filter_deny = |deny_paths: &[AbsolutePathBuf],
+                       allowed: &Option<Vec<AbsolutePathBuf>>|
+     -> Vec<AbsolutePathBuf> {
+        if cfg!(target_os = "linux")
+            && let Some(roots) = allowed
+        {
+            return deny_paths
+                .iter()
+                .filter(|deny| {
+                    roots
+                        .iter()
+                        .any(|root| deny.as_path().starts_with(root.as_path()))
+                })
+                .cloned()
+                .collect();
+        }
+        deny_paths.to_vec()
+    };
+
+    let effective_deny_read = filter_deny(&resolved.deny_readable, &resolved.readable);
     entries.extend(make_path_entries(
-        &resolved.deny_readable,
+        &effective_deny_read,
         FileSystemAccessMode::None,
     ));
 
@@ -150,8 +180,9 @@ pub fn build_fs_policy(
         entries.extend(make_path_entries(paths, FileSystemAccessMode::Write));
     }
 
+    let effective_deny_write = filter_deny(&resolved.deny_writable, &resolved.writable);
     entries.extend(make_path_entries(
-        &resolved.deny_writable,
+        &effective_deny_write,
         FileSystemAccessMode::Read,
     ));
 
@@ -219,12 +250,11 @@ mod tests {
             restore: false,
             snapshot_paths: None,
             snapshot_exclude: None,
+            profile: None,
             subcommand: None,
             command: vec!["true".to_string()],
         }
     }
-
-    // ── resolve_path ──
 
     #[test]
     fn resolve_path_absolute_unchanged() {
@@ -238,8 +268,6 @@ mod tests {
         let result = resolve_path(Path::new("/base/dir"), Path::new("child")).expect("resolve");
         assert_eq!(result.as_path(), Path::new("/base/dir/child"));
     }
-
-    // ── resolve_cli_paths ──
 
     #[test]
     fn resolve_defaults_all_empty() {
@@ -280,8 +308,6 @@ mod tests {
         assert_eq!(resolved.deny_writable.len(), 1);
     }
 
-    // ── build_fs_policy ──
-
     #[test]
     fn fs_policy_allow_all_is_unrestricted() {
         let resolved = ResolvedPaths {
@@ -312,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn fs_policy_allow_read_includes_minimal() {
+    fn fs_policy_allow_read_restricts_to_listed_paths() {
         let resolved = ResolvedPaths {
             readable: Some(vec![
                 AbsolutePathBuf::try_from(PathBuf::from("/tmp")).expect("abs"),
@@ -324,6 +350,10 @@ mod tests {
         };
         let policy = build_fs_policy(&resolved, false, false);
         assert!(!policy.has_full_disk_read_access());
+        // macOS: no platform defaults. Linux: Minimal for symlink dirs.
+        #[cfg(target_os = "macos")]
+        assert!(!policy.include_platform_defaults());
+        #[cfg(target_os = "linux")]
         assert!(policy.include_platform_defaults());
     }
 
@@ -339,8 +369,6 @@ mod tests {
         let policy = build_fs_policy(&resolved, false, false);
         assert!(policy.has_full_disk_write_access());
     }
-
-    // ── build_legacy_sandbox_policy ──
 
     #[test]
     fn legacy_allow_all_is_danger() {
@@ -432,8 +460,6 @@ mod tests {
         ));
     }
 
-    // ── net_is_enabled / build_net_policy ──
-
     #[test]
     fn net_disabled_by_default() {
         let cli = cli_defaults();
@@ -462,5 +488,33 @@ mod tests {
         let mut cli = cli_defaults();
         cli.allow_net = Some(vec!["example.com".to_string()]);
         assert!(net_is_enabled(&cli));
+    }
+
+    #[test]
+    fn deny_under_unmounted_parent_skipped_on_linux() {
+        let readable = Some(vec![
+            AbsolutePathBuf::try_from(PathBuf::from("/usr")).expect("abs"),
+        ]);
+        let deny = vec![
+            AbsolutePathBuf::try_from(PathBuf::from("/home/user/.ssh")).expect("abs"),
+            AbsolutePathBuf::try_from(PathBuf::from("/usr/secret")).expect("abs"),
+        ];
+        let resolved = ResolvedPaths {
+            readable: readable.clone(),
+            deny_readable: deny,
+            writable: None,
+            deny_writable: vec![],
+            full_write: false,
+        };
+        let policy = build_fs_policy(&resolved, false, false);
+        // /usr/secret: under mounted root, deny applies on both platforms.
+        // /home/user/.ssh: not mounted on Linux, skipped. macOS keeps it.
+        let json = serde_json::to_string(&policy).unwrap();
+        assert!(json.contains("/usr/secret"));
+        if cfg!(target_os = "linux") {
+            assert!(!json.contains("/home/user/.ssh"));
+        } else {
+            assert!(json.contains("/home/user/.ssh"));
+        }
     }
 }

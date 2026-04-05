@@ -1,0 +1,9 @@
+{
+  "$schema": "./schema.json",
+  "description": "Linux temp write paths.",
+  "platform": "linux",
+  "allow_write": [
+    "/tmp",
+    "$TMPDIR"
+  ]
+}

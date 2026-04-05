@@ -1,0 +1,32 @@
+{
+  "$schema": "./schema.json",
+  "description": "OpenClaw messaging gateway.",
+  "use": [
+    "default",
+    "cache-macos",
+    "cache-linux",
+    "node-runtime"
+  ],
+  "allow_read": [
+    "$CWD",
+    "$HOME/.openclaw",
+    "$HOME/.config/openclaw",
+    "$HOME/.local"
+  ],
+  "allow_write": [
+    "$HOME/.openclaw",
+    "$HOME/.config/openclaw",
+    "$HOME/.local"
+  ],
+  "allow_net": [],
+  "allow_env": [
+    "PATH",
+    "HOME",
+    "USER",
+    "SHELL",
+    "TERM",
+    "LANG",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY"
+  ]
+}

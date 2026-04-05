@@ -1,0 +1,19 @@
+{
+  "$schema": "./schema.json",
+  "description": "Deny access to macOS messages, mail, and cookies.",
+  "platform": "macos",
+  "deny_read": [
+    "$HOME/Library/Messages",
+    "$HOME/Library/Mail",
+    "$HOME/Library/Cookies",
+    "$HOME/Library/Containers/com.apple.Safari",
+    "$HOME/Library/Application Support/MobileSync"
+  ],
+  "deny_write": [
+    "$HOME/Library/Messages",
+    "$HOME/Library/Mail",
+    "$HOME/Library/Cookies",
+    "$HOME/Library/Containers/com.apple.Safari",
+    "$HOME/Library/Application Support/MobileSync"
+  ]
+}

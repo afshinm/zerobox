@@ -101,19 +101,38 @@ describe.skipIf(skip)("Sandbox (e2e)", () => {
     expect(output.trim()).toBe("hello");
   });
 
+  // ── workspace CWD access ──
+
+  it("workspace profile can read CWD", async () => {
+    const sandbox = Sandbox.create();
+    const result = await sandbox.sh`ls .`.output();
+    expect(result.code).toBe(0);
+    expect(result.stdout.length).toBeGreaterThan(0);
+  });
+
+  it("workspace profile can write to CWD", async () => {
+    const sandbox = Sandbox.create();
+    const name = `zerobox-sdk-cwd-${Date.now()}`;
+    try {
+      await sandbox.sh`echo ok > ${name}`.output();
+      expect(existsSync(name)).toBe(true);
+      expect(readFileSync(name, "utf8").trim()).toBe("ok");
+    } finally {
+      rmSync(name, { force: true });
+    }
+  });
+
   // ── write enforcement ──
 
-  it(
-    "blocks writes by default",
-    withCleanup("/tmp/zerobox-sdk-wb", async () => {
-      const sandbox = Sandbox.create();
-      const result = await sandbox.sh`echo x > /tmp/zerobox-sdk-wb 2>&1 || echo BLOCKED`.output();
-      expect(result.stdout + result.stderr).toMatch(
-        /BLOCKED|Read-only|Permission denied|Operation not permitted/i,
-      );
-      expect(existsSync("/tmp/zerobox-sdk-wb")).toBe(false);
-    }),
-  );
+  it("blocks writes outside allowed paths", async () => {
+    const home = process.env.HOME ?? "/tmp";
+    const target = `${home}/zerobox-sdk-wb-${Date.now()}`;
+    const sandbox = Sandbox.create();
+    const result = await sandbox.sh`echo x > ${target} 2>&1 || echo BLOCKED`.output();
+    expect(result.stdout + result.stderr).toMatch(
+      /BLOCKED|Read-only|Permission denied|Operation not permitted|No such file/i,
+    );
+  });
 
   it(
     "allows writes with allowWrite",
@@ -132,6 +151,8 @@ describe.skipIf(skip)("Sandbox (e2e)", () => {
       mkdirSync(`${dir}/.git`, { recursive: true });
 
       const sandbox = Sandbox.create({
+        cwd: dir,
+        allowRead: [dir],
         allowWrite: [dir],
         denyWrite: [`${dir}/.git`],
       });

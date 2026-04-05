@@ -1,0 +1,23 @@
+{
+  "$schema": "./schema.json",
+  "description": "Deny access to macOS keychains and password stores.",
+  "platform": "macos",
+  "deny_read": [
+    "$HOME/Library/Keychains",
+    "/Library/Keychains",
+    "$HOME/.password-store",
+    "$HOME/.1password",
+    "$HOME/Library/Group Containers/2BUA8C4S2C.com.1password",
+    "$HOME/Library/Application Support/1Password",
+    "$HOME/Library/Containers/com.1password.1password"
+  ],
+  "deny_write": [
+    "$HOME/Library/Keychains",
+    "/Library/Keychains",
+    "$HOME/.password-store",
+    "$HOME/.1password",
+    "$HOME/Library/Group Containers/2BUA8C4S2C.com.1password",
+    "$HOME/Library/Application Support/1Password",
+    "$HOME/Library/Containers/com.1password.1password"
+  ]
+}

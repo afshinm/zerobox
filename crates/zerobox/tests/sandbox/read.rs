@@ -60,6 +60,8 @@ mod deny_read {
         std::fs::write(secret.join("key.txt"), "password").expect("setup");
 
         let out = run(&[
+            "--profile",
+            "workspace",
             &format!("--deny-read={}", secret.display()),
             "--",
             "node",

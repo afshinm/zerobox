@@ -1,0 +1,130 @@
+--- upstream/sandboxing/src/seatbelt_base_policy.sbpl	2026-04-05 09:52:30
++++ upstream/sandboxing/src/seatbelt_base_policy.sbpl	2026-04-05 09:48:53
+@@ -10,16 +10,32 @@
+ ; child processes inherit the policy of their parent
+ (allow process-exec)
+ (allow process-fork)
++(allow signal (target self))
+ (allow signal (target same-sandbox))
+ 
+ ; process-info
++(allow process-info* (target self))
+ (allow process-info* (target same-sandbox))
+ 
+-(allow file-write-data
+-  (require-all
+-    (path "/dev/null")
+-    (vnode-type CHARACTER-DEVICE)))
++; Standard /dev access.
++(allow file-read* file-write-data
++  (literal "/dev/null")
++  (literal "/dev/zero"))
++(allow file-read* file-test-existence
++  (literal "/dev/random")
++  (literal "/dev/urandom")
++  (literal "/dev/full"))
++(allow file-read-data file-test-existence file-write-data
++  (subpath "/dev/fd"))
++(allow file-read-metadata file-test-existence
++  (literal "/dev")
++  (literal "/dev/stdin")
++  (literal "/dev/stdout")
++  (literal "/dev/stderr"))
+ 
++; Kernel control and routing sockets for networking.
++(allow system-socket)
++
+ ; sysctls permitted.
+ (allow sysctl-read
+   (sysctl-name "hw.activecpu")
+@@ -105,12 +121,89 @@
+     (extension "com.apple.sandbox.pty")))
+ ; PTYs created before entering seatbelt may lack the extension; allow ioctl
+ ; on those slave ttys so interactive shells detect a TTY and remain functional.
++(allow file-ioctl (literal "/dev/tty"))
+ (allow file-ioctl (regex #"^/dev/ttys[0-9]+"))
++(allow file-ioctl (regex #"^/dev/pty[a-z][0-9a-f]+$"))
+ 
+-; allow readonly user preferences
++; POSIX shared memory.
+ (allow ipc-posix-shm-read* (ipc-posix-name-prefix "apple.cfprefs."))
++(allow ipc-posix-shm-write-data)
++(allow ipc-posix-shm-write-create)
+ (allow mach-lookup
+   (global-name "com.apple.cfprefsd.daemon")
+   (global-name "com.apple.cfprefsd.agent")
+   (local-name "com.apple.cfprefsd.agent"))
+ (allow user-preference-read)
++
++; System agents IPC.
++(allow mach-lookup
++  (global-name "com.apple.analyticsd")
++  (global-name "com.apple.analyticsd.messagetracer")
++  (global-name "com.apple.appsleep")
++  (global-name "com.apple.bsd.dirhelper")
++  (global-name "com.apple.diagnosticd")
++  (global-name "com.apple.dt.automationmode.reader")
++  (global-name "com.apple.espd")
++  (global-name "com.apple.logd")
++  (global-name "com.apple.logd.events")
++  (global-name "com.apple.runningboard")
++  (global-name "com.apple.secinitd")
++  (global-name "com.apple.system.DirectoryService.libinfo_v1")
++  (global-name "com.apple.system.logger")
++  (global-name "com.apple.system.notification_center")
++  (global-name "com.apple.system.opendirectoryd.membership")
++  (global-name "com.apple.trustd")
++  (global-name "com.apple.trustd.agent")
++  (global-name "com.apple.xpc.activity.unmanaged")
++  (local-name "com.apple.cfprefsd.agent"))
++
++(allow network-outbound (literal "/private/var/run/syslog"))
++
++(allow ipc-posix-shm-read*
++  (ipc-posix-name "apple.shm.notification_center"))
++
++(allow mach-lookup (global-name "com.apple.audio.audiohald"))
++(allow mach-lookup (global-name "com.apple.audio.AudioComponentRegistrar"))
++
++(allow system-mac-syscall (mac-policy-name "vnguard"))
++(allow system-mac-syscall
++  (require-all
++    (mac-policy-name "Sandbox")
++    (mac-syscall-number 67)))
++
++; Dynamic linker.
++(allow file-map-executable
++  (subpath "/Library/Apple/System/Library/Frameworks")
++  (subpath "/Library/Apple/System/Library/PrivateFrameworks")
++  (subpath "/Library/Apple/usr/lib")
++  (subpath "/System/Library/Extensions")
++  (subpath "/System/Library/Frameworks")
++  (subpath "/System/Library/PrivateFrameworks")
++  (subpath "/System/Library/SubFrameworks")
++  (subpath "/System/iOSSupport/System/Library/Frameworks")
++  (subpath "/System/iOSSupport/System/Library/PrivateFrameworks")
++  (subpath "/System/iOSSupport/System/Library/SubFrameworks")
++  (subpath "/usr/lib"))
++
++(allow system-fsctl (fsctl-command FSIOC_CAS_BSDFLAGS))
++
++; CWD resolution.
++(allow file-read* file-test-existence
++  (literal "/"))
++
++; macOS symlink resolution.
++(allow file-read-metadata file-test-existence
++  (literal "/etc")
++  (literal "/tmp")
++  (literal "/var")
++  (literal "/private/etc/localtime"))
++
++(allow file-read-metadata file-test-existence
++  (path-ancestors "/System/Volumes/Data/private"))
++
++(allow file-read-metadata (literal "/System/Volumes") (vnode-type DIRECTORY))
++(allow file-read-metadata (literal "/System/Volumes/Data") (vnode-type DIRECTORY))
++(allow file-read-metadata (literal "/System/Volumes/Data/Users") (vnode-type DIRECTORY))
++
++(allow file-read* (extension "com.apple.app-sandbox.read"))
++(allow file-read* file-write* (extension "com.apple.app-sandbox.read-write"))

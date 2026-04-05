@@ -1,0 +1,8 @@
+{
+  "$schema": "./schema.json",
+  "description": "OpenCode binary directory on Linux.",
+  "platform": "linux",
+  "allow_read": [
+    "$HOME/.opencode/bin"
+  ]
+}

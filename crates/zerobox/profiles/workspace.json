@@ -1,0 +1,15 @@
+{
+  "$schema": "./schema.json",
+  "description": "Secured workspace with CWD read/write access, no network.",
+  "use": [
+    "default"
+  ],
+  "allow_read": [
+    "$CWD",
+    "$TMPDIR"
+  ],
+  "allow_write": [
+    "$CWD",
+    "$TMPDIR"
+  ]
+}
