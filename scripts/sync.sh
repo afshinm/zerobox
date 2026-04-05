@@ -134,6 +134,15 @@ if [ -f "$PLATFORM_PATCH" ]; then
     cd -
 fi
 
+# Deny-default writes on Linux: add --remount-ro / to bwrap after all mounts.
+DENY_WRITE_PATCH="$SCRIPT_DIR/upstream-deny-default-write.patch"
+if [ -f "$DENY_WRITE_PATCH" ]; then
+    echo "==> Applying deny-default-write patch..."
+    cd "$ROOT"
+    patch -p0 < "$DENY_WRITE_PATCH"
+    cd -
+fi
+
 {
     echo "$REF"
     echo "# commit: $COMMIT_SHA"
