@@ -10,15 +10,21 @@ fn default_read_succeeds() {
 
 #[test]
 fn default_write_blocked_outside_temp() {
+    let home = std::env::var("HOME").expect("HOME not set");
+    let target = format!("{}/zerobox-e2e-write-blocked", home);
     let out = run(&[
         "--",
         "sh",
         "-c",
-        "echo x > /usr/zerobox-e2e-wb 2>/dev/null && echo OK || echo BLOCKED",
+        &format!(
+            "echo x > {} 2>/dev/null && echo OK || echo BLOCKED",
+            target
+        ),
     ]);
+    let _ = std::fs::remove_file(&target);
     assert!(
         stdout(&out).contains("BLOCKED"),
-        "write outside temp should be blocked, got: {}",
+        "write to home should be blocked, got: {}",
         stdout(&out)
     );
 }
