@@ -175,10 +175,13 @@ fn relative_write_path_resolved() {
 #[test]
 fn default_profile_blocks_home_read() {
     let home = std::env::var("HOME").expect("HOME not set");
-    let out = run(&["--", "ls", &home]);
+    let target = format!("{}/zerobox-e2e-read-test", home);
+    std::fs::write(&target, "secret").expect("setup");
+    let out = run(&["--", "cat", &target]);
+    let _ = std::fs::remove_file(&target);
     assert!(
         !out.status.success(),
-        "home should not be readable with default profile"
+        "home files should not be readable with default profile"
     );
 }
 
