@@ -1,5 +1,5 @@
 --- upstream/linux-sandbox/src/bwrap.rs	2026-04-05 10:42:21
-+++ upstream/linux-sandbox/src/bwrap.rs	2026-04-05 09:44:20
++++ upstream/linux-sandbox/src/bwrap.rs	2026-04-05 10:46:19
 @@ -82,6 +82,7 @@
  pub(crate) struct BwrapArgs {
      pub args: Vec<String>,
@@ -24,7 +24,7 @@
      }
  }
  
-@@ -153,15 +156,13 @@
+@@ -153,15 +156,12 @@
      command_cwd: &Path,
      options: BwrapOptions,
  ) -> Result<BwrapArgs> {
@@ -32,8 +32,7 @@
 -        args: filesystem_args,
 -        preserved_files,
 -    } = create_filesystem_args(file_system_sandbox_policy, sandbox_policy_cwd)?;
-+    let filesystem_result =
-+        create_filesystem_args(file_system_sandbox_policy, sandbox_policy_cwd)?;
++    let filesystem_result = create_filesystem_args(file_system_sandbox_policy, sandbox_policy_cwd)?;
      let normalized_command_cwd = normalize_command_cwd_for_bwrap(command_cwd);
      let mut args = Vec::new();
      args.push("--new-session".to_string());
@@ -43,16 +42,15 @@
      // Request a user namespace explicitly rather than relying on bubblewrap's
      // auto-enable behavior, which is skipped when the caller runs as uid 0.
      args.push("--unshare-user".to_string());
-@@ -173,12 +174,13 @@
-     if options.mount_proc {
+@@ -174,11 +174,12 @@
          args.push("--proc".to_string());
          args.push("/proc".to_string());
-+    }
+     }
 +    // Deny-default writes: make tmpfs root read-only after all mounts.
 +    if filesystem_result.used_tmpfs_root {
 +        args.push("--remount-ro".to_string());
 +        args.push("/".to_string());
-     }
++    }
      if normalized_command_cwd.as_path() != command_cwd {
 -        // Bubblewrap otherwise inherits the helper's logical cwd, which can be
 -        // a symlink alias that disappears once the sandbox only mounts
@@ -61,7 +59,7 @@
          args.push("--chdir".to_string());
          args.push(path_to_string(normalized_command_cwd.as_path()));
      }
-@@ -186,7 +188,8 @@
+@@ -186,7 +187,8 @@
      args.extend(command);
      Ok(BwrapArgs {
          args,
@@ -71,7 +69,7 @@
      })
  }
  
-@@ -220,6 +223,7 @@
+@@ -220,6 +222,7 @@
          .collect::<Vec<_>>();
      let unreadable_roots = file_system_sandbox_policy.get_unreadable_roots_with_cwd(cwd);
  
@@ -79,7 +77,7 @@
      let mut args = if file_system_sandbox_policy.has_full_disk_read_access() {
          // Read-only root, then mount a minimal device tree.
          // In bubblewrap (`bubblewrap.c`, `SETUP_MOUNT_DEV`), `--dev /dev`
-@@ -236,6 +240,7 @@
+@@ -236,6 +239,7 @@
      } else {
          // Start from an empty filesystem and add only the approved readable
          // roots plus a minimal `/dev`.
@@ -87,7 +85,7 @@
          let mut args = vec![
              "--tmpfs".to_string(),
              "/".to_string(),
-@@ -385,6 +390,7 @@
+@@ -385,6 +389,7 @@
      Ok(BwrapArgs {
          args,
          preserved_files,
