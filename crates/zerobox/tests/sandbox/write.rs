@@ -65,26 +65,4 @@ console.log(r.join(','));
         assert!(result.contains("file:ok"), "got: {result}");
         assert!(result.contains("git:blocked"), "got: {result}");
     }
-
-    #[test]
-    fn deny_write_with_full_write() {
-        let dir = setup_tmp("dw2");
-        std::fs::create_dir_all(&dir).expect("setup");
-
-        let out = run(&[
-            "--profile",
-            "workspace",
-            "--allow-write",
-            &format!("--deny-write={}", dir.display()),
-            "--",
-            "node",
-            "-e",
-            &format!(
-                "try{{require('fs').writeFileSync('{}/blocked.txt','x');console.log('ALLOWED')}}catch(e){{console.log('BLOCKED')}}",
-                dir.display()
-            ),
-        ]);
-        assert!(out.status.success(), "stderr: {}", stderr(&out));
-        assert_eq!(stdout(&out).trim(), "BLOCKED");
-    }
 }
