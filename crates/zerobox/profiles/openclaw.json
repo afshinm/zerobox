@@ -2,7 +2,7 @@
   "$schema": "./schema.json",
   "description": "OpenClaw messaging gateway.",
   "use": [
-    "secure",
+    "default",
     "cache-macos",
     "cache-linux",
     "node-runtime"

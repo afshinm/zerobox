@@ -114,7 +114,6 @@ const BUILTIN_PROFILES: &[(&str, &str)] = &[
     ),
     // Compositions
     ("default", include_str!("../profiles/default.json")),
-    ("secure", include_str!("../profiles/secure.json")),
     ("workspace", include_str!("../profiles/workspace.json")),
     // App profiles
     ("claude", include_str!("../profiles/claude.json")),
@@ -630,8 +629,8 @@ mod tests {
 
     #[test]
     fn deserialize_use_string() {
-        let p: Profile = serde_json::from_str(r#"{"use": "secure"}"#).unwrap();
-        assert_eq!(p.uses, vec!["secure"]);
+        let p: Profile = serde_json::from_str(r#"{"use": "default"}"#).unwrap();
+        assert_eq!(p.uses, vec!["default"]);
     }
 
     #[test]
@@ -743,18 +742,18 @@ mod tests {
     }
 
     #[test]
-    fn resolve_builtin_secure() {
+    fn resolve_builtin_default_has_deny_rules() {
         let mut chain = Vec::new();
-        let profile = resolve("secure", &mut chain, 0).unwrap();
-        assert_eq!(profile.strict_sandbox, Some(true));
+        let profile = resolve("default", &mut chain, 0).unwrap();
         assert!(profile.deny_read.is_some());
+        assert!(profile.deny_write.is_some());
+        assert!(profile.allow_read.is_some());
     }
 
     #[test]
-    fn resolve_builtin_workspace_uses_secure() {
+    fn resolve_builtin_workspace_uses_default() {
         let mut chain = Vec::new();
         let profile = resolve("workspace", &mut chain, 0).unwrap();
-        assert_eq!(profile.strict_sandbox, Some(true));
         assert!(profile.deny_read.is_some());
         assert!(profile.allow_write.is_some());
         assert!(profile.allow_read.is_some());

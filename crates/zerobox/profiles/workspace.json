@@ -2,7 +2,7 @@
   "$schema": "./schema.json",
   "description": "Secured workspace with CWD read/write access, no network.",
   "use": [
-    "secure"
+    "default"
   ],
   "allow_read": [
     "$CWD",

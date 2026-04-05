@@ -9,16 +9,16 @@ fn default_read_succeeds() {
 }
 
 #[test]
-fn default_write_blocked() {
+fn default_write_blocked_outside_temp() {
     let out = run(&[
         "--",
         "sh",
         "-c",
-        "echo x > /tmp/zerobox-e2e-wb 2>/dev/null && echo OK || echo BLOCKED",
+        "echo x > /usr/zerobox-e2e-wb 2>/dev/null && echo OK || echo BLOCKED",
     ]);
     assert!(
         stdout(&out).contains("BLOCKED"),
-        "write should be blocked, got: {}",
+        "write outside temp should be blocked, got: {}",
         stdout(&out)
     );
 }
