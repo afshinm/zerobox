@@ -171,14 +171,21 @@ fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
 
 /// Data directory: `$ZEROBOX_HOME` > `$CODEX_HOME` > `~/.zerobox`.
 pub fn zerobox_home() -> PathBuf {
-    std::env::var_os("ZEROBOX_HOME")
+    let path = std::env::var_os("ZEROBOX_HOME")
         .or_else(|| std::env::var_os("CODEX_HOME"))
         .map(PathBuf::from)
         .unwrap_or_else(|| {
             dirs::home_dir()
                 .unwrap_or_else(|| PathBuf::from("."))
                 .join(".zerobox")
-        })
+        });
+    if path.is_absolute() {
+        path
+    } else {
+        std::env::current_dir()
+            .map(|cwd| cwd.join(&path))
+            .unwrap_or(path)
+    }
 }
 
 /// Check if the current process can create user namespaces (required for bubblewrap).
