@@ -143,6 +143,22 @@ if [ -f "$DENY_WRITE_PATCH" ]; then
     cd -
 fi
 
+# Skip preemptive .codex directory protection (codex-specific, not needed by zerobox).
+CODEX_PROTECT_PATCH="$SCRIPT_DIR/upstream-no-preemptive-codex-protect.patch"
+if [ -f "$CODEX_PROTECT_PATCH" ]; then
+    echo "==> Applying no-preemptive-codex-protect patch..."
+    cd "$ROOT"
+    patch -p0 < "$CODEX_PROTECT_PATCH"
+    # Format patched files to match rustfmt expectations.
+    if command -v cargo >/dev/null 2>&1 && command -v rustfmt >/dev/null 2>&1; then
+        echo "    formatting patched files"
+        cargo fmt -- \
+            upstream/protocol/src/permissions.rs \
+            2>/dev/null || true
+    fi
+    cd -
+fi
+
 {
     echo "$REF"
     echo "# commit: $COMMIT_SHA"

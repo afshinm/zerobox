@@ -1,0 +1,55 @@
+--- upstream/protocol/src/permissions.rs	2026-04-06 07:07:03
++++ upstream/protocol/src/permissions.rs	2026-04-06 07:05:36
+@@ -280,9 +280,7 @@
+             });
+ 
+             if let Ok(cwd_root) = AbsolutePathBuf::from_absolute_path(cwd) {
+-                for protected_path in default_read_only_subpaths_for_writable_root(
+-                    &cwd_root, /*protect_missing_dot_codex*/ true,
+-                ) {
++                for protected_path in default_read_only_subpaths_for_writable_root(&cwd_root) {
+                     append_default_read_only_path_if_no_explicit_rule(
+                         &mut file_system_policy.entries,
+                         protected_path,
+@@ -290,10 +288,7 @@
+                 }
+             }
+             for writable_root in writable_roots {
+-                for protected_path in default_read_only_subpaths_for_writable_root(
+-                    writable_root,
+-                    /*protect_missing_dot_codex*/ false,
+-                ) {
++                for protected_path in default_read_only_subpaths_for_writable_root(writable_root) {
+                     append_default_read_only_path_if_no_explicit_rule(
+                         &mut file_system_policy.entries,
+                         protected_path,
+@@ -476,11 +471,8 @@
+                 .iter()
+                 .filter(|path| normalize_effective_absolute_path((*path).clone()) == root)
+                 .collect();
+-            let protect_missing_dot_codex = AbsolutePathBuf::from_absolute_path(cwd)
+-                .ok()
+-                .is_some_and(|cwd| normalize_effective_absolute_path(cwd) == root);
+             let mut read_only_subpaths: Vec<AbsolutePathBuf> =
+-                default_read_only_subpaths_for_writable_root(&root, protect_missing_dot_codex)
++                default_read_only_subpaths_for_writable_root(&root)
+                     .into_iter()
+                     .filter(|path| !has_explicit_resolved_path_entry(&resolved_entries, path))
+                     .collect();
+@@ -1097,7 +1089,6 @@
+ 
+ fn default_read_only_subpaths_for_writable_root(
+     writable_root: &AbsolutePathBuf,
+-    protect_missing_dot_codex: bool,
+ ) -> Vec<AbsolutePathBuf> {
+     let mut subpaths: Vec<AbsolutePathBuf> = Vec::new();
+     #[allow(clippy::expect_used)]
+@@ -1131,7 +1122,7 @@
+     // protected-path approval flow.
+     #[allow(clippy::expect_used)]
+     let top_level_codex = writable_root.join(".codex").expect("valid relative path");
+-    if protect_missing_dot_codex || top_level_codex.as_path().is_dir() {
++    if top_level_codex.as_path().is_dir() {
+         subpaths.push(top_level_codex);
+     }
+ 
