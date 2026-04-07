@@ -1,50 +1,15 @@
 --- upstream/protocol/src/permissions.rs	2026-04-06 07:07:03
-+++ upstream/protocol/src/permissions.rs	2026-04-06 07:05:36
-@@ -280,9 +280,7 @@
-             });
- 
-             if let Ok(cwd_root) = AbsolutePathBuf::from_absolute_path(cwd) {
--                for protected_path in default_read_only_subpaths_for_writable_root(
--                    &cwd_root, /*protect_missing_dot_codex*/ true,
--                ) {
-+                for protected_path in default_read_only_subpaths_for_writable_root(&cwd_root) {
-                     append_default_read_only_path_if_no_explicit_rule(
-                         &mut file_system_policy.entries,
-                         protected_path,
-@@ -290,10 +288,7 @@
-                 }
-             }
-             for writable_root in writable_roots {
--                for protected_path in default_read_only_subpaths_for_writable_root(
--                    writable_root,
--                    /*protect_missing_dot_codex*/ false,
--                ) {
-+                for protected_path in default_read_only_subpaths_for_writable_root(writable_root) {
-                     append_default_read_only_path_if_no_explicit_rule(
-                         &mut file_system_policy.entries,
-                         protected_path,
-@@ -476,11 +471,8 @@
-                 .iter()
-                 .filter(|path| normalize_effective_absolute_path((*path).clone()) == root)
-                 .collect();
--            let protect_missing_dot_codex = AbsolutePathBuf::from_absolute_path(cwd)
--                .ok()
--                .is_some_and(|cwd| normalize_effective_absolute_path(cwd) == root);
-             let mut read_only_subpaths: Vec<AbsolutePathBuf> =
--                default_read_only_subpaths_for_writable_root(&root, protect_missing_dot_codex)
-+                default_read_only_subpaths_for_writable_root(&root)
-                     .into_iter()
-                     .filter(|path| !has_explicit_resolved_path_entry(&resolved_entries, path))
-                     .collect();
-@@ -1097,7 +1089,6 @@
++++ upstream/protocol/src/permissions.rs	2026-04-06 11:02:53
+@@ -1097,7 +1097,7 @@
  
  fn default_read_only_subpaths_for_writable_root(
      writable_root: &AbsolutePathBuf,
 -    protect_missing_dot_codex: bool,
++    _protect_missing_dot_codex: bool,
  ) -> Vec<AbsolutePathBuf> {
      let mut subpaths: Vec<AbsolutePathBuf> = Vec::new();
      #[allow(clippy::expect_used)]
-@@ -1131,7 +1122,7 @@
+@@ -1131,7 +1131,7 @@
      // protected-path approval flow.
      #[allow(clippy::expect_used)]
      let top_level_codex = writable_root.join(".codex").expect("valid relative path");
@@ -53,3 +18,214 @@
          subpaths.push(top_level_codex);
      }
  
+@@ -1315,7 +1315,7 @@
+         assert_eq!(writable_roots.len(), 1);
+         assert_eq!(writable_roots[0].root, expected_root);
+         assert!(
+-            writable_roots[0]
++            !writable_roots[0]
+                 .read_only_subpaths
+                 .contains(&expected_dot_codex)
+         );
+@@ -1386,19 +1386,12 @@
+         let file_system_policy =
+             FileSystemSandboxPolicy::from_legacy_sandbox_policy(&policy, cwd.path());
+ 
+-        assert!(!file_system_policy.can_write_path_with_cwd(&dot_codex_config, cwd.path()));
++        assert!(file_system_policy.can_write_path_with_cwd(&dot_codex_config, cwd.path()));
+     }
+ 
+     #[test]
+     fn legacy_workspace_write_projection_accepts_relative_cwd() {
+         let relative_cwd = Path::new("workspace");
+-        let expected_dot_codex = AbsolutePathBuf::from_absolute_path(
+-            std::env::current_dir()
+-                .expect("current dir")
+-                .join(relative_cwd)
+-                .join(".codex"),
+-        )
+-        .expect("absolute dot codex");
+         let policy = SandboxPolicy::WorkspaceWrite {
+             writable_roots: vec![],
+             read_only_access: ReadOnlyAccess::Restricted {
+@@ -1415,24 +1408,12 @@
+ 
+         assert_eq!(
+             file_system_policy,
+-            FileSystemSandboxPolicy::restricted(vec![
+-                FileSystemSandboxEntry {
+-                    path: FileSystemPath::Special {
+-                        value: FileSystemSpecialPath::CurrentWorkingDirectory,
+-                    },
+-                    access: FileSystemAccessMode::Write,
+-                },
+-                FileSystemSandboxEntry {
+-                    path: FileSystemPath::Path {
+-                        path: expected_dot_codex,
+-                    },
+-                    access: FileSystemAccessMode::Read,
++            FileSystemSandboxPolicy::restricted(vec![FileSystemSandboxEntry {
++                path: FileSystemPath::Special {
++                    value: FileSystemSpecialPath::CurrentWorkingDirectory,
+                 },
+-            ])
+-        );
+-        assert!(
+-            !file_system_policy
+-                .can_write_path_with_cwd(Path::new(".codex/config.toml"), relative_cwd,)
++                access: FileSystemAccessMode::Write,
++            }])
+         );
+     }
+ 
+--- upstream/protocol/src/protocol.rs	2026-04-06 10:00:24
++++ upstream/protocol/src/protocol.rs	2026-04-06 11:04:57
+@@ -4103,8 +4103,6 @@
+         let expected_docs_public =
+             AbsolutePathBuf::from_absolute_path(canonical_cwd.join("docs/public"))
+                 .expect("canonical docs/public");
+-        let expected_dot_codex = AbsolutePathBuf::from_absolute_path(canonical_cwd.join(".codex"))
+-            .expect("canonical .codex");
+         let policy = FileSystemSandboxPolicy::restricted(vec![
+             FileSystemSandboxEntry {
+                 path: FileSystemPath::Special {
+@@ -4126,13 +4124,7 @@
+         assert_eq!(
+             sorted_writable_roots(policy.get_writable_roots_with_cwd(cwd.path())),
+             vec![
+-                (
+-                    canonical_cwd,
+-                    vec![
+-                        expected_dot_codex.to_path_buf(),
+-                        expected_docs.to_path_buf()
+-                    ],
+-                ),
++                (canonical_cwd, vec![expected_docs.to_path_buf()],),
+                 (expected_docs_public.to_path_buf(), Vec::new()),
+             ]
+         );
+@@ -4144,8 +4136,6 @@
+         let docs =
+             AbsolutePathBuf::resolve_path_against_base("docs", cwd.path()).expect("resolve docs");
+         let canonical_cwd = cwd.path().canonicalize().expect("canonicalize cwd");
+-        let expected_dot_codex = AbsolutePathBuf::from_absolute_path(canonical_cwd.join(".codex"))
+-            .expect("canonical .codex");
+         let policy = SandboxPolicy::WorkspaceWrite {
+             writable_roots: vec![],
+             read_only_access: ReadOnlyAccess::Restricted {
+@@ -4162,7 +4152,7 @@
+                 FileSystemSandboxPolicy::from_legacy_sandbox_policy(&policy, cwd.path())
+                     .get_writable_roots_with_cwd(cwd.path())
+             ),
+-            vec![(canonical_cwd, vec![expected_dot_codex.to_path_buf()])]
++            vec![(canonical_cwd, vec![])]
+         );
+     }
+ 
+--- upstream/sandboxing/src/seatbelt_tests.rs	2026-04-06 10:00:24
++++ upstream/sandboxing/src/seatbelt_tests.rs	2026-04-07 10:00:31
+@@ -154,8 +154,7 @@
+         writable_definitions,
+         vec![
+             "-DWRITABLE_ROOT_0=/".to_string(),
+-            "-DWRITABLE_ROOT_0_EXCLUDED_0=/.codex".to_string(),
+-            format!("-DWRITABLE_ROOT_0_EXCLUDED_1={}", unreadable_root.display()),
++            format!("-DWRITABLE_ROOT_0_EXCLUDED_0={}", unreadable_root.display()),
+         ],
+         "unexpected write carveout parameters in args: {args:#?}"
+     );
+@@ -256,10 +255,8 @@
+         "legacy workspace-write readable roots under cwd should not become seatbelt carveouts:\n{args:#?}",
+     );
+     assert!(
+-        args.iter()
+-            .any(|arg| arg.starts_with("-DWRITABLE_ROOT_0_EXCLUDED_")
+-                && arg.ends_with("/workspace/.codex")),
+-        "expected proactive .codex carveout for cwd root: {args:#?}",
++        !args.iter().any(|arg| arg.contains("/workspace/.codex")),
++        ".codex does not exist so no carveout expected: {args:#?}",
+     );
+ }
+ 
+@@ -566,13 +563,25 @@
+     );
+ 
+     let policy_text = seatbelt_policy_arg(&args);
+-    assert!(
+-        policy_text.contains("(require-all (subpath (param \"WRITABLE_ROOT_0\"))"),
+-        "expected cwd writable root to carry protected carveouts:\n{policy_text}",
++    // CWD has no .codex, so WRITABLE_ROOT_0 should be a bare subpath grant
++    // without require-all carveouts.
++    assert!(
++        policy_text.contains("(subpath (param \"WRITABLE_ROOT_0\"))"),
++        "expected cwd writable root in policy:\n{policy_text}",
+     );
+     assert!(
+-        policy_text.contains("WRITABLE_ROOT_0_EXCLUDED_0"),
+-        "expected cwd .codex carveout in policy:\n{policy_text}",
++        !policy_text.contains("(require-all (subpath (param \"WRITABLE_ROOT_0\"))"),
++        "cwd should not have require-all carveouts when .codex is missing:\n{policy_text}",
++    );
++    assert!(
++        !policy_text.contains("WRITABLE_ROOT_0_EXCLUDED"),
++        "cwd has no .codex so no carveout expected:\n{policy_text}",
++    );
++    // vulnerable_root has .git and .codex, so WRITABLE_ROOT_1 should have
++    // require-all with two carveouts.
++    assert!(
++        policy_text.contains("(require-all (subpath (param \"WRITABLE_ROOT_1\"))"),
++        "expected require-all carveouts for vulnerable root:\n{policy_text}",
+     );
+     assert!(
+         policy_text.contains("WRITABLE_ROOT_1_EXCLUDED_0")
+@@ -592,13 +601,6 @@
+                 .to_string_lossy()
+         ),
+         format!(
+-            "-DWRITABLE_ROOT_0_EXCLUDED_0={}",
+-            cwd.canonicalize()
+-                .expect("canonicalize cwd")
+-                .join(".codex")
+-                .display()
+-        ),
+-        format!(
+             "-DWRITABLE_ROOT_1={}",
+             vulnerable_root_canonical.to_string_lossy()
+         ),
+@@ -782,13 +784,17 @@
+ 
+     let policy_text = seatbelt_policy_arg(&args);
+     assert!(
+-        policy_text.contains("(require-not (literal (param \"WRITABLE_ROOT_0_EXCLUDED_1\")))"),
+-        "expected exact .codex carveout in policy:\n{policy_text}"
++        policy_text.contains("(require-not (literal (param \"WRITABLE_ROOT_0_EXCLUDED_0\")))"),
++        "expected exact .git carveout in policy:\n{policy_text}"
+     );
+     assert!(
+-        policy_text.contains("(require-not (subpath (param \"WRITABLE_ROOT_0_EXCLUDED_1\")))"),
+-        "expected descendant .codex carveout in policy:\n{policy_text}"
++        policy_text.contains("(require-not (subpath (param \"WRITABLE_ROOT_0_EXCLUDED_0\")))"),
++        "expected descendant .git carveout in policy:\n{policy_text}"
+     );
++    assert!(
++        !policy_text.contains("WRITABLE_ROOT_0_EXCLUDED_1"),
++        ".codex does not exist so no second carveout expected:\n{policy_text}"
++    );
+ }
+ 
+ #[test]
+--- upstream/linux-sandbox/src/bwrap.rs	2026-04-06 12:26:40
++++ upstream/linux-sandbox/src/bwrap.rs	2026-04-06 11:27:10
+@@ -786,12 +786,6 @@
+                 "--bind".to_string(),
+                 "/".to_string(),
+                 "/".to_string(),
+-                // Mask the default protected .codex subpath under that writable
+-                // root. Because the root is `/` in this test, the carveout path
+-                // appears as `/.codex`.
+-                "--ro-bind".to_string(),
+-                "/dev/null".to_string(),
+-                "/.codex".to_string(),
+                 // Rebind /dev after the root bind so device nodes remain
+                 // writable/usable inside the writable root.
+                 "--bind".to_string(),

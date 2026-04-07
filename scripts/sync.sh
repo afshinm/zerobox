@@ -154,6 +154,9 @@ if [ -f "$CODEX_PROTECT_PATCH" ]; then
         echo "    formatting patched files"
         cargo fmt -- \
             upstream/protocol/src/permissions.rs \
+            upstream/protocol/src/protocol.rs \
+            upstream/sandboxing/src/seatbelt_tests.rs \
+            upstream/linux-sandbox/src/bwrap.rs \
             2>/dev/null || true
     fi
     cd -
