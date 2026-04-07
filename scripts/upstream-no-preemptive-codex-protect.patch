@@ -123,7 +123,7 @@
      }
  
 --- upstream/sandboxing/src/seatbelt_tests.rs	2026-04-06 10:00:24
-+++ upstream/sandboxing/src/seatbelt_tests.rs	2026-04-06 11:04:11
++++ upstream/sandboxing/src/seatbelt_tests.rs	2026-04-07 10:00:31
 @@ -154,8 +154,7 @@
          writable_definitions,
          vec![
@@ -147,24 +147,38 @@
      );
  }
  
-@@ -567,12 +564,12 @@
+@@ -566,13 +563,25 @@
+     );
  
      let policy_text = seatbelt_policy_arg(&args);
-     assert!(
+-    assert!(
 -        policy_text.contains("(require-all (subpath (param \"WRITABLE_ROOT_0\"))"),
 -        "expected cwd writable root to carry protected carveouts:\n{policy_text}",
++    // CWD has no .codex, so WRITABLE_ROOT_0 should be a bare subpath grant
++    // without require-all carveouts.
++    assert!(
 +        policy_text.contains("(subpath (param \"WRITABLE_ROOT_0\"))"),
 +        "expected cwd writable root in policy:\n{policy_text}",
      );
      assert!(
 -        policy_text.contains("WRITABLE_ROOT_0_EXCLUDED_0"),
 -        "expected cwd .codex carveout in policy:\n{policy_text}",
++        !policy_text.contains("(require-all (subpath (param \"WRITABLE_ROOT_0\"))"),
++        "cwd should not have require-all carveouts when .codex is missing:\n{policy_text}",
++    );
++    assert!(
 +        !policy_text.contains("WRITABLE_ROOT_0_EXCLUDED"),
 +        "cwd has no .codex so no carveout expected:\n{policy_text}",
++    );
++    // vulnerable_root has .git and .codex, so WRITABLE_ROOT_1 should have
++    // require-all with two carveouts.
++    assert!(
++        policy_text.contains("(require-all (subpath (param \"WRITABLE_ROOT_1\"))"),
++        "expected require-all carveouts for vulnerable root:\n{policy_text}",
      );
      assert!(
          policy_text.contains("WRITABLE_ROOT_1_EXCLUDED_0")
-@@ -592,13 +589,6 @@
+@@ -592,13 +601,6 @@
                  .to_string_lossy()
          ),
          format!(
@@ -178,23 +192,28 @@
              "-DWRITABLE_ROOT_1={}",
              vulnerable_root_canonical.to_string_lossy()
          ),
-@@ -782,12 +772,12 @@
+@@ -782,13 +784,17 @@
  
      let policy_text = seatbelt_policy_arg(&args);
      assert!(
 -        policy_text.contains("(require-not (literal (param \"WRITABLE_ROOT_0_EXCLUDED_1\")))"),
 -        "expected exact .codex carveout in policy:\n{policy_text}"
-+        policy_text.contains("WRITABLE_ROOT_0_EXCLUDED_0"),
-+        "expected .git carveout in policy:\n{policy_text}"
++        policy_text.contains("(require-not (literal (param \"WRITABLE_ROOT_0_EXCLUDED_0\")))"),
++        "expected exact .git carveout in policy:\n{policy_text}"
      );
      assert!(
 -        policy_text.contains("(require-not (subpath (param \"WRITABLE_ROOT_0_EXCLUDED_1\")))"),
 -        "expected descendant .codex carveout in policy:\n{policy_text}"
++        policy_text.contains("(require-not (subpath (param \"WRITABLE_ROOT_0_EXCLUDED_0\")))"),
++        "expected descendant .git carveout in policy:\n{policy_text}"
+     );
++    assert!(
 +        !policy_text.contains("WRITABLE_ROOT_0_EXCLUDED_1"),
 +        ".codex does not exist so no second carveout expected:\n{policy_text}"
-     );
++    );
  }
  
+ #[test]
 --- upstream/linux-sandbox/src/bwrap.rs	2026-04-06 12:26:40
 +++ upstream/linux-sandbox/src/bwrap.rs	2026-04-06 11:27:10
 @@ -786,12 +786,6 @@
