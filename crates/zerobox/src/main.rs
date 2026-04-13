@@ -14,8 +14,8 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
-use codex_protocol::config_types::WindowsSandboxLevel;
-use codex_sandboxing::{
+use zerobox_protocol::config_types::WindowsSandboxLevel;
+use zerobox_sandboxing::{
     SandboxCommand, SandboxManager, SandboxTransformRequest, SandboxType, get_platform_sandbox,
 };
 
@@ -224,13 +224,13 @@ async fn tokio_main() -> ExitCode {
     // zerobox a single binary that doubles as the sandbox helper on Linux.
     #[cfg(target_os = "linux")]
     {
-        use codex_sandboxing::landlock::CODEX_LINUX_SANDBOX_ARG0;
+        use zerobox_sandboxing::landlock::ZEROBOX_LINUX_SANDBOX_ARG0;
         let exe_name = std::env::args_os()
             .next()
             .as_ref()
             .and_then(|s| Path::new(s).file_name().map(|f| f.to_os_string()));
-        if exe_name.as_deref() == Some(std::ffi::OsStr::new(CODEX_LINUX_SANDBOX_ARG0)) {
-            codex_linux_sandbox::run_main(); // never returns
+        if exe_name.as_deref() == Some(std::ffi::OsStr::new(ZEROBOX_LINUX_SANDBOX_ARG0)) {
+            zerobox_linux_sandbox::run_main(); // never returns
         }
     }
 
@@ -384,7 +384,7 @@ async fn tokio_main() -> ExitCode {
         debug_log!(dbg, "network: denied domains: {}", domains.join(", "));
     }
 
-    codex_utils_rustls_provider::ensure_rustls_crypto_provider();
+    zerobox_utils_rustls_provider::ensure_rustls_crypto_provider();
 
     let proxy = match build_network_proxy(&cli, &secret_store, dbg).await {
         Ok(p) => p,
@@ -484,7 +484,7 @@ async fn tokio_main() -> ExitCode {
         enforce_managed_network: proxy.is_some(),
         network: proxy.as_ref(),
         sandbox_policy_cwd: &cwd,
-        codex_linux_sandbox_exe: linux_sandbox_exe.as_ref(),
+        zerobox_linux_sandbox_exe: linux_sandbox_exe.as_ref(),
         use_legacy_landlock,
         windows_sandbox_level: WindowsSandboxLevel::default(),
         windows_sandbox_private_desktop: false,

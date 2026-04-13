@@ -3,12 +3,12 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use codex_protocol::permissions::{
+use zerobox_protocol::permissions::{
     FileSystemAccessMode, FileSystemPath, FileSystemSandboxEntry, FileSystemSandboxPolicy,
     FileSystemSpecialPath, NetworkSandboxPolicy,
 };
-use codex_protocol::protocol::SandboxPolicy;
-use codex_utils_absolute_path::AbsolutePathBuf;
+use zerobox_protocol::protocol::SandboxPolicy;
+use zerobox_utils_absolute_path::AbsolutePathBuf;
 
 use crate::Cli;
 

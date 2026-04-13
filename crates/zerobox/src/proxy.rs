@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use codex_network_proxy::{
+use zerobox_network_proxy::{
     ConfigReloader, ConfigState, NetworkMode, NetworkProxy, NetworkProxyConfig, NetworkProxyState,
     RequestHeaderTransformer, build_config_state,
 };
@@ -91,7 +91,7 @@ pub async fn build_network_proxy(
 
     let state = build_config_state(
         config,
-        codex_network_proxy::NetworkProxyConstraints::default(),
+        zerobox_network_proxy::NetworkProxyConstraints::default(),
     )?;
 
     let mut proxy_state = NetworkProxyState::with_reloader(state, Arc::new(StaticReloader));

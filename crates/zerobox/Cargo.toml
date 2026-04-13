@@ -14,12 +14,12 @@ name = "zerobox"
 path = "src/main.rs"
 
 [dependencies]
-codex-network-proxy = { workspace = true }
+zerobox-network-proxy = { workspace = true }
 zerobox-snapshot = { path = "../zerobox-snapshot" }
-codex-sandboxing = { workspace = true }
-codex-protocol = { workspace = true }
-codex-utils-absolute-path = { workspace = true }
-codex-utils-rustls-provider = { workspace = true }
+zerobox-sandboxing = { workspace = true }
+zerobox-protocol = { workspace = true }
+zerobox-utils-absolute-path = { workspace = true }
+zerobox-utils-rustls-provider = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
@@ -38,4 +38,4 @@ tracing-subscriber = { version = "0.3", features = ["fmt"] }
 tempfile = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-codex-linux-sandbox = { workspace = true }
+zerobox-linux-sandbox = { workspace = true }
