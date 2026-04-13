@@ -72,9 +72,12 @@ pub fn build_secret_store(
             .iter_mut()
             .find(|e| e.key == *key)
             .ok_or_else(|| format!("secret-host references unknown secret '{key}'"))?;
-        entry
-            .hosts
-            .extend(hosts_str.split(',').map(|s| s.trim().to_ascii_lowercase()));
+        entry.hosts.extend(
+            hosts_str
+                .split(',')
+                .map(|s| s.trim().to_ascii_lowercase())
+                .filter(|s| !s.is_empty()),
+        );
     }
 
     Ok(SecretStore { entries })
@@ -84,42 +87,23 @@ pub fn parse_secret_flags(
     secrets: &[String],
     secret_hosts: &[String],
 ) -> Result<SecretStore, String> {
-    let mut entries = Vec::new();
-    let mut seen_keys = HashSet::new();
-
+    let mut parsed_secrets = Vec::new();
     for pair in secrets {
         let (key, value) = pair
             .split_once('=')
             .ok_or_else(|| format!("invalid --secret value '{pair}': expected KEY=VALUE format"))?;
-        if key.is_empty() {
-            return Err(format!(
-                "invalid --secret value '{pair}': key cannot be empty"
-            ));
-        }
-        if !seen_keys.insert(key) {
-            return Err(format!("duplicate --secret key '{key}'"));
-        }
-        entries.push(SecretEntry {
-            key: key.to_string(),
-            placeholder: generate_placeholder(),
-            value: value.to_string(),
-            hosts: Vec::new(),
-        });
+        parsed_secrets.push((key.to_string(), value.to_string()));
     }
 
-    for host_spec in secret_hosts {
-        let (key, hosts_str) = host_spec.split_once('=').ok_or_else(|| {
-            format!("invalid --secret-host value '{host_spec}': expected KEY=host1,host2 format")
+    let mut parsed_hosts = Vec::new();
+    for spec in secret_hosts {
+        let (key, hosts) = spec.split_once('=').ok_or_else(|| {
+            format!("invalid --secret-host value '{spec}': expected KEY=host1,host2 format")
         })?;
-        let entry = entries.iter_mut().find(|e| e.key == key).ok_or_else(|| {
-            format!("--secret-host references unknown secret '{key}': define it with --secret {key}=<value> first")
-        })?;
-        entry
-            .hosts
-            .extend(hosts_str.split(',').map(|s| s.trim().to_ascii_lowercase()));
+        parsed_hosts.push((key.to_string(), hosts.to_string()));
     }
 
-    Ok(SecretStore { entries })
+    build_secret_store(&parsed_secrets, &parsed_hosts)
 }
 
 impl SecretStore {

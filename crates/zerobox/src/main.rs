@@ -187,8 +187,13 @@ async fn tokio_main() -> ExitCode {
         sandbox = sandbox.no_sandbox().no_profile();
     } else if cli.allow_all {
         sandbox = sandbox.full_access().no_profile();
-    } else if let Some(ref name) = cli.profile {
-        sandbox = sandbox.profile(name);
+    } else {
+        if cli.strict_sandbox {
+            sandbox = sandbox.strict();
+        }
+        if let Some(ref name) = cli.profile {
+            sandbox = sandbox.profile(name);
+        }
     }
     // else: default profile loads automatically
 

@@ -66,6 +66,7 @@ pub struct Sandbox {
     secret_hosts: Vec<(String, String)>,
     disabled: bool,
     full_access: bool,
+    strict: bool,
     profile_name: Option<String>,
     use_profile: bool,
 }
@@ -91,6 +92,7 @@ impl Sandbox {
             secret_hosts: Vec::new(),
             disabled: false,
             full_access: false,
+            strict: false,
             profile_name: None,
             use_profile: true,
         }
@@ -206,6 +208,11 @@ impl Sandbox {
         self
     }
 
+    pub fn strict(mut self) -> Self {
+        self.strict = true;
+        self
+    }
+
     pub fn profile(mut self, name: impl Into<String>) -> Self {
         self.profile_name = Some(name.into());
         self.use_profile = true;
@@ -276,6 +283,7 @@ impl Sandbox {
             mut secret_hosts,
             mut disabled,
             mut full_access,
+            strict,
             profile_name,
             use_profile,
         } = self;
@@ -320,7 +328,7 @@ impl Sandbox {
         let (sandbox_type, use_legacy_landlock) = if disabled || full_access {
             (SandboxType::None, false)
         } else {
-            select_sandbox_type()
+            select_sandbox_type(strict)?
         };
 
         let fs_policy = build_fs_policy(
@@ -643,30 +651,25 @@ fn apply_profile(
         }
     }
 
+    fn merge_optional_strings(target: &mut Option<Vec<String>>, source: &Option<Vec<String>>) {
+        if let Some(items) = source {
+            let list = target.get_or_insert_with(Vec::new);
+            for s in items {
+                if !list.contains(s) {
+                    list.push(s.clone());
+                }
+            }
+        }
+    }
+
     merge_paths(allow_read, &profile.allow_read);
     merge_paths(deny_read, &profile.deny_read);
     merge_paths(allow_write, &profile.allow_write);
     merge_paths(deny_write, &profile.deny_write);
     merge_strings(deny_net, &profile.deny_net);
     merge_strings(deny_env, &profile.deny_env);
-
-    if let Some(ref net) = profile.allow_net {
-        let target = allow_net.get_or_insert_with(Vec::new);
-        for d in net {
-            if !target.contains(d) {
-                target.push(d.clone());
-            }
-        }
-    }
-
-    if let Some(ref keys) = profile.allow_env {
-        let target = allow_env.get_or_insert_with(Vec::new);
-        for k in keys {
-            if !target.contains(k) {
-                target.push(k.clone());
-            }
-        }
-    }
+    merge_optional_strings(allow_net, &profile.allow_net);
+    merge_optional_strings(allow_env, &profile.allow_env);
 
     if let Some(ref profile_env) = profile.set_env {
         for (k, v) in profile_env {
@@ -708,16 +711,20 @@ pub(crate) fn resolve_path(base: &Path, p: &Path) -> Result<AbsolutePathBuf> {
     AbsolutePathBuf::try_from(abs).context("failed to resolve path")
 }
 
-fn select_sandbox_type() -> (SandboxType, bool) {
+fn select_sandbox_type(strict: bool) -> Result<(SandboxType, bool)> {
     match get_platform_sandbox(false) {
         Some(SandboxType::LinuxSeccomp) => {
             if can_create_user_namespace() {
-                (SandboxType::LinuxSeccomp, false)
+                Ok((SandboxType::LinuxSeccomp, false))
+            } else if strict {
+                anyhow::bail!(
+                    "strict sandbox requires bubblewrap but user namespaces are unavailable"
+                )
             } else {
-                (SandboxType::LinuxSeccomp, true)
+                Ok((SandboxType::LinuxSeccomp, true))
             }
         }
-        other => (other.unwrap_or(SandboxType::None), false),
+        other => Ok((other.unwrap_or(SandboxType::None), false)),
     }
 }
 
