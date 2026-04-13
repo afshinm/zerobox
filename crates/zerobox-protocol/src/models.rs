@@ -1,8 +1,8 @@
-use zerobox_utils_absolute_path::AbsolutePathBuf;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 use ts_rs::TS;
+use zerobox_utils_absolute_path::AbsolutePathBuf;
 
 #[derive(Debug, Clone, Default, Eq, Hash, PartialEq, Serialize, Deserialize, JsonSchema, TS)]
 pub struct FileSystemPermissions {

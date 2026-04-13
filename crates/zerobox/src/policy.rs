@@ -1,5 +1,3 @@
-//! CLI flags → Codex sandbox policy types.
-
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
