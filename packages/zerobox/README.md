@@ -21,6 +21,7 @@ Lightweight, cross-platform process sandboxing powered by [OpenAI Codex](https:/
 - **File access control:** Allow or deny reads and writes to specific paths
 - **Network filtering:** Allow or deny outbound traffic by domain
 - **Clean environment:** Only essential env vars (PATH, HOME, etc.) are inherited by default
+- **Rust SDK:** `use zerobox::Sandbox` with a builder API
 - **TypeScript SDK:** `import { Sandbox } from "zerobox"` with a Deno-style API
 - **Cross-platform:** macOS and Linux. Windows support planned
 - **Single binary:** No Docker, no VMs, ~10ms overhead
@@ -78,7 +79,20 @@ Pass a secret to a specific host and the inner process never sees the real value
 zerobox --secret OPENAI_API_KEY=sk-proj-123 --secret-host OPENAI_API_KEY=api.openai.com -- node agent.js
 ```
 
-Same thing with the TypeScript SDK:
+Same thing with the Rust SDK:
+
+```rust
+use zerobox::Sandbox;
+
+let output = Sandbox::command("node")
+    .arg("agent.js")
+    .secret("OPENAI_API_KEY", "sk-proj-123")
+    .secret_host("OPENAI_API_KEY", "api.openai.com")
+    .run()
+    .await?;
+```
+
+Or the TypeScript SDK:
 
 ```ts
 import { Sandbox } from "zerobox";
@@ -137,7 +151,7 @@ Pass a secret with `--secret` and restrict it to a specific domain with `--secre
 zerobox --secret OPENAI_API_KEY=sk-proj-123 --secret-host OPENAI_API_KEY=api.openai.com -- node app.js
 ```
 
-Without `--secret-host`, the secret is pass to all domains:
+Without `--secret-host`, the secret is passed to all domains:
 
 ```bash
 zerobox --secret TOKEN=abc123 -- node app.js
@@ -153,6 +167,19 @@ zerobox \
 ```
 
 > Node.js `fetch` does not respect `HTTPS_PROXY` by default. When running Node.js inside a sandbox with secrets, make sure to pass the `--use-env-proxy` argument.
+
+### Rust SDK
+
+```rust
+let output = Sandbox::command("node")
+    .arg("agent.js")
+    .secret("OPENAI_API_KEY", "sk-proj-123")
+    .secret_host("OPENAI_API_KEY", "api.openai.com")
+    .secret("GITHUB_TOKEN", "ghp-456")
+    .secret_host("GITHUB_TOKEN", "api.github.com")
+    .run()
+    .await?;
+```
 
 ### TypeScript SDK
 
@@ -205,6 +232,18 @@ or set a specific variable:
 zerobox --env NODE_ENV=production --env DEBUG=false -- node app.js
 ```
 
+### Rust SDK
+
+```rust
+let output = Sandbox::command("node")
+    .arg("app.js")
+    .env("NODE_ENV", "production")
+    .allow_env(&["PATH", "HOME"])
+    .deny_env(&["AWS_SECRET_ACCESS_KEY"])
+    .run()
+    .await?;
+```
+
 ### TypeScript SDK
 
 ```ts
@@ -231,7 +270,20 @@ Or allow writes only to an output directory:
 zerobox --allow-write=/tmp/output -- python3 /tmp/task.py
 ```
 
-Or via the TypeScript SDK:
+Or via the Rust SDK:
+
+```rust
+let output = Sandbox::command("python3")
+    .arg("/tmp/task.py")
+    .allow_write("/tmp/output")
+    .allow_net(&["api.openai.com"])
+    .run()
+    .await?;
+
+println!("{}", String::from_utf8_lossy(&output.stdout));
+```
+
+Or the TypeScript SDK:
 
 ```ts
 import { Sandbox } from "zerobox";
@@ -292,7 +344,87 @@ Run tests with no network and catch accidental external calls:
 zerobox --allow-write=/tmp -- npm test
 ```
 
-## SDK reference
+## Rust SDK
+
+```toml
+[dependencies]
+zerobox = "0.1"
+```
+
+### Run and collect output
+
+```rust
+use zerobox::Sandbox;
+
+let output = Sandbox::command("echo")
+    .arg("hello")
+    .allow_write("/tmp")
+    .run()
+    .await?;
+
+println!("{}", String::from_utf8_lossy(&output.stdout));
+println!("exit: {}", output.status);
+```
+
+### Stream output
+
+```rust
+let mut child = Sandbox::command("cargo")
+    .arg("build")
+    .allow_write("/project/target")
+    .allow_net(&["crates.io"])
+    .spawn()
+    .await?;
+
+let stdout = child.stdout().unwrap();
+// read from stdout while the process runs
+let status = child.wait().await?;
+```
+
+### Inherit stdio (TTY passthrough)
+
+```rust
+let status = Sandbox::command("vim")
+    .allow_write("/project")
+    .status()
+    .await?;
+```
+
+### Profiles
+
+```rust
+// default profile loads automatically (denies ~/.ssh, ~/.aws, etc.)
+let output = Sandbox::command("npm test").run().await?;
+
+// use a different profile
+let output = Sandbox::command("npm test")
+    .profile("workspace")
+    .run()
+    .await?;
+
+// opt out of profiles
+let output = Sandbox::command("npm test")
+    .no_profile()
+    .allow_read("/src")
+    .run()
+    .await?;
+```
+
+### Full access / no sandbox
+
+```rust
+let output = Sandbox::command("install.sh")
+    .full_access()
+    .run()
+    .await?;
+
+let output = Sandbox::command("ls")
+    .no_sandbox()
+    .run()
+    .await?;
+```
+
+## TypeScript SDK
 
 ```bash
 npm install zerobox

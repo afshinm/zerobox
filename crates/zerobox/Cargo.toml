@@ -19,7 +19,7 @@ path = "src/main.rs"
 
 [dependencies]
 zerobox-network-proxy = { workspace = true }
-zerobox-snapshot = { path = "../zerobox-snapshot" }
+zerobox-snapshot = { version = "0.1.11", path = "../zerobox-snapshot" }
 zerobox-sandboxing = { workspace = true }
 zerobox-protocol = { workspace = true }
 zerobox-utils-absolute-path = { workspace = true }

@@ -255,6 +255,50 @@ jobs:
             artifacts/*.tar.gz
 
 
+  # ── Publish to crates.io ──
+  publish-crates:
+    name: Publish crates.io
+    needs: [sync, github-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: upstream
+          path: upstream/
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y libcap-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Publish crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          for crate in \
+            zerobox-utils-absolute-path \
+            zerobox-utils-string \
+            zerobox-utils-pty \
+            zerobox-utils-rustls-provider \
+            zerobox-utils-home-dir \
+            zerobox-process-hardening \
+            zerobox-snapshot \
+            zerobox-protocol \
+            zerobox-network-proxy \
+            zerobox-sandboxing \
+            zerobox-linux-sandbox \
+            zerobox-windows-sandbox \
+            zerobox; do
+            echo "Publishing $crate..."
+            OUTPUT=$(cargo publish -p "$crate" --no-verify --allow-dirty 2>&1) && echo "  ok" || {
+              if echo "$OUTPUT" | grep -q "is already uploaded"; then
+                echo "  already published, skipping"
+              else
+                echo "$OUTPUT"
+                exit 1
+              fi
+            }
+            sleep 10
+          done
+
   # ── Publish to npm ──
   publish-npm:
     name: Publish npm
