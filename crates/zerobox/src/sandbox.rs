@@ -29,6 +29,8 @@ pub struct SandboxOutput {
 
 pub struct SandboxChild {
     inner: Child,
+    _proxy_handle: Option<zerobox_network_proxy::NetworkProxyHandle>,
+    _proxy: Option<zerobox_network_proxy::NetworkProxy>,
 }
 
 impl SandboxChild {
@@ -235,7 +237,11 @@ impl Sandbox {
         prepared.cmd.stderr(std::process::Stdio::piped());
         prepared.cmd.stdin(std::process::Stdio::null());
         let child = prepared.cmd.spawn().context("failed to spawn command")?;
-        Ok(SandboxChild { inner: child })
+        Ok(SandboxChild {
+            inner: child,
+            _proxy_handle: prepared._proxy_handle,
+            _proxy: prepared._proxy,
+        })
     }
 
     pub async fn status(self) -> Result<ExitStatus> {
@@ -249,18 +255,16 @@ impl Sandbox {
     }
 
     async fn prepare(self) -> Result<PreparedCommand> {
-        let home = crate::zerobox_home();
-        let _ = std::fs::create_dir_all(&home);
-        unsafe { std::env::set_var("CODEX_HOME", &home) };
+        init_home();
 
         let Sandbox {
             program,
             args,
             cwd,
-            env,
+            mut env,
             inherit_env,
-            allow_env,
-            deny_env,
+            mut allow_env,
+            mut deny_env,
             mut allow_read,
             mut deny_read,
             mut allow_write,
@@ -268,8 +272,8 @@ impl Sandbox {
             mut full_write,
             mut allow_net,
             mut deny_net,
-            secrets,
-            secret_hosts,
+            mut secrets,
+            mut secret_hosts,
             mut disabled,
             mut full_access,
             profile_name,
@@ -293,6 +297,11 @@ impl Sandbox {
                 &mut full_write,
                 &mut allow_net,
                 &mut deny_net,
+                &mut env,
+                &mut allow_env,
+                &mut deny_env,
+                &mut secrets,
+                &mut secret_hosts,
                 &mut disabled,
                 &mut full_access,
             );
@@ -605,6 +614,11 @@ fn apply_profile(
     full_write: &mut bool,
     allow_net: &mut Option<Vec<String>>,
     deny_net: &mut Vec<String>,
+    env: &mut HashMap<String, String>,
+    allow_env: &mut Option<Vec<String>>,
+    deny_env: &mut Vec<String>,
+    secrets: &mut Vec<(String, String)>,
+    secret_hosts: &mut Vec<(String, String)>,
     disabled: &mut bool,
     full_access: &mut bool,
 ) {
@@ -634,6 +648,7 @@ fn apply_profile(
     merge_paths(allow_write, &profile.allow_write);
     merge_paths(deny_write, &profile.deny_write);
     merge_strings(deny_net, &profile.deny_net);
+    merge_strings(deny_env, &profile.deny_env);
 
     if let Some(ref net) = profile.allow_net {
         let target = allow_net.get_or_insert_with(Vec::new);
@@ -644,13 +659,44 @@ fn apply_profile(
         }
     }
 
+    if let Some(ref keys) = profile.allow_env {
+        let target = allow_env.get_or_insert_with(Vec::new);
+        for k in keys {
+            if !target.contains(k) {
+                target.push(k.clone());
+            }
+        }
+    }
+
+    if let Some(ref profile_env) = profile.set_env {
+        for (k, v) in profile_env {
+            env.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+    }
+
+    if let Some(ref hosts_map) = profile.secret_hosts {
+        for (key, hosts) in hosts_map {
+            secret_hosts.push((key.clone(), hosts.join(",")));
+        }
+    }
+
     if profile.allow_all == Some(true) {
         *full_access = true;
     }
     if profile.no_sandbox == Some(true) {
         *disabled = true;
     }
-    let _ = full_write;
+    let _ = (full_write, secrets);
+}
+
+fn init_home() {
+    use std::sync::Once;
+    static INIT: Once = Once::new();
+    INIT.call_once(|| {
+        let home = crate::zerobox_home();
+        let _ = std::fs::create_dir_all(&home);
+        unsafe { std::env::set_var("CODEX_HOME", &home) };
+    });
 }
 
 pub(crate) fn resolve_path(base: &Path, p: &Path) -> Result<AbsolutePathBuf> {
@@ -1039,86 +1085,92 @@ mod tests {
 
     // -- apply_profile --
 
-    #[test]
-    fn profile_default_adds_deny_rules() {
+    fn apply_default_profile() -> (
+        Vec<PathBuf>,
+        Vec<PathBuf>,
+        Vec<PathBuf>,
+        Vec<PathBuf>,
+        bool,
+        Option<Vec<String>>,
+        Vec<String>,
+        HashMap<String, String>,
+        Option<Vec<String>>,
+        Vec<String>,
+        Vec<(String, String)>,
+        Vec<(String, String)>,
+        bool,
+        bool,
+    ) {
         let cwd = std::env::current_dir().unwrap();
         let profile = crate::profile_core::load_profile("default", &cwd).unwrap();
-
-        let mut allow_read = Vec::new();
-        let mut deny_read = Vec::new();
-        let mut allow_write = Vec::new();
-        let mut deny_write = Vec::new();
-        let mut full_write = false;
-        let mut allow_net = None;
-        let mut deny_net = Vec::new();
-        let mut disabled = false;
-        let mut full_access = false;
-
+        let mut ar = Vec::new();
+        let mut dr = Vec::new();
+        let mut aw = Vec::new();
+        let mut dw = Vec::new();
+        let mut fw = false;
+        let mut an = None;
+        let mut dn = Vec::new();
+        let mut env = HashMap::new();
+        let mut ae = None;
+        let mut de = Vec::new();
+        let mut sec = Vec::new();
+        let mut sh = Vec::new();
+        let mut dis = false;
+        let mut fa = false;
         apply_profile(
-            &profile,
-            &mut allow_read,
-            &mut deny_read,
-            &mut allow_write,
-            &mut deny_write,
-            &mut full_write,
-            &mut allow_net,
-            &mut deny_net,
-            &mut disabled,
-            &mut full_access,
+            &profile, &mut ar, &mut dr, &mut aw, &mut dw, &mut fw, &mut an, &mut dn, &mut env,
+            &mut ae, &mut de, &mut sec, &mut sh, &mut dis, &mut fa,
         );
+        (ar, dr, aw, dw, fw, an, dn, env, ae, de, sec, sh, dis, fa)
+    }
 
-        assert!(
-            !deny_read.is_empty(),
-            "default profile should deny sensitive paths"
-        );
-        assert!(
-            !allow_read.is_empty(),
-            "default profile should allow system paths"
-        );
+    #[test]
+    fn profile_default_adds_deny_rules() {
+        let (allow_read, deny_read, ..) = apply_default_profile();
+        assert!(!deny_read.is_empty());
+        assert!(!allow_read.is_empty());
         let home = dirs::home_dir().unwrap();
-        assert!(
-            deny_read.contains(&home.join(".ssh")),
-            "default profile should deny ~/.ssh"
-        );
+        assert!(deny_read.contains(&home.join(".ssh")));
     }
 
     #[test]
     fn profile_merges_with_existing_rules() {
         let cwd = std::env::current_dir().unwrap();
         let profile = crate::profile_core::load_profile("default", &cwd).unwrap();
-
         let mut allow_read = vec![p("/my/custom/path")];
         let mut deny_read = vec![p("/my/custom/deny")];
-        let mut allow_write = Vec::new();
-        let mut deny_write = Vec::new();
-        let mut full_write = false;
-        let mut allow_net = None;
-        let mut deny_net = Vec::new();
-        let mut disabled = false;
-        let mut full_access = false;
-
+        let mut aw = Vec::new();
+        let mut dw = Vec::new();
+        let mut fw = false;
+        let mut an = None;
+        let mut dn = Vec::new();
+        let mut env = HashMap::new();
+        let mut ae = None;
+        let mut de = Vec::new();
+        let mut sec = Vec::new();
+        let mut sh = Vec::new();
+        let mut dis = false;
+        let mut fa = false;
         apply_profile(
             &profile,
             &mut allow_read,
             &mut deny_read,
-            &mut allow_write,
-            &mut deny_write,
-            &mut full_write,
-            &mut allow_net,
-            &mut deny_net,
-            &mut disabled,
-            &mut full_access,
+            &mut aw,
+            &mut dw,
+            &mut fw,
+            &mut an,
+            &mut dn,
+            &mut env,
+            &mut ae,
+            &mut de,
+            &mut sec,
+            &mut sh,
+            &mut dis,
+            &mut fa,
         );
-
-        assert!(
-            allow_read.contains(&p("/my/custom/path")),
-            "user paths preserved"
-        );
-        assert!(
-            deny_read.contains(&p("/my/custom/deny")),
-            "user denies preserved"
-        );
-        assert!(allow_read.len() > 1, "profile paths added");
-        assert!(deny_read.len() > 1, "profile denies added");
+        assert!(allow_read.contains(&p("/my/custom/path")));
+        assert!(deny_read.contains(&p("/my/custom/deny")));
+        assert!(allow_read.len() > 1);
+        assert!(deny_read.len() > 1);
     }
 }
