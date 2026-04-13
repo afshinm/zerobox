@@ -3,6 +3,9 @@ name = "zerobox-utils-home-dir"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [lints]
 workspace = true

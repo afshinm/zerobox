@@ -199,6 +199,14 @@ find "$UPSTREAM_DIR" -name '*.rs' -exec "${SED_INPLACE[@]}" \
     -e 's/CODEX_LINUX_SANDBOX_ARG0/ZEROBOX_LINUX_SANDBOX_ARG0/g' \
     {} +
 
+# Add workspace metadata inheritance for crates.io publishing.
+find "$UPSTREAM_DIR" -name 'Cargo.toml' -exec "${SED_INPLACE[@]}" \
+    '/^license.workspace/a\
+description.workspace = true\
+repository.workspace = true\
+homepage.workspace = true
+' {} +
+
 # --- Apply patches ---
 
 echo "==> Applying patches..."

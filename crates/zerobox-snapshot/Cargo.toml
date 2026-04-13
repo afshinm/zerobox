@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Filesystem snapshot and restore for zerobox sandboxes"
+repository.workspace = true
+homepage.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
