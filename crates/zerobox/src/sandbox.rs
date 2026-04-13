@@ -399,19 +399,19 @@ impl Sandbox {
                 "1".to_string(),
             );
         }
-        if secret_store.requires_mitm() {
-            if let Some(ca_path) = secret::mitm_ca_cert_path() {
-                let ca = ca_path.to_string_lossy().to_string();
-                for var in &[
-                    "CURL_CA_BUNDLE",
-                    "SSL_CERT_FILE",
-                    "NODE_EXTRA_CA_CERTS",
-                    "REQUESTS_CA_BUNDLE",
-                    "CARGO_HTTP_CAINFO",
-                    "GIT_SSL_CAINFO",
-                ] {
-                    final_env.insert(var.to_string(), ca.clone());
-                }
+        if secret_store.requires_mitm()
+            && let Some(ca_path) = secret::mitm_ca_cert_path()
+        {
+            let ca = ca_path.to_string_lossy().to_string();
+            for var in &[
+                "CURL_CA_BUNDLE",
+                "SSL_CERT_FILE",
+                "NODE_EXTRA_CA_CERTS",
+                "REQUESTS_CA_BUNDLE",
+                "CARGO_HTTP_CAINFO",
+                "GIT_SSL_CAINFO",
+            ] {
+                final_env.insert(var.to_string(), ca.clone());
             }
         }
         cmd.envs(&final_env);
@@ -470,15 +470,14 @@ fn build_fs_policy(
                 });
             }
         }
-        if let Ok(exe) = std::env::current_exe() {
-            if let Some(dir) = exe.parent() {
-                if let Ok(abs) = AbsolutePathBuf::try_from(dir.to_path_buf()) {
-                    entries.push(FileSystemSandboxEntry {
-                        path: FileSystemPath::Path { path: abs },
-                        access: FileSystemAccessMode::Read,
-                    });
-                }
-            }
+        if let Ok(exe) = std::env::current_exe()
+            && let Some(dir) = exe.parent()
+            && let Ok(abs) = AbsolutePathBuf::try_from(dir.to_path_buf())
+        {
+            entries.push(FileSystemSandboxEntry {
+                path: FileSystemPath::Path { path: abs },
+                access: FileSystemAccessMode::Read,
+            });
         }
         if net_enabled {
             if let Ok(abs) = AbsolutePathBuf::try_from(crate::zerobox_home().join("tmp")) {
