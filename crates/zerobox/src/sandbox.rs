@@ -315,6 +315,10 @@ impl Sandbox {
             );
         }
 
+        if !full_access {
+            validate_paths(&allow_read, &deny_read, &allow_write, &deny_write, &cwd)?;
+        }
+
         let secret_store = Arc::new(
             secret::build_secret_store(&secrets, &secret_hosts).map_err(|e| anyhow::anyhow!(e))?,
         );
@@ -346,7 +350,8 @@ impl Sandbox {
         } else {
             NetworkSandboxPolicy::Restricted
         };
-        let legacy_policy = build_legacy_policy(&allow_write, full_access, full_write, net_enabled);
+        let legacy_policy =
+            build_legacy_policy(&allow_write, full_access, full_write, net_enabled, &cwd);
 
         zerobox_utils_rustls_provider::ensure_rustls_crypto_provider();
         let deny_slice = if deny_net.is_empty() {
@@ -556,6 +561,7 @@ fn build_legacy_policy(
     full_access: bool,
     full_write: bool,
     net_enabled: bool,
+    cwd: &Path,
 ) -> SandboxPolicy {
     if full_access || full_write {
         return SandboxPolicy::DangerFullAccess;
@@ -563,7 +569,7 @@ fn build_legacy_policy(
     if !allow_write.is_empty() {
         let writable_roots: Vec<AbsolutePathBuf> = allow_write
             .iter()
-            .filter_map(|p| AbsolutePathBuf::try_from(p.clone()).ok())
+            .filter_map(|p| resolve_path(cwd, p).ok())
             .collect();
         SandboxPolicy::WorkspaceWrite {
             writable_roots,
@@ -692,13 +698,37 @@ fn apply_profile(
     let _ = (full_write, secrets);
 }
 
+fn validate_paths(
+    allow_read: &[PathBuf],
+    deny_read: &[PathBuf],
+    allow_write: &[PathBuf],
+    deny_write: &[PathBuf],
+    cwd: &Path,
+) -> Result<()> {
+    for p in allow_read {
+        resolve_path(cwd, p)
+            .with_context(|| format!("invalid allow_read path: {}", p.display()))?;
+    }
+    for p in deny_read {
+        resolve_path(cwd, p).with_context(|| format!("invalid deny_read path: {}", p.display()))?;
+    }
+    for p in allow_write {
+        resolve_path(cwd, p)
+            .with_context(|| format!("invalid allow_write path: {}", p.display()))?;
+    }
+    for p in deny_write {
+        resolve_path(cwd, p)
+            .with_context(|| format!("invalid deny_write path: {}", p.display()))?;
+    }
+    Ok(())
+}
+
 fn init_home() {
     use std::sync::Once;
     static INIT: Once = Once::new();
     INIT.call_once(|| {
         let home = crate::zerobox_home();
         let _ = std::fs::create_dir_all(&home);
-        unsafe { std::env::set_var("CODEX_HOME", &home) };
     });
 }
 
@@ -873,7 +903,7 @@ mod tests {
 
     #[test]
     fn legacy_default_read_only_no_net() {
-        let pol = build_legacy_policy(&[], false, false, false);
+        let pol = build_legacy_policy(&[], false, false, false, Path::new("/tmp"));
         assert!(matches!(
             pol,
             SandboxPolicy::ReadOnly {
@@ -885,7 +915,7 @@ mod tests {
 
     #[test]
     fn legacy_net_flag_propagates() {
-        let pol = build_legacy_policy(&[], false, false, true);
+        let pol = build_legacy_policy(&[], false, false, true, Path::new("/tmp"));
         assert!(matches!(
             pol,
             SandboxPolicy::ReadOnly {
@@ -894,7 +924,7 @@ mod tests {
             }
         ));
 
-        let pol = build_legacy_policy(&[p("/out")], false, false, true);
+        let pol = build_legacy_policy(&[p("/out")], false, false, true, Path::new("/tmp"));
         match pol {
             SandboxPolicy::WorkspaceWrite { network_access, .. } => assert!(network_access),
             other => panic!("expected WorkspaceWrite, got {other:?}"),
@@ -903,22 +933,22 @@ mod tests {
 
     #[test]
     fn legacy_write_paths_become_workspace_write() {
-        let pol = build_legacy_policy(&[p("/tmp")], false, false, false);
+        let pol = build_legacy_policy(&[p("/tmp")], false, false, false, Path::new("/tmp"));
         assert!(matches!(pol, SandboxPolicy::WorkspaceWrite { .. }));
     }
 
     #[test]
     fn legacy_full_access_or_full_write_is_danger() {
         assert!(matches!(
-            build_legacy_policy(&[], true, false, false),
+            build_legacy_policy(&[], true, false, false, Path::new("/tmp")),
             SandboxPolicy::DangerFullAccess
         ));
         assert!(matches!(
-            build_legacy_policy(&[], false, true, false),
+            build_legacy_policy(&[], false, true, false, Path::new("/tmp")),
             SandboxPolicy::DangerFullAccess
         ));
         assert!(matches!(
-            build_legacy_policy(&[], true, true, true),
+            build_legacy_policy(&[], true, true, true, Path::new("/tmp")),
             SandboxPolicy::DangerFullAccess
         ));
     }

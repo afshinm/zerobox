@@ -3946,8 +3946,6 @@ name = "zerobox-utils-home-dir"
 version = "0.1.11"
 dependencies = [
  "dirs",
- "pretty_assertions",
- "tempfile",
 ]
 
 [[package]]

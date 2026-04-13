@@ -9,7 +9,6 @@ pub use sandbox::SandboxOutput;
 
 pub fn zerobox_home() -> std::path::PathBuf {
     let path = std::env::var_os("ZEROBOX_HOME")
-        .or_else(|| std::env::var_os("CODEX_HOME"))
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| {
             dirs::home_dir()

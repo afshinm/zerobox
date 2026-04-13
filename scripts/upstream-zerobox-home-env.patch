@@ -1,0 +1,14 @@
+--- upstream/linux-sandbox/src/proxy_routing.rs
++++ upstream/linux-sandbox/src/proxy_routing.rs
+@@ -300,8 +300,9 @@
+ }
+
+ fn proxy_socket_parent_dir() -> PathBuf {
+-    if let Some(codex_home) = std::env::var_os("CODEX_HOME") {
+-        let candidate = PathBuf::from(codex_home).join("tmp");
++    if let Some(home) = std::env::var_os("ZEROBOX_HOME").or_else(|| std::env::var_os("CODEX_HOME"))
++    {
++        let candidate = PathBuf::from(home).join("tmp");
+         if ensure_private_proxy_socket_parent_dir(candidate.as_path()).is_ok() {
+             return candidate;
+         }

@@ -133,9 +133,6 @@ fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
 }
 
 fn main() -> ExitCode {
-    let home = zerobox::zerobox_home();
-    let _ = std::fs::create_dir_all(&home);
-    unsafe { std::env::set_var("CODEX_HOME", &home) };
     tokio_main()
 }
 

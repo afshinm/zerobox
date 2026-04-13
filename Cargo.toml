@@ -7,7 +7,7 @@ members = [
     "upstream/utils/absolute-path",
     "upstream/utils/string",
     "upstream/utils/pty",
-    "upstream/utils/home-dir",
+    "crates/zerobox-home-dir",
     "upstream/utils/rustls-provider",
     "upstream/network-proxy",
 
@@ -37,7 +37,7 @@ zerobox-windows-sandbox = { path = "upstream/windows-sandbox-rs" }
 zerobox-utils-absolute-path = { path = "upstream/utils/absolute-path" }
 zerobox-utils-pty = { path = "upstream/utils/pty" }
 zerobox-utils-string = { path = "upstream/utils/string" }
-zerobox-utils-home-dir = { path = "upstream/utils/home-dir" }
+zerobox-utils-home-dir = { path = "crates/zerobox-home-dir" }
 zerobox-network-proxy = { path = "upstream/network-proxy" }
 zerobox-utils-rustls-provider = { path = "upstream/utils/rustls-provider" }
 

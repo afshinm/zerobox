@@ -61,7 +61,6 @@ UTILS=(
     absolute-path
     string
     pty
-    home-dir
     rustls-provider
 )
 
@@ -180,6 +179,7 @@ RENAME_PAIRS=(
     "codex-utils-rustls-provider:zerobox-utils-rustls-provider"
     "codex-command-runner:zerobox-command-runner"
     "codex-windows-sandbox-setup:zerobox-windows-sandbox-setup"
+    "find-codex-home:find-home"
 )
 
 SED_ARGS=()
@@ -242,6 +242,12 @@ if [ -f "$CODEX_PROTECT_PATCH" ]; then
             upstream/linux-sandbox/src/bwrap.rs \
             2>/dev/null || true
     fi
+fi
+
+HOME_ENV_PATCH="$SCRIPT_DIR/upstream-zerobox-home-env.patch"
+if [ -f "$HOME_ENV_PATCH" ]; then
+    echo "    zerobox-home-env"
+    patch -p0 < "$HOME_ENV_PATCH" || echo "    WARNING: patch did not apply cleanly"
 fi
 
 cd -
