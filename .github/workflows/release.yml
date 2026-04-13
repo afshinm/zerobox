@@ -123,10 +123,10 @@ jobs:
             runner: macos-latest
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-24.04-arm
-            glibc: "2.31"
+            glibc: "2.17"
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
-            glibc: "2.31"
+            glibc: "2.17"
           - target: x86_64-unknown-linux-musl
             runner: ubuntu-latest
             packages: musl-tools
