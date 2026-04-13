@@ -45,50 +45,65 @@ fn generate_placeholder() -> String {
     hex
 }
 
-/// Parse `--secret` and `--secret-host` CLI flags into a SecretStore.
-///
-/// - `secrets`: `["KEY=VALUE", ...]` from `--secret`
-/// - `secret_hosts`: `["KEY=host1,host2", ...]` from `--secret-host`
-pub fn parse_secret_flags(
-    secrets: &[String],
-    secret_hosts: &[String],
+pub fn build_secret_store(
+    secrets: &[(String, String)],
+    secret_hosts: &[(String, String)],
 ) -> Result<SecretStore, String> {
     let mut entries = Vec::new();
     let mut seen_keys = HashSet::new();
 
-    for pair in secrets {
-        let (key, value) = pair
-            .split_once('=')
-            .ok_or_else(|| format!("invalid --secret value '{pair}': expected KEY=VALUE format"))?;
+    for (key, value) in secrets {
         if key.is_empty() {
-            return Err(format!(
-                "invalid --secret value '{pair}': key cannot be empty"
-            ));
+            return Err("secret key cannot be empty".to_string());
         }
-        if !seen_keys.insert(key) {
-            return Err(format!("duplicate --secret key '{key}'"));
+        if !seen_keys.insert(key.as_str()) {
+            return Err(format!("duplicate secret key '{key}'"));
         }
         entries.push(SecretEntry {
-            key: key.to_string(),
+            key: key.clone(),
             placeholder: generate_placeholder(),
-            value: value.to_string(),
+            value: value.clone(),
             hosts: Vec::new(),
         });
     }
 
-    for host_spec in secret_hosts {
-        let (key, hosts_str) = host_spec.split_once('=').ok_or_else(|| {
-            format!("invalid --secret-host value '{host_spec}': expected KEY=host1,host2 format")
-        })?;
-        let entry = entries.iter_mut().find(|e| e.key == key).ok_or_else(|| {
-            format!("--secret-host references unknown secret '{key}': define it with --secret {key}=<value> first")
-        })?;
-        entry
-            .hosts
-            .extend(hosts_str.split(',').map(|s| s.trim().to_ascii_lowercase()));
+    for (key, hosts_str) in secret_hosts {
+        let entry = entries
+            .iter_mut()
+            .find(|e| e.key == *key)
+            .ok_or_else(|| format!("secret-host references unknown secret '{key}'"))?;
+        entry.hosts.extend(
+            hosts_str
+                .split(',')
+                .map(|s| s.trim().to_ascii_lowercase())
+                .filter(|s| !s.is_empty()),
+        );
     }
 
     Ok(SecretStore { entries })
+}
+
+pub fn parse_secret_flags(
+    secrets: &[String],
+    secret_hosts: &[String],
+) -> Result<SecretStore, String> {
+    let mut parsed_secrets = Vec::new();
+    for pair in secrets {
+        let (key, value) = pair
+            .split_once('=')
+            .ok_or_else(|| format!("invalid --secret value '{pair}': expected KEY=VALUE format"))?;
+        parsed_secrets.push((key.to_string(), value.to_string()));
+    }
+
+    let mut parsed_hosts = Vec::new();
+    for spec in secret_hosts {
+        let (key, hosts) = spec.split_once('=').ok_or_else(|| {
+            format!("invalid --secret-host value '{spec}': expected KEY=host1,host2 format")
+        })?;
+        parsed_hosts.push((key.to_string(), hosts.to_string()));
+    }
+
+    build_secret_store(&parsed_secrets, &parsed_hosts)
 }
 
 impl SecretStore {

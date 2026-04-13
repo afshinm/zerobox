@@ -134,7 +134,7 @@ fn generate_session_id() -> String {
 }
 
 fn snapshots_dir() -> PathBuf {
-    crate::zerobox_home().join("snapshots")
+    zerobox::zerobox_home().join("snapshots")
 }
 
 fn validate_session_id(id: &str) -> bool {
@@ -420,7 +420,7 @@ mod tests {
 
     #[test]
     fn zerobox_home_precedence() {
-        let home = crate::zerobox_home();
+        let home = zerobox::zerobox_home();
         assert!(!home.as_os_str().is_empty());
         assert!(snapshots_dir().ends_with("snapshots"));
     }
