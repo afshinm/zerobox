@@ -9,6 +9,10 @@ homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[lib]
+name = "zerobox"
+path = "src/lib.rs"
+
 [[bin]]
 name = "zerobox"
 path = "src/main.rs"
