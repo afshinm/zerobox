@@ -1,5 +1,11 @@
 # @zerobox/cli-linux-arm64
 
+## 0.2.0
+
+### Minor Changes
+
+- [`cf9a4e7`](https://github.com/afshinm/zerobox/commit/cf9a4e7f747845829f9e83bccaee3c1314639694) Thanks [@afshinm](https://github.com/afshinm)! - Add the Rust SDK
+
 ## 0.1.11
 
 ### Patch Changes
