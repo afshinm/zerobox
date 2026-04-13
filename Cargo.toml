@@ -39,6 +39,7 @@ zerobox-utils-pty = { path = "upstream/utils/pty" }
 zerobox-utils-string = { path = "upstream/utils/string" }
 zerobox-utils-home-dir = { path = "crates/zerobox-home-dir" }
 zerobox-network-proxy = { path = "upstream/network-proxy" }
+zerobox-snapshot = { path = "crates/zerobox-snapshot" }
 zerobox-utils-rustls-provider = { path = "upstream/utils/rustls-provider" }
 
 anyhow = "1"
