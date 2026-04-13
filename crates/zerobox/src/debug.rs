@@ -2,7 +2,7 @@ use std::io::IsTerminal;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use codex_network_proxy::{BlockedRequest, BlockedRequestObserver};
+use zerobox_network_proxy::{BlockedRequest, BlockedRequestObserver};
 
 pub fn log(msg: &str) {
     let ts = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.6fZ");

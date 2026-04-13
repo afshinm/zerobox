@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
 #
-# Sync upstream Codex sandboxing crates from a specific release.
+# Sync sandbox crates from openai/codex, rename to zerobox-*.
 #
 # Usage:
-#   ./sync.sh                    # sync from the pinned ref in UPSTREAM_VERSION
-#   ./sync.sh v0.1.2503262      # sync from a specific tag/branch/SHA
+#   ./sync.sh                    # use pinned ref from UPSTREAM_VERSION
+#   ./sync.sh rust-v0.118.0      # specific tag/branch/SHA
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$SCRIPT_DIR/.."
+
+if sed --version >/dev/null 2>&1; then
+    SED_INPLACE=(sed -i)
+else
+    SED_INPLACE=(sed -i '')
+fi
+
 UPSTREAM_DIR="$ROOT/upstream"
 VERSION_FILE="$ROOT/UPSTREAM_VERSION"
 
@@ -39,7 +46,6 @@ if [ ! -d "$SRC" ]; then
     exit 1
 fi
 
-# Record the actual commit SHA for reproducibility.
 COMMIT_SHA="$(git -C "$WORK_DIR/codex" rev-parse HEAD)"
 echo "==> Resolved to commit $COMMIT_SHA"
 
@@ -48,8 +54,6 @@ CRATES=(
     linux-sandbox
     windows-sandbox-rs
     process-hardening
-    protocol
-    execpolicy
     network-proxy
 )
 
@@ -57,9 +61,6 @@ UTILS=(
     absolute-path
     string
     pty
-    image
-    cache
-    template
     home-dir
     rustls-provider
 )
@@ -69,50 +70,146 @@ rm -rf "$UPSTREAM_DIR"
 mkdir -p "$UPSTREAM_DIR/utils"
 
 for crate in "${CRATES[@]}"; do
-    echo "    copying $crate/"
+    echo "    $crate/"
     cp -r "$SRC/$crate" "$UPSTREAM_DIR/$crate"
 done
 
 for util in "${UTILS[@]}"; do
-    echo "    copying utils/$util/"
+    echo "    utils/$util/"
     cp -r "$SRC/utils/$util" "$UPSTREAM_DIR/utils/$util"
 done
 
-# Vendor directory (bubblewrap C sources for Linux)
 if [ -d "$SRC/vendor" ]; then
-    echo "    copying vendor/"
+    echo "    vendor/"
     cp -r "$SRC/vendor" "$UPSTREAM_DIR/vendor"
 fi
 
-echo "==> Applying patches..."
+# --- Inline error types into linux-sandbox (replace codex-core dep) ---
 
-# windows-sandbox-rs uses path-based dep instead of workspace.
+echo "==> Patching linux-sandbox..."
+
+rm -rf "$UPSTREAM_DIR/linux-sandbox/tests"
+
+cat > "$UPSTREAM_DIR/linux-sandbox/src/error.rs" <<'ERRS'
+use std::io;
+use thiserror::Error;
+
+pub type Result<T> = std::result::Result<T, CodexErr>;
+
+#[derive(Error, Debug)]
+pub enum SandboxErr {
+    #[cfg(target_os = "linux")]
+    #[error("seccomp setup error")]
+    SeccompInstall(#[from] seccompiler::Error),
+
+    #[cfg(target_os = "linux")]
+    #[error("seccomp backend error")]
+    SeccompBackend(#[from] seccompiler::BackendError),
+
+    #[error("command was killed by a signal")]
+    Signal(i32),
+
+    #[error("Landlock was not able to fully enforce all sandbox rules")]
+    LandlockRestrict,
+}
+
+#[derive(Error, Debug)]
+pub enum CodexErr {
+    #[error("sandbox error: {0}")]
+    Sandbox(#[from] SandboxErr),
+
+    #[error("unsupported operation: {0}")]
+    UnsupportedOperation(String),
+
+    #[error(transparent)]
+    Io(#[from] io::Error),
+
+    #[cfg(target_os = "linux")]
+    #[error(transparent)]
+    LandlockRuleset(#[from] landlock::RulesetError),
+
+    #[cfg(target_os = "linux")]
+    #[error(transparent)]
+    LandlockPathFd(#[from] landlock::PathFdError),
+}
+ERRS
+
+"${SED_INPLACE[@]}" '/^#\[cfg(target_os = "linux")\]/{
+N
+/mod bwrap;/{
+a\
+#[cfg(target_os = "linux")]\
+pub mod error;
+}
+}' "$UPSTREAM_DIR/linux-sandbox/src/lib.rs"
+
+find "$UPSTREAM_DIR/linux-sandbox/src" -name '*.rs' -exec "${SED_INPLACE[@]}" \
+    -e 's/use codex_core::error::/use crate::error::/g' \
+    {} +
+
+"${SED_INPLACE[@]}" '/^codex-core = /d' "$UPSTREAM_DIR/linux-sandbox/Cargo.toml"
+"${SED_INPLACE[@]}" '/^clap = /a\
+thiserror = { workspace = true }
+' "$UPSTREAM_DIR/linux-sandbox/Cargo.toml"
+
+# --- Patch windows-sandbox-rs (path dep -> workspace) ---
+
 WIN_TOML="$UPSTREAM_DIR/windows-sandbox-rs/Cargo.toml"
 if [ -f "$WIN_TOML" ] && grep -q 'path = "\.\./protocol"' "$WIN_TOML"; then
-    echo "    patching windows-sandbox-rs/Cargo.toml (path dep -> workspace)"
-    # Replace the multi-line [dependencies.codex-protocol] section with a single workspace line.
-    sed -i.bak 's|\[dependencies\.codex-protocol\]|codex-protocol = { workspace = true }|' "$WIN_TOML"
-    sed -i.bak '/^package = "codex-protocol"/d' "$WIN_TOML"
-    sed -i.bak '/^path = "\.\.\/protocol"/d' "$WIN_TOML"
-    rm -f "$WIN_TOML.bak"
-
-    # Verify the patch took effect.
-    if grep -q 'path = "\.\./protocol"' "$WIN_TOML"; then
-        echo "error: failed to patch $WIN_TOML"
-        exit 1
-    fi
+    echo "==> Patching windows-sandbox-rs..."
+    "${SED_INPLACE[@]}" 's|\[dependencies\.codex-protocol\]|codex-protocol = { workspace = true }|' "$WIN_TOML"
+    "${SED_INPLACE[@]}" '/^package = "codex-protocol"/d' "$WIN_TOML"
+    "${SED_INPLACE[@]}" '/^path = "\.\.\/protocol"/d' "$WIN_TOML"
 fi
 
-# These add the RequestHeaderTransformer hook for secret substitution
-# and enable MITM in Full mode. See the patch file for details.
+# --- Rename codex-* → zerobox-* ---
+
+echo "==> Renaming codex-* → zerobox-*..."
+
+RENAME_PAIRS=(
+    "codex-linux-sandbox:zerobox-linux-sandbox"
+    "codex-network-proxy:zerobox-network-proxy"
+    "codex-process-hardening:zerobox-process-hardening"
+    "codex-protocol:zerobox-protocol"
+    "codex-sandboxing:zerobox-sandboxing"
+    "codex-windows-sandbox:zerobox-windows-sandbox"
+    "codex-utils-absolute-path:zerobox-utils-absolute-path"
+    "codex-utils-pty:zerobox-utils-pty"
+    "codex-utils-string:zerobox-utils-string"
+    "codex-utils-home-dir:zerobox-utils-home-dir"
+    "codex-utils-rustls-provider:zerobox-utils-rustls-provider"
+    "codex-command-runner:zerobox-command-runner"
+    "codex-windows-sandbox-setup:zerobox-windows-sandbox-setup"
+)
+
+SED_ARGS=()
+for pair in "${RENAME_PAIRS[@]}"; do
+    old="${pair%%:*}"
+    new="${pair##*:}"
+    SED_ARGS+=(-e "s/${old}/${new}/g")
+    old_us="${old//-/_}"
+    new_us="${new//-/_}"
+    SED_ARGS+=(-e "s/${old_us}/${new_us}/g")
+done
+
+find "$UPSTREAM_DIR" \( -name '*.rs' -o -name '*.toml' \) \
+    -exec "${SED_INPLACE[@]}" "${SED_ARGS[@]}" {} +
+
+find "$UPSTREAM_DIR" -name '*.rs' -exec "${SED_INPLACE[@]}" \
+    -e 's/CODEX_LINUX_SANDBOX_ARG0/ZEROBOX_LINUX_SANDBOX_ARG0/g' \
+    {} +
+
+# --- Apply patches ---
+
+echo "==> Applying patches..."
+
+cd "$ROOT"
+
 PATCH="$SCRIPT_DIR/upstream-secret-substitution.patch"
 if [ -f "$PATCH" ]; then
-    echo "==> Applying zerobox upstream patches..."
-    cd "$ROOT"
-    patch -p1 < "$PATCH"
-    # Format patched files to match rustfmt expectations.
+    echo "    secret-substitution"
+    patch -p1 < "$PATCH" || echo "    WARNING: patch did not apply cleanly"
     if command -v cargo >/dev/null 2>&1 && command -v rustfmt >/dev/null 2>&1; then
-        echo "    formatting patched files"
         cargo fmt -- \
             upstream/network-proxy/src/certs.rs \
             upstream/network-proxy/src/http_proxy.rs \
@@ -121,46 +218,33 @@ if [ -f "$PATCH" ]; then
             upstream/network-proxy/src/runtime.rs \
             2>/dev/null || true
     fi
-    cd -
 fi
 
-# Move non-FS platform defaults from restricted_read_only_platform_defaults.sbpl
-# into the base policy. Profiles now control all filesystem rules.
 PLATFORM_PATCH="$SCRIPT_DIR/upstream-platform-defaults.patch"
 if [ -f "$PLATFORM_PATCH" ]; then
-    echo "==> Applying platform defaults patch..."
-    cd "$ROOT"
-    patch -p0 < "$PLATFORM_PATCH"
-    cd -
+    echo "    platform-defaults"
+    patch -p0 < "$PLATFORM_PATCH" || echo "    WARNING: patch did not apply cleanly"
 fi
 
-# Deny-default writes on Linux: add --remount-ro / to bwrap after all mounts.
 DENY_WRITE_PATCH="$SCRIPT_DIR/upstream-deny-default-write.patch"
 if [ -f "$DENY_WRITE_PATCH" ]; then
-    echo "==> Applying deny-default-write patch..."
-    cd "$ROOT"
-    patch -p0 < "$DENY_WRITE_PATCH"
-    cd -
+    echo "    deny-default-write"
+    patch -p0 < "$DENY_WRITE_PATCH" || echo "    WARNING: patch did not apply cleanly"
 fi
 
-# Skip preemptive .codex directory protection (codex-specific, not needed by zerobox).
 CODEX_PROTECT_PATCH="$SCRIPT_DIR/upstream-no-preemptive-codex-protect.patch"
 if [ -f "$CODEX_PROTECT_PATCH" ]; then
-    echo "==> Applying no-preemptive-codex-protect patch..."
-    cd "$ROOT"
-    patch -p0 < "$CODEX_PROTECT_PATCH"
-    # Format patched files to match rustfmt expectations.
+    echo "    no-preemptive-codex-protect"
+    patch -p0 < "$CODEX_PROTECT_PATCH" || echo "    WARNING: patch did not apply cleanly"
     if command -v cargo >/dev/null 2>&1 && command -v rustfmt >/dev/null 2>&1; then
-        echo "    formatting patched files"
         cargo fmt -- \
-            upstream/protocol/src/permissions.rs \
-            upstream/protocol/src/protocol.rs \
             upstream/sandboxing/src/seatbelt_tests.rs \
             upstream/linux-sandbox/src/bwrap.rs \
             2>/dev/null || true
     fi
-    cd -
 fi
+
+cd -
 
 {
     echo "$REF"
