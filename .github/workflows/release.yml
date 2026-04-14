@@ -296,7 +296,7 @@ jobs:
                 exit 1
               fi
             }
-            sleep 10
+            sleep 60
           done
 
   # ── Publish to npm ──
@@ -314,7 +314,7 @@ jobs:
           version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
       - run: pnpm install
       - name: Build SDK
@@ -327,15 +327,9 @@ jobs:
       - name: Extract binaries into platform packages
         run: ./scripts/prepare-npm.sh artifacts/
       - name: Publish platform packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
         run: |
           for pkg in cli-darwin-arm64 cli-darwin-x64 cli-linux-arm64 cli-linux-x64 cli-linux-arm64-musl cli-linux-x64-musl; do
             pnpm publish "packages/$pkg" --access public --no-git-checks
           done
       - name: Publish main package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
         run: pnpm publish packages/zerobox --access public --no-git-checks
