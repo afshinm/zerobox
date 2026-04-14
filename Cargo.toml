@@ -28,19 +28,18 @@ keywords = ["security", "sandbox", "secret-management", "ai-agents", "process-is
 categories = ["command-line-utilities", "os"]
 
 [workspace.dependencies]
-# Upstream
-zerobox-linux-sandbox = { path = "upstream/linux-sandbox" }
-zerobox-process-hardening = { path = "upstream/process-hardening" }
-zerobox-protocol = { path = "crates/zerobox-protocol" }
-zerobox-sandboxing = { path = "upstream/sandboxing" }
-zerobox-windows-sandbox = { path = "upstream/windows-sandbox-rs" }
-zerobox-utils-absolute-path = { path = "upstream/utils/absolute-path" }
-zerobox-utils-pty = { path = "upstream/utils/pty" }
-zerobox-utils-string = { path = "upstream/utils/string" }
-zerobox-utils-home-dir = { path = "crates/zerobox-home-dir" }
-zerobox-network-proxy = { path = "upstream/network-proxy" }
-zerobox-snapshot = { path = "crates/zerobox-snapshot" }
-zerobox-utils-rustls-provider = { path = "upstream/utils/rustls-provider" }
+zerobox-linux-sandbox = { version = "=0.2.0", path = "upstream/linux-sandbox" }
+zerobox-process-hardening = { version = "=0.2.0", path = "upstream/process-hardening" }
+zerobox-protocol = { version = "=0.2.0", path = "crates/zerobox-protocol" }
+zerobox-sandboxing = { version = "=0.2.0", path = "upstream/sandboxing" }
+zerobox-windows-sandbox = { version = "=0.2.0", path = "upstream/windows-sandbox-rs" }
+zerobox-utils-absolute-path = { version = "=0.2.0", path = "upstream/utils/absolute-path" }
+zerobox-utils-pty = { version = "=0.2.0", path = "upstream/utils/pty" }
+zerobox-utils-string = { version = "=0.2.0", path = "upstream/utils/string" }
+zerobox-utils-home-dir = { version = "=0.2.0", path = "crates/zerobox-home-dir" }
+zerobox-network-proxy = { version = "=0.2.0", path = "upstream/network-proxy" }
+zerobox-snapshot = { version = "=0.2.0", path = "crates/zerobox-snapshot" }
+zerobox-utils-rustls-provider = { version = "=0.2.0", path = "upstream/utils/rustls-provider" }
 
 anyhow = "1"
 async-trait = "0.1.89"
