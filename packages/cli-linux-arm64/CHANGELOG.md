@@ -1,5 +1,11 @@
 # @zerobox/cli-linux-arm64
 
+## 0.2.1
+
+### Patch Changes
+
+- [`8e34a04`](https://github.com/afshinm/zerobox/commit/8e34a04191c1c65039e54293a1ce9c4b5359a274) Thanks [@afshinm](https://github.com/afshinm)! - Update pnpm/cargo publish pipelines
+
 ## 0.2.0
 
 ### Minor Changes
