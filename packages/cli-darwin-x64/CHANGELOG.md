@@ -1,5 +1,11 @@
 # @zerobox/cli-darwin-x64
 
+## 0.2.2
+
+### Patch Changes
+
+- [`95edecc`](https://github.com/afshinm/zerobox/commit/95edecc60633bb8fb2a32a636c1dc20987ca3056) Thanks [@afshinm](https://github.com/afshinm)! - Fix cargo.toml changeset
+
 ## 0.2.1
 
 ### Patch Changes
