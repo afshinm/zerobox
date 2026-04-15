@@ -3,6 +3,7 @@ pub mod proxy;
 mod sandbox;
 pub mod secret;
 
+pub use sandbox::PreparedCommand;
 pub use sandbox::Sandbox;
 pub use sandbox::SandboxChild;
 pub use sandbox::SandboxOutput;

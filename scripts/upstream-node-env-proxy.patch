@@ -1,0 +1,12 @@
+--- upstream/network-proxy/src/proxy.rs
++++ upstream/network-proxy/src/proxy.rs
+@@ -441,6 +441,9 @@
+     set_env_keys(env, NO_PROXY_ENV_KEYS, DEFAULT_NO_PROXY_VALUE);
+
+     env.insert("ELECTRON_GET_USE_PROXY".to_string(), "true".to_string());
++
++    // Node.js 22.21+ / 24+: make built-in fetch() respect HTTP_PROXY/HTTPS_PROXY
++    env.insert("NODE_USE_ENV_PROXY".to_string(), "1".to_string());
+
+     // Keep HTTP_PROXY/HTTPS_PROXY as HTTP endpoints. A lot of clients break if
+     // those vars contain SOCKS URLs. We only switch ALL_PROXY here.
