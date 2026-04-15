@@ -258,12 +258,6 @@ if [ -f "$HOME_ENV_PATCH" ]; then
     patch -p0 < "$HOME_ENV_PATCH"
 fi
 
-CA_LOCK_PATCH="$SCRIPT_DIR/upstream-ca-cert-locking.patch"
-if [ -f "$CA_LOCK_PATCH" ]; then
-    echo "    ca-cert-locking"
-    patch -p0 < "$CA_LOCK_PATCH"
-fi
-
 NODE_PROXY_PATCH="$SCRIPT_DIR/upstream-node-env-proxy.patch"
 if [ -f "$NODE_PROXY_PATCH" ]; then
     echo "    node-env-proxy"
