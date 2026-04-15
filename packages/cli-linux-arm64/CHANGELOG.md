@@ -1,5 +1,11 @@
 # @zerobox/cli-linux-arm64
 
+## 0.2.3
+
+### Patch Changes
+
+- [`df3d0f2`](https://github.com/afshinm/zerobox/commit/df3d0f209bea17bd5d8a5da9558b833cd3345404) Thanks [@afshinm](https://github.com/afshinm)! - Add self wrap in the Rust crate
+
 ## 0.2.2
 
 ### Patch Changes
