@@ -216,7 +216,7 @@ cd "$ROOT"
 PATCH="$SCRIPT_DIR/upstream-secret-substitution.patch"
 if [ -f "$PATCH" ]; then
     echo "    secret-substitution"
-    patch -p1 < "$PATCH" || echo "    WARNING: patch did not apply cleanly"
+    patch -p1 < "$PATCH"
     if command -v cargo >/dev/null 2>&1 && command -v rustfmt >/dev/null 2>&1; then
         cargo fmt -- \
             upstream/network-proxy/src/certs.rs \
@@ -231,19 +231,19 @@ fi
 PLATFORM_PATCH="$SCRIPT_DIR/upstream-platform-defaults.patch"
 if [ -f "$PLATFORM_PATCH" ]; then
     echo "    platform-defaults"
-    patch -p0 < "$PLATFORM_PATCH" || echo "    WARNING: patch did not apply cleanly"
+    patch -p0 < "$PLATFORM_PATCH"
 fi
 
 DENY_WRITE_PATCH="$SCRIPT_DIR/upstream-deny-default-write.patch"
 if [ -f "$DENY_WRITE_PATCH" ]; then
     echo "    deny-default-write"
-    patch -p0 < "$DENY_WRITE_PATCH" || echo "    WARNING: patch did not apply cleanly"
+    patch -p0 < "$DENY_WRITE_PATCH"
 fi
 
 CODEX_PROTECT_PATCH="$SCRIPT_DIR/upstream-no-preemptive-codex-protect.patch"
 if [ -f "$CODEX_PROTECT_PATCH" ]; then
     echo "    no-preemptive-codex-protect"
-    patch -p0 < "$CODEX_PROTECT_PATCH" || echo "    WARNING: patch did not apply cleanly"
+    patch -p0 < "$CODEX_PROTECT_PATCH"
     if command -v cargo >/dev/null 2>&1 && command -v rustfmt >/dev/null 2>&1; then
         cargo fmt -- \
             upstream/sandboxing/src/seatbelt_tests.rs \
@@ -255,7 +255,19 @@ fi
 HOME_ENV_PATCH="$SCRIPT_DIR/upstream-zerobox-home-env.patch"
 if [ -f "$HOME_ENV_PATCH" ]; then
     echo "    zerobox-home-env"
-    patch -p0 < "$HOME_ENV_PATCH" || echo "    WARNING: patch did not apply cleanly"
+    patch -p0 < "$HOME_ENV_PATCH"
+fi
+
+CA_LOCK_PATCH="$SCRIPT_DIR/upstream-ca-cert-locking.patch"
+if [ -f "$CA_LOCK_PATCH" ]; then
+    echo "    ca-cert-locking"
+    patch -p0 < "$CA_LOCK_PATCH"
+fi
+
+NODE_PROXY_PATCH="$SCRIPT_DIR/upstream-node-env-proxy.patch"
+if [ -f "$NODE_PROXY_PATCH" ]; then
+    echo "    node-env-proxy"
+    patch -p0 < "$NODE_PROXY_PATCH"
 fi
 
 cd -

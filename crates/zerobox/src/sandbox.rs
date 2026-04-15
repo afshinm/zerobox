@@ -261,7 +261,32 @@ impl Sandbox {
         Ok(status)
     }
 
-    async fn prepare(self) -> Result<PreparedCommand> {
+    /// Re-exec the current binary inside a sandbox.
+    pub fn wrap_self() -> Result<Self> {
+        let exe = std::env::current_exe().context("cannot determine current executable")?;
+        let args: Vec<String> = std::env::args().skip(1).collect();
+        let mut sb = Self::command(exe.to_string_lossy());
+        for arg in args {
+            sb = sb.arg(arg);
+        }
+        Ok(sb)
+    }
+
+    pub fn is_sandboxed() -> bool {
+        std::env::var("ZEROBOX_SANDBOXED").is_ok()
+    }
+
+    /// No-op if already sandboxed. Otherwise re-execs inside the sandbox and exits.
+    pub async fn exec_or_continue(self) -> Result<()> {
+        if Self::is_sandboxed() {
+            return Ok(());
+        }
+        let sb = self.env("ZEROBOX_SANDBOXED", "1");
+        let status = sb.status().await?;
+        std::process::exit(status.code().unwrap_or(1));
+    }
+
+    pub async fn prepare(self) -> Result<PreparedCommand> {
         init_home();
 
         let Sandbox {
@@ -322,6 +347,12 @@ impl Sandbox {
         let secret_store = Arc::new(
             secret::build_secret_store(&secrets, &secret_hosts).map_err(|e| anyhow::anyhow!(e))?,
         );
+
+        if secret_store.requires_mitm()
+            && let Some(ca_path) = secret::mitm_ca_cert_path()
+        {
+            allow_read.push(ca_path);
+        }
 
         let mut child_env = build_env(inherit_env, allow_env.as_deref(), &deny_env, &env);
         for (key, placeholder) in secret_store.get_env_overrides() {
@@ -432,6 +463,7 @@ impl Sandbox {
                 "REQUESTS_CA_BUNDLE",
                 "CARGO_HTTP_CAINFO",
                 "GIT_SSL_CAINFO",
+                "GOOSE_CA_CERT_PATH",
             ] {
                 final_env.insert(var.to_string(), ca.clone());
             }
@@ -446,10 +478,16 @@ impl Sandbox {
     }
 }
 
-struct PreparedCommand {
+pub struct PreparedCommand {
     cmd: tokio::process::Command,
     _proxy_handle: Option<zerobox_network_proxy::NetworkProxyHandle>,
     _proxy: Option<zerobox_network_proxy::NetworkProxy>,
+}
+
+impl PreparedCommand {
+    pub fn into_command(self) -> tokio::process::Command {
+        self.cmd
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -800,7 +838,7 @@ mod tests {
         build_fs_policy(&ar, &dr, &aw, &dw, fw, fa, net, Path::new("/work"))
     }
 
-    // -- filesystem policy --
+    // filesystem policy
 
     #[test]
     fn fs_default_full_read_no_write() {
@@ -899,7 +937,7 @@ mod tests {
         assert!(!pol.can_write_path_with_cwd(Path::new("/out/.git/hooks"), cwd));
     }
 
-    // -- legacy policy --
+    // legacy policy
 
     #[test]
     fn legacy_default_read_only_no_net() {
@@ -953,7 +991,7 @@ mod tests {
         ));
     }
 
-    // -- env --
+    // env
 
     #[test]
     fn env_default_filters_to_essentials() {
@@ -997,7 +1035,7 @@ mod tests {
         assert_eq!(env["NEW_VAR"], "val");
     }
 
-    // -- resolve_path --
+    // resolve_path
 
     #[test]
     fn resolve_absolute_unchanged() {
@@ -1011,7 +1049,7 @@ mod tests {
         assert_eq!(r.as_path(), Path::new("/base/child"));
     }
 
-    // -- build_secret_store (separate code path from parse_secret_flags) --
+    // build_secret_store (separate code path from parse_secret_flags)
 
     #[test]
     fn secret_store_generates_placeholders() {
@@ -1057,7 +1095,7 @@ mod tests {
         );
     }
 
-    // -- builder --
+    // builder
 
     #[test]
     fn builder_sets_all_fields() {
@@ -1120,7 +1158,7 @@ mod tests {
         assert_eq!(s.allow_net, Some(vec![]));
     }
 
-    // -- apply_profile --
+    // apply_profile
 
     fn apply_default_profile() -> (
         Vec<PathBuf>,
@@ -1209,5 +1247,33 @@ mod tests {
         assert!(deny_read.contains(&p("/my/custom/deny")));
         assert!(allow_read.len() > 1);
         assert!(deny_read.len() > 1);
+    }
+
+    // wrap_self / is_sandboxed
+
+    #[test]
+    fn wrap_self_captures_current_exe() {
+        let sb = Sandbox::wrap_self().unwrap();
+        let exe = std::env::current_exe().unwrap();
+        assert_eq!(sb.program, exe.to_string_lossy().as_ref());
+    }
+
+    #[test]
+    fn is_sandboxed_false_by_default() {
+        assert!(!Sandbox::is_sandboxed());
+    }
+
+    // PreparedCommand
+
+    #[test]
+    fn prepared_command_into_command() {
+        let cmd = tokio::process::Command::new("echo");
+        let prepared = PreparedCommand {
+            cmd,
+            _proxy_handle: None,
+            _proxy: None,
+        };
+        let cmd = prepared.into_command();
+        assert!(format!("{cmd:?}").contains("echo"));
     }
 }
