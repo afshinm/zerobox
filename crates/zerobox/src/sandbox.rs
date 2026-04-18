@@ -341,7 +341,8 @@ impl Sandbox {
         }
 
         #[cfg(unix)]
-        if !disabled
+        if use_profile
+            && !disabled
             && !full_access
             && profile_name.as_deref().is_some_and(is_claude_invocation)
             && let Some(home) = validated_home()
@@ -849,7 +850,7 @@ fn apply_claude_json_redirect(home: &Path) {
         if let Err(e) = result
             && e.kind() != std::io::ErrorKind::AlreadyExists
         {
-            eprintln!("zerobox: failed to pre-create {}: {e}", path.display());
+            eprintln!("warning: failed to pre-create {}: {e}", path.display());
         }
     };
 
@@ -861,7 +862,7 @@ fn apply_claude_json_redirect(home: &Path) {
     let redirect_target = claude_dir.join("claude.json");
 
     if let Err(e) = std::fs::create_dir_all(&claude_dir) {
-        eprintln!("zerobox: failed to create {}: {e}", claude_dir.display());
+        eprintln!("warning: failed to create {}: {e}", claude_dir.display());
         return;
     }
 
@@ -870,9 +871,19 @@ fn apply_claude_json_redirect(home: &Path) {
     }
 
     if claude_json.exists() {
+        if redirect_target.exists() {
+            eprintln!(
+                "warning: cannot redirect claude config — both {} and {} exist \
+                 with independent content. Compare the two, keep the current one, \
+                 delete the other, then re-run.",
+                claude_json.display(),
+                redirect_target.display()
+            );
+            return;
+        }
         if let Err(e) = std::fs::rename(&claude_json, &redirect_target) {
             eprintln!(
-                "zerobox: failed to move {} to {}: {e}",
+                "warning: failed to move {} to {}: {e}",
                 claude_json.display(),
                 redirect_target.display()
             );
@@ -886,7 +897,7 @@ fn apply_claude_json_redirect(home: &Path) {
         && e.kind() != std::io::ErrorKind::AlreadyExists
     {
         eprintln!(
-            "zerobox: failed to create symlink {}: {e}",
+            "warning: failed to create symlink {}: {e}",
             claude_json.display()
         );
     }
@@ -1499,5 +1510,25 @@ mod tests {
 
         assert!(tmp.path().join(".claude.json").is_symlink());
         assert_eq!(std::fs::read(&target).unwrap(), b"after-first-run");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn claude_json_redirect_bails_when_both_exist() {
+        let tmp = tempfile::tempdir().unwrap();
+        let claude_json = tmp.path().join(".claude.json");
+        let target_dir = tmp.path().join(".claude");
+        let target = target_dir.join("claude.json");
+
+        std::fs::create_dir_all(&target_dir).unwrap();
+        std::fs::write(&claude_json, b"new-contents").unwrap();
+        std::fs::write(&target, b"existing-contents").unwrap();
+
+        apply_claude_json_redirect(tmp.path());
+
+        assert!(!claude_json.is_symlink());
+        assert!(claude_json.is_file());
+        assert_eq!(std::fs::read(&claude_json).unwrap(), b"new-contents");
+        assert_eq!(std::fs::read(&target).unwrap(), b"existing-contents");
     }
 }
