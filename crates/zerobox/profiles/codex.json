@@ -3,12 +3,11 @@
   "description": "OpenAI Codex CLI agent.",
   "use": [
     "workspace",
-    "cache-macos",
-    "cache-linux",
     "codex-macos",
     "node-runtime",
     "rust-runtime",
     "python-runtime",
+    "go-runtime",
     "linux-sysfs-read",
     "nix-runtime",
     "git-config"

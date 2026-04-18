@@ -86,6 +86,7 @@ const BUILTIN_PROFILES: &[(&str, &str)] = &[
         "homebrew-linux",
         include_str!("../profiles/homebrew-linux.json"),
     ),
+    ("go-runtime", include_str!("../profiles/go-runtime.json")),
     ("nix-runtime", include_str!("../profiles/nix-runtime.json")),
     ("user-tools", include_str!("../profiles/user-tools.json")),
     ("git-config", include_str!("../profiles/git-config.json")),
@@ -374,4 +375,9 @@ pub fn load_profile(name: &str, cwd: &Path) -> Result<Profile> {
 
 pub fn builtin_profiles() -> &'static [(&'static str, &'static str)] {
     BUILTIN_PROFILES
+}
+
+/// Raw `use:` list from a profile, without resolving composition.
+pub fn load_profile_uses(name: &str) -> Option<Vec<String>> {
+    load_raw(name).ok().map(|p| p.uses)
 }

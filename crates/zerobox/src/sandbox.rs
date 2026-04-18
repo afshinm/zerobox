@@ -340,6 +340,16 @@ impl Sandbox {
             );
         }
 
+        #[cfg(unix)]
+        if use_profile
+            && !disabled
+            && !full_access
+            && profile_name.as_deref().is_some_and(is_claude_invocation)
+            && let Some(home) = validated_home()
+        {
+            apply_claude_json_redirect(&home);
+        }
+
         if !full_access {
             validate_paths(&allow_read, &deny_read, &allow_write, &deny_write, &cwd)?;
         }
@@ -768,6 +778,129 @@ fn init_home() {
         let home = crate::zerobox_home();
         let _ = std::fs::create_dir_all(&home);
     });
+}
+
+/// True if `profile_name` is `"claude"` or transitively composes it via `use:`.
+fn is_claude_invocation(profile_name: &str) -> bool {
+    is_claude_invocation_with(profile_name, crate::profile_core::load_profile_uses)
+}
+
+fn is_claude_invocation_with<F>(profile_name: &str, load_uses: F) -> bool
+where
+    F: Fn(&str) -> Option<Vec<String>>,
+{
+    let mut visited: Vec<String> = Vec::new();
+    let mut stack: Vec<String> = vec![profile_name.to_string()];
+    while let Some(name) = stack.pop() {
+        if name == "claude" {
+            return true;
+        }
+        if visited.iter().any(|v| v == &name) {
+            continue;
+        }
+        visited.push(name.clone());
+        if let Some(uses) = load_uses(&name) {
+            stack.extend(uses);
+        }
+    }
+    false
+}
+
+/// `HOME` must be an absolute path; otherwise a malicious parent could
+/// redirect filesystem operations by setting `HOME=.` or similar.
+#[cfg(unix)]
+fn validated_home() -> Option<PathBuf> {
+    validate_home_str(std::env::var("HOME").ok().as_deref())
+}
+
+#[cfg(unix)]
+fn validate_home_str(home: Option<&str>) -> Option<PathBuf> {
+    let home = home?;
+    if home.is_empty() {
+        return None;
+    }
+    let path = PathBuf::from(home);
+    if !path.is_absolute() {
+        return None;
+    }
+    Some(path)
+}
+
+/// Claude Code writes `~/.claude.json` atomically via temp files named
+/// `~/.claude.json.tmp.<pid>.<timestamp>`. Sandboxes grant access to fixed
+/// paths, not patterns, so those temp writes are denied and auth-token
+/// refresh silently breaks. Redirecting `~/.claude.json` through a symlink
+/// into `~/.claude/` makes the temp files land in a directory that's
+/// granted as a whole.
+#[cfg(unix)]
+fn apply_claude_json_redirect(home: &Path) {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let precreate = |path: &Path, is_dir: bool| {
+        let result = if is_dir {
+            std::fs::create_dir_all(path)
+        } else {
+            std::fs::OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .mode(0o600)
+                .open(path)
+                .map(|_| ())
+        };
+        if let Err(e) = result
+            && e.kind() != std::io::ErrorKind::AlreadyExists
+        {
+            eprintln!("warning: failed to pre-create {}: {e}", path.display());
+        }
+    };
+
+    precreate(&home.join(".claude.json.lock"), false);
+    precreate(&home.join(".cache/claude-cli-nodejs"), true);
+
+    let claude_json = home.join(".claude.json");
+    let claude_dir = home.join(".claude");
+    let redirect_target = claude_dir.join("claude.json");
+
+    if let Err(e) = std::fs::create_dir_all(&claude_dir) {
+        eprintln!("warning: failed to create {}: {e}", claude_dir.display());
+        return;
+    }
+
+    if claude_json.is_symlink() {
+        return;
+    }
+
+    if claude_json.exists() {
+        if redirect_target.exists() {
+            eprintln!(
+                "warning: cannot redirect claude config — both {} and {} exist \
+                 with independent content. Compare the two, keep the current one, \
+                 delete the other, then re-run.",
+                claude_json.display(),
+                redirect_target.display()
+            );
+            return;
+        }
+        if let Err(e) = std::fs::rename(&claude_json, &redirect_target) {
+            eprintln!(
+                "warning: failed to move {} to {}: {e}",
+                claude_json.display(),
+                redirect_target.display()
+            );
+            return;
+        }
+    } else {
+        precreate(&redirect_target, false);
+    }
+
+    if let Err(e) = std::os::unix::fs::symlink(".claude/claude.json", &claude_json)
+        && e.kind() != std::io::ErrorKind::AlreadyExists
+    {
+        eprintln!(
+            "warning: failed to create symlink {}: {e}",
+            claude_json.display()
+        );
+    }
 }
 
 pub(crate) fn resolve_path(base: &Path, p: &Path) -> Result<AbsolutePathBuf> {
@@ -1275,5 +1408,127 @@ mod tests {
         };
         let cmd = prepared.into_command();
         assert!(format!("{cmd:?}").contains("echo"));
+    }
+
+    // is_claude_invocation
+
+    #[test]
+    fn is_claude_invocation_matches_profile_name() {
+        assert!(is_claude_invocation("claude"));
+    }
+
+    #[test]
+    fn is_claude_invocation_rejects_other_profiles() {
+        // Mock loader so the test doesn't depend on real profile content or
+        // user-dir overrides.
+        let loader = |name: &str| -> Option<Vec<String>> {
+            match name {
+                "codex" => Some(vec!["workspace".to_string(), "codex-macos".to_string()]),
+                "claude-macos" => Some(vec![]),
+                "default" => Some(vec!["system-read-linux".to_string()]),
+                "workspace" | "codex-macos" | "system-read-linux" => Some(vec![]),
+                _ => None,
+            }
+        };
+        assert!(!is_claude_invocation_with("codex", loader));
+        assert!(!is_claude_invocation_with("claude-macos", loader));
+        assert!(!is_claude_invocation_with("default", loader));
+    }
+
+    #[test]
+    fn is_claude_invocation_follows_transitive_use() {
+        let loader = |name: &str| -> Option<Vec<String>> {
+            match name {
+                "my-claude" => Some(vec!["claude".to_string()]),
+                "nested" => Some(vec!["my-claude".to_string()]),
+                "cycle-a" => Some(vec!["cycle-b".to_string()]),
+                "cycle-b" => Some(vec!["cycle-a".to_string()]),
+                _ => None,
+            }
+        };
+        assert!(is_claude_invocation_with("my-claude", loader));
+        assert!(is_claude_invocation_with("nested", loader));
+        assert!(!is_claude_invocation_with("cycle-a", loader));
+        assert!(!is_claude_invocation_with("unknown", loader));
+    }
+
+    // validate_home_str
+
+    #[cfg(unix)]
+    #[test]
+    fn validate_home_str_requires_absolute_path() {
+        assert!(validate_home_str(None).is_none());
+        assert!(validate_home_str(Some("")).is_none());
+        assert!(validate_home_str(Some("relative/path")).is_none());
+        assert!(validate_home_str(Some(".")).is_none());
+        assert_eq!(validate_home_str(Some("/tmp")), Some(PathBuf::from("/tmp")));
+        assert_eq!(
+            validate_home_str(Some("/home/user")),
+            Some(PathBuf::from("/home/user"))
+        );
+    }
+
+    // apply_claude_json_redirect
+
+    #[cfg(unix)]
+    #[test]
+    fn claude_json_redirect_creates_symlink_when_file_absent() {
+        let tmp = tempfile::tempdir().unwrap();
+        apply_claude_json_redirect(tmp.path());
+
+        let link = tmp.path().join(".claude.json");
+        let target = tmp.path().join(".claude/claude.json");
+        assert!(link.is_symlink(), "~/.claude.json should be a symlink");
+        assert!(target.exists(), "redirect target should be pre-created");
+        assert!(tmp.path().join(".claude.json.lock").exists());
+        assert!(tmp.path().join(".cache/claude-cli-nodejs").is_dir());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn claude_json_redirect_moves_existing_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let original = tmp.path().join(".claude.json");
+        std::fs::write(&original, b"real-contents").unwrap();
+
+        apply_claude_json_redirect(tmp.path());
+
+        let target = tmp.path().join(".claude/claude.json");
+        assert!(original.is_symlink());
+        assert_eq!(std::fs::read(&target).unwrap(), b"real-contents");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn claude_json_redirect_is_idempotent() {
+        let tmp = tempfile::tempdir().unwrap();
+        apply_claude_json_redirect(tmp.path());
+        let target = tmp.path().join(".claude/claude.json");
+        std::fs::write(&target, b"after-first-run").unwrap();
+
+        apply_claude_json_redirect(tmp.path());
+
+        assert!(tmp.path().join(".claude.json").is_symlink());
+        assert_eq!(std::fs::read(&target).unwrap(), b"after-first-run");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn claude_json_redirect_bails_when_both_exist() {
+        let tmp = tempfile::tempdir().unwrap();
+        let claude_json = tmp.path().join(".claude.json");
+        let target_dir = tmp.path().join(".claude");
+        let target = target_dir.join("claude.json");
+
+        std::fs::create_dir_all(&target_dir).unwrap();
+        std::fs::write(&claude_json, b"new-contents").unwrap();
+        std::fs::write(&target, b"existing-contents").unwrap();
+
+        apply_claude_json_redirect(tmp.path());
+
+        assert!(!claude_json.is_symlink());
+        assert!(claude_json.is_file());
+        assert_eq!(std::fs::read(&claude_json).unwrap(), b"new-contents");
+        assert_eq!(std::fs::read(&target).unwrap(), b"existing-contents");
     }
 }

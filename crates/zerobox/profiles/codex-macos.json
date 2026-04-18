@@ -1,8 +1,13 @@
 {
   "$schema": "./schema.json",
-  "description": "Codex keychain access on macOS for OAuth.",
+  "description": "Codex macOS keychain and state paths.",
   "platform": "macos",
   "allow_read": [
-    "$HOME/Library/Keychains/login.keychain-db"
+    "$HOME/Library/Keychains/login.keychain-db",
+    "$HOME/Library/Keychains/metadata.keychain-db"
+  ],
+  "allow_write": [
+    "$HOME/Library/Keychains/login.keychain-db",
+    "$HOME/Library/Keychains/metadata.keychain-db"
   ]
 }

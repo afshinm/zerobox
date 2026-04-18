@@ -1,0 +1,8 @@
+{
+  "$schema": "./schema.json",
+  "description": "Go toolchain paths.",
+  "allow_read": [
+    "$HOME/go",
+    "/usr/local/go"
+  ]
+}
