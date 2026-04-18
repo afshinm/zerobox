@@ -402,6 +402,12 @@ let output = Sandbox::command("npm test")
     .run()
     .await?;
 
+// combine multiple profiles (merged left-to-right)
+let output = Sandbox::command("claude")
+    .profiles(&["claude", "git-config"])
+    .run()
+    .await?;
+
 // opt out of profiles
 let output = Sandbox::command("npm test")
     .no_profile()
@@ -478,7 +484,7 @@ try {
   await sandbox.sh`exit 1`.text();
 } catch (e) {
   if (e instanceof SandboxCommandError) {
-    console.log(e.code);   // 1
+    console.log(e.code); // 1
     console.log(e.stderr);
   }
 }
@@ -519,59 +525,59 @@ await sandbox.sh`sleep 60`.text({ signal: controller.signal });
 
 Sandbox overhead is minimal, typically ~10ms and ~7MB:
 
-| Command | Bare | Sandboxed | Overhead | Bare Mem | Sandbox Mem |
-|---------|------|-----------|----------|----------|-------------|
-| `echo hello` | <1ms | 10ms | +10ms | 1.2 MB | 8.4 MB |
-| `node -e '...'` | 10ms | 20ms | +10ms | 39.3 MB | 39.1 MB |
-| `python3 -c '...'` | 10ms | 20ms | +10ms | 12.9 MB | 13.0 MB |
-| `cat 10MB file` | <1ms | 10ms | +10ms | 1.9 MB | 8.4 MB |
-| `curl https://...` | 50ms | 60ms | +10ms | 7.2 MB | 8.4 MB |
+| Command            | Bare | Sandboxed | Overhead | Bare Mem | Sandbox Mem |
+| ------------------ | ---- | --------- | -------- | -------- | ----------- |
+| `echo hello`       | <1ms | 10ms      | +10ms    | 1.2 MB   | 8.4 MB      |
+| `node -e '...'`    | 10ms | 20ms      | +10ms    | 39.3 MB  | 39.1 MB     |
+| `python3 -c '...'` | 10ms | 20ms      | +10ms    | 12.9 MB  | 13.0 MB     |
+| `cat 10MB file`    | <1ms | 10ms      | +10ms    | 1.9 MB   | 8.4 MB      |
+| `curl https://...` | 50ms | 60ms      | +10ms    | 7.2 MB   | 8.4 MB      |
 
 <sub>Best of 10 runs with warmup on Apple M5 Pro. Run `./bench/run.sh` to reproduce.</sub>
 
 ## Platform support
 
-| Platform | Backend | Status |
-|----------|---------|--------|
-| macOS | Seatbelt (`sandbox-exec`) | Fully supported |
-| Linux | Bubblewrap + Seccomp + Namespaces | Fully supported |
-| Windows | Restricted Tokens + ACLs + Firewall | Planned |
+| Platform | Backend                             | Status          |
+| -------- | ----------------------------------- | --------------- |
+| macOS    | Seatbelt (`sandbox-exec`)           | Fully supported |
+| Linux    | Bubblewrap + Seccomp + Namespaces   | Fully supported |
+| Windows  | Restricted Tokens + ACLs + Firewall | Planned         |
 
 ## CLI reference
 
-| Flag | Example | Description |
-|------|---------|-------------|
-| `--allow-read <paths>` | `--allow-read=/tmp,/data` | Restrict readable user data to listed paths. System libraries remain accessible. Default: all reads allowed. |
-| `--deny-read <paths>` | `--deny-read=/secret` | Block reading from these paths. Takes precedence over `--allow-read`. |
-| `--allow-write [paths]` | `--allow-write=.` | Allow writing to these paths. Without a value, allows writing everywhere. Default: no writes. |
-| `--deny-write <paths>` | `--deny-write=./.git` | Block writing to these paths. Takes precedence over `--allow-write`. |
-| `--allow-net [domains]` | `--allow-net=example.com` | Allow outbound network. Without a value, allows all domains. Default: no network. |
-| `--deny-net <domains>` | `--deny-net=evil.com` | Block network to these domains. Takes precedence over `--allow-net`. |
-| `--env <KEY=VALUE>` | `--env NODE_ENV=prod` | Set env var in the sandbox. Can be repeated. |
-| `--allow-env [keys]` | `--allow-env=PATH,HOME` | Inherit parent env vars. Without a value, inherits all. Default: only PATH, HOME, USER, SHELL, TERM, LANG. |
-| `--deny-env <keys>` | `--deny-env=SECRET` | Drop these parent env vars. Takes precedence over `--allow-env`. |
-| `--secret <KEY=VALUE>` | `--secret API_KEY=sk-123` | Pass a secret. The process sees a placeholder; the real value is injected at the proxy for approved hosts. |
-| `--secret-host <KEY=HOSTS>` | `--secret-host API_KEY=api.openai.com` | Restrict a secret to specific hosts. Without this, the secret is substituted for all hosts. |
-| `-A`, `--allow-all` | `-A` | Grant all filesystem and network permissions. Env and secrets still apply. |
-| `--no-sandbox` | `--no-sandbox` | Disable the sandbox entirely. |
-| `--strict-sandbox` | `--strict-sandbox` | Require full sandbox (bubblewrap). Fail instead of falling back to weaker isolation. |
-| `--debug` | `--debug` | Print sandbox config and proxy decisions to stderr. |
-| `--snapshot` | `--snapshot` | Record filesystem changes during execution. |
-| `--restore` | `--restore` | Record and restore tracked files to pre-execution state after exit. Implies `--snapshot`. |
-| `--snapshot-path <paths>` | `--snapshot-path=./src` | Paths to track for snapshots (default: cwd). |
-| `--snapshot-exclude <patterns>` | `--snapshot-exclude=build` | Exclude patterns from snapshots. |
-| `-C <dir>` | `-C /workspace` | Set working directory for the sandboxed command. |
-| `-V`, `--version` | `--version` | Print version. |
-| `-h`, `--help` | `--help` | Print help. |
+| Flag                            | Example                                | Description                                                                                                  |
+| ------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `--allow-read <paths>`          | `--allow-read=/tmp,/data`              | Restrict readable user data to listed paths. System libraries remain accessible. Default: all reads allowed. |
+| `--deny-read <paths>`           | `--deny-read=/secret`                  | Block reading from these paths. Takes precedence over `--allow-read`.                                        |
+| `--allow-write [paths]`         | `--allow-write=.`                      | Allow writing to these paths. Without a value, allows writing everywhere. Default: no writes.                |
+| `--deny-write <paths>`          | `--deny-write=./.git`                  | Block writing to these paths. Takes precedence over `--allow-write`.                                         |
+| `--allow-net [domains]`         | `--allow-net=example.com`              | Allow outbound network. Without a value, allows all domains. Default: no network.                            |
+| `--deny-net <domains>`          | `--deny-net=evil.com`                  | Block network to these domains. Takes precedence over `--allow-net`.                                         |
+| `--env <KEY=VALUE>`             | `--env NODE_ENV=prod`                  | Set env var in the sandbox. Can be repeated.                                                                 |
+| `--allow-env [keys]`            | `--allow-env=PATH,HOME`                | Inherit parent env vars. Without a value, inherits all. Default: only PATH, HOME, USER, SHELL, TERM, LANG.   |
+| `--deny-env <keys>`             | `--deny-env=SECRET`                    | Drop these parent env vars. Takes precedence over `--allow-env`.                                             |
+| `--secret <KEY=VALUE>`          | `--secret API_KEY=sk-123`              | Pass a secret. The process sees a placeholder; the real value is injected at the proxy for approved hosts.   |
+| `--secret-host <KEY=HOSTS>`     | `--secret-host API_KEY=api.openai.com` | Restrict a secret to specific hosts. Without this, the secret is substituted for all hosts.                  |
+| `-A`, `--allow-all`             | `-A`                                   | Grant all filesystem and network permissions. Env and secrets still apply.                                   |
+| `--no-sandbox`                  | `--no-sandbox`                         | Disable the sandbox entirely.                                                                                |
+| `--strict-sandbox`              | `--strict-sandbox`                     | Require full sandbox (bubblewrap). Fail instead of falling back to weaker isolation.                         |
+| `--debug`                       | `--debug`                              | Print sandbox config and proxy decisions to stderr.                                                          |
+| `--snapshot`                    | `--snapshot`                           | Record filesystem changes during execution.                                                                  |
+| `--restore`                     | `--restore`                            | Record and restore tracked files to pre-execution state after exit. Implies `--snapshot`.                    |
+| `--snapshot-path <paths>`       | `--snapshot-path=./src`                | Paths to track for snapshots (default: cwd).                                                                 |
+| `--snapshot-exclude <patterns>` | `--snapshot-exclude=build`             | Exclude patterns from snapshots.                                                                             |
+| `-C <dir>`                      | `-C /workspace`                        | Set working directory for the sandboxed command.                                                             |
+| `-V`, `--version`               | `--version`                            | Print version.                                                                                               |
+| `-h`, `--help`                  | `--help`                               | Print help.                                                                                                  |
 
 ### Snapshot subcommands
 
-| Command | Description |
-|---------|-------------|
-| `zerobox snapshot list` | List recorded sessions. |
-| `zerobox snapshot diff <id>` | Show changes from a session. |
-| `zerobox snapshot restore <id>` | Restore filesystem to a session's baseline. |
-| `zerobox snapshot clean --older-than=<days>` | Remove old snapshot sessions. |
+| Command                                      | Description                                 |
+| -------------------------------------------- | ------------------------------------------- |
+| `zerobox snapshot list`                      | List recorded sessions.                     |
+| `zerobox snapshot diff <id>`                 | Show changes from a session.                |
+| `zerobox snapshot restore <id>`              | Restore filesystem to a session's baseline. |
+| `zerobox snapshot clean --older-than=<days>` | Remove old snapshot sessions.               |
 
 ## License
 

@@ -65,8 +65,8 @@ pub struct Cli {
     #[arg(long)]
     pub debug: bool,
 
-    #[arg(long)]
-    pub profile: Option<String>,
+    #[arg(long = "profile", value_delimiter = ',')]
+    pub profile: Vec<String>,
 
     #[arg(long)]
     pub snapshot: bool,
@@ -188,8 +188,8 @@ async fn tokio_main() -> ExitCode {
         if cli.strict_sandbox {
             sandbox = sandbox.strict();
         }
-        if let Some(ref name) = cli.profile {
-            sandbox = sandbox.profile(name);
+        if !cli.profile.is_empty() {
+            sandbox = sandbox.profiles(&cli.profile);
         }
     }
     // else: default profile loads automatically

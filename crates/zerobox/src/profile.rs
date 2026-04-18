@@ -188,6 +188,57 @@ mod tests {
     }
 
     #[test]
+    fn load_profiles_single_matches_load_profile() {
+        // claude-macos has no `use:` and a `platform` field, so it catches
+        // regressions where the single case falls into the merge loop and
+        // loses metadata.
+        let cwd = std::env::current_dir().unwrap();
+        let single = profile_core::load_profile("claude-macos", &cwd).unwrap();
+        let multi = profile_core::load_profiles(&["claude-macos"], &cwd).unwrap();
+        assert_eq!(single.allow_read, multi.allow_read);
+        assert_eq!(single.allow_write, multi.allow_write);
+        assert_eq!(single.platform, multi.platform);
+        assert_eq!(single.description, multi.description);
+        assert_eq!(single.schema, multi.schema);
+    }
+
+    #[test]
+    fn load_profiles_empty_list_returns_default() {
+        let cwd = std::env::current_dir().unwrap();
+        let empty: [&str; 0] = [];
+        let merged = profile_core::load_profiles(&empty, &cwd).unwrap();
+        assert!(merged.allow_read.is_none());
+        assert!(merged.allow_write.is_none());
+        assert!(merged.uses.is_empty());
+    }
+
+    #[test]
+    fn load_profiles_merges_left_to_right() {
+        let cwd = std::env::current_dir().unwrap();
+        let merged = profile_core::load_profiles(&["workspace", "git-config"], &cwd).unwrap();
+        let reads = merged.allow_read.as_ref().unwrap();
+        assert!(
+            reads.iter().any(|p| p.ends_with(".gitconfig")),
+            "git-config paths missing from merged profile: {reads:?}"
+        );
+        assert!(
+            reads
+                .iter()
+                .any(|p| p.starts_with("/bin") || p.starts_with("/usr")),
+            "workspace-chain system paths missing from merged profile: {reads:?}"
+        );
+    }
+
+    #[test]
+    fn load_profiles_deduplicates_repeated_names() {
+        let cwd = std::env::current_dir().unwrap();
+        let once = profile_core::load_profiles(&["workspace"], &cwd).unwrap();
+        let twice = profile_core::load_profiles(&["workspace", "workspace"], &cwd).unwrap();
+        assert_eq!(once.allow_read, twice.allow_read);
+        assert_eq!(once.allow_write, twice.allow_write);
+    }
+
+    #[test]
     fn merge_env_maps() {
         let base = Profile {
             set_env: Some(HashMap::from([
