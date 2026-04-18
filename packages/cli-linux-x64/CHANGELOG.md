@@ -1,5 +1,11 @@
 # @zerobox/cli-linux-x64
 
+## 0.2.5
+
+### Patch Changes
+
+- [`2c34a44`](https://github.com/afshinm/zerobox/commit/2c34a44b377c71a6b97c49d223b97309aef4ae03) Thanks [@afshinm](https://github.com/afshinm)! - Uprade to Codex v0.122
+
 ## 0.2.4
 
 ### Patch Changes
