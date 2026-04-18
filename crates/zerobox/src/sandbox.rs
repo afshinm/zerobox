@@ -1450,10 +1450,7 @@ mod tests {
         assert!(validate_home_str(Some("")).is_none());
         assert!(validate_home_str(Some("relative/path")).is_none());
         assert!(validate_home_str(Some(".")).is_none());
-        assert_eq!(
-            validate_home_str(Some("/tmp")),
-            Some(PathBuf::from("/tmp"))
-        );
+        assert_eq!(validate_home_str(Some("/tmp")), Some(PathBuf::from("/tmp")));
         assert_eq!(
             validate_home_str(Some("/home/user")),
             Some(PathBuf::from("/home/user"))
