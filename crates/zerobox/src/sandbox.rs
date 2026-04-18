@@ -67,7 +67,7 @@ pub struct Sandbox {
     disabled: bool,
     full_access: bool,
     strict: bool,
-    profile_name: Option<String>,
+    profile_names: Vec<String>,
     use_profile: bool,
 }
 
@@ -93,7 +93,7 @@ impl Sandbox {
             disabled: false,
             full_access: false,
             strict: false,
-            profile_name: None,
+            profile_names: Vec::new(),
             use_profile: true,
         }
     }
@@ -214,7 +214,14 @@ impl Sandbox {
     }
 
     pub fn profile(mut self, name: impl Into<String>) -> Self {
-        self.profile_name = Some(name.into());
+        self.profile_names.push(name.into());
+        self.use_profile = true;
+        self
+    }
+
+    pub fn profiles(mut self, names: &[impl AsRef<str>]) -> Self {
+        self.profile_names
+            .extend(names.iter().map(|s| s.as_ref().to_string()));
         self.use_profile = true;
         self
     }
@@ -309,7 +316,7 @@ impl Sandbox {
             mut disabled,
             mut full_access,
             strict,
-            profile_name,
+            profile_names,
             use_profile,
         } = self;
 
@@ -319,8 +326,11 @@ impl Sandbox {
         };
 
         if use_profile && !disabled && !full_access {
-            let name = profile_name.as_deref().unwrap_or("default");
-            let profile = crate::profile_core::load_profile(name, &cwd)?;
+            let profile = if profile_names.is_empty() {
+                crate::profile_core::load_profile("default", &cwd)?
+            } else {
+                crate::profile_core::load_profiles(&profile_names, &cwd)?
+            };
             apply_profile(
                 &profile,
                 &mut allow_read,
@@ -344,7 +354,7 @@ impl Sandbox {
         if use_profile
             && !disabled
             && !full_access
-            && profile_name.as_deref().is_some_and(is_claude_invocation)
+            && profile_names.iter().any(|n| is_claude_invocation(n))
             && let Some(home) = validated_home()
         {
             apply_claude_json_redirect(&home);
@@ -1270,7 +1280,7 @@ mod tests {
         assert_eq!(s.secret_hosts, vec![("KEY".into(), "api.com".into())]);
         assert!(s.disabled);
         assert!(s.full_access);
-        assert_eq!(s.profile_name, Some("workspace".to_string()));
+        assert_eq!(s.profile_names, vec!["workspace".to_string()]);
         assert!(!s.use_profile);
     }
 
@@ -1289,6 +1299,45 @@ mod tests {
     fn builder_allow_net_all_is_empty_some() {
         let s = Sandbox::command("x").allow_net_all();
         assert_eq!(s.allow_net, Some(vec![]));
+    }
+
+    #[test]
+    fn builder_profile_accumulates_across_calls() {
+        let s = Sandbox::command("x")
+            .profile("workspace")
+            .profile("git-config");
+        assert_eq!(
+            s.profile_names,
+            vec!["workspace".to_string(), "git-config".to_string()]
+        );
+        assert!(s.use_profile);
+    }
+
+    #[test]
+    fn builder_profiles_slice_extends() {
+        let s = Sandbox::command("x").profiles(&["workspace", "git-config"]);
+        assert_eq!(
+            s.profile_names,
+            vec!["workspace".to_string(), "git-config".to_string()]
+        );
+        assert!(s.use_profile);
+    }
+
+    #[test]
+    fn builder_profile_and_profiles_compose() {
+        let s = Sandbox::command("x")
+            .profile("a")
+            .profiles(&["b", "c"])
+            .profile("d");
+        assert_eq!(
+            s.profile_names,
+            vec![
+                "a".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+                "d".to_string()
+            ]
+        );
     }
 
     // apply_profile
@@ -1450,6 +1499,31 @@ mod tests {
         assert!(is_claude_invocation_with("nested", loader));
         assert!(!is_claude_invocation_with("cycle-a", loader));
         assert!(!is_claude_invocation_with("unknown", loader));
+    }
+
+    #[test]
+    fn is_claude_invocation_detected_in_multi_profile_list() {
+        // Mirrors the expression used in `prepare()` for the claude redirect
+        // gate: the redirect fires when any profile in the list resolves to
+        // claude, directly or transitively.
+        let loader = |name: &str| -> Option<Vec<String>> {
+            match name {
+                "custom-wrapper" => Some(vec!["claude".to_string()]),
+                _ => None,
+            }
+        };
+        let with_claude = ["workspace", "custom-wrapper", "git-config"];
+        let without_claude = ["workspace", "git-config"];
+        assert!(
+            with_claude
+                .iter()
+                .any(|n| is_claude_invocation_with(n, loader))
+        );
+        assert!(
+            !without_claude
+                .iter()
+                .any(|n| is_claude_invocation_with(n, loader))
+        );
     }
 
     // validate_home_str

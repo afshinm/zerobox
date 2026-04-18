@@ -367,10 +367,32 @@ pub fn resolve(name: &str, chain: &mut Vec<String>, depth: usize) -> Result<Prof
 pub fn load_profile(name: &str, cwd: &Path) -> Result<Profile> {
     let mut chain = Vec::new();
     let mut profile = resolve(name, &mut chain, 0)?;
+    expand_with_env(&mut profile, cwd);
+    Ok(profile)
+}
+
+/// Resolve a list of profile names and merge them left-to-right. Later
+/// entries override earlier ones on conflicting fields, matching the
+/// semantics of `use:` composition. Single-element input is equivalent
+/// to `load_profile`.
+pub fn load_profiles<S: AsRef<str>>(names: &[S], cwd: &Path) -> Result<Profile> {
+    if let [single] = names {
+        return load_profile(single.as_ref(), cwd);
+    }
+    let mut merged = Profile::default();
+    for name in names {
+        let mut chain = Vec::new();
+        let resolved = resolve(name.as_ref(), &mut chain, 0)?;
+        merged = merge_profiles(&merged, &resolved);
+    }
+    expand_with_env(&mut merged, cwd);
+    Ok(merged)
+}
+
+fn expand_with_env(profile: &mut Profile, cwd: &Path) {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
     let tmpdir = std::env::temp_dir();
-    expand_profile(&mut profile, &home, cwd, &tmpdir);
-    Ok(profile)
+    expand_profile(profile, &home, cwd, &tmpdir);
 }
 
 pub fn builtin_profiles() -> &'static [(&'static str, &'static str)] {

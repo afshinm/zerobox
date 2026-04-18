@@ -1,7 +1,11 @@
 /** Options for creating a Sandbox instance. Maps to zerobox CLI flags. */
 export interface SandboxOptions {
-  /** Named profile to use. Defaults to "workspace" (CWD read/write, no network). */
-  profile?: string;
+  /**
+   * Named profile(s) to use. A list is merged left-to-right; later entries
+   * override earlier ones on conflicting fields. Defaults to "workspace"
+   * (CWD read/write, no network).
+   */
+  profile?: string | string[];
   /** Restrict readable paths. System libraries remain accessible. */
   allowRead?: string[];
   /** Block reading from these paths. Takes precedence over allowRead. */

@@ -29,7 +29,15 @@ export function buildFlags(options: SandboxOptions): string[] {
   } else if (options.noSandbox) {
     flags.push("--no-sandbox");
   } else {
-    flags.push("--profile", options.profile ?? "workspace");
+    const explicit = Array.isArray(options.profile)
+      ? options.profile
+      : options.profile
+        ? [options.profile]
+        : [];
+    const profiles = explicit.length > 0 ? explicit : ["workspace"];
+    for (const p of profiles) {
+      flags.push("--profile", p);
+    }
     if (options.allowRead?.length) {
       flags.push(`--allow-read=${options.allowRead.join(",")}`);
     }

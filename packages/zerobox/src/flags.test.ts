@@ -10,6 +10,23 @@ describe("buildFlags", () => {
     expect(buildFlags({ profile: "claude" })).toEqual(["--profile", "claude"]);
   });
 
+  it("emits one --profile per entry for an array", () => {
+    expect(buildFlags({ profile: ["workspace", "git-config"] })).toEqual([
+      "--profile",
+      "workspace",
+      "--profile",
+      "git-config",
+    ]);
+  });
+
+  it("single-element array emits the same flag as a string", () => {
+    expect(buildFlags({ profile: ["claude"] })).toEqual(buildFlags({ profile: "claude" }));
+  });
+
+  it("falls back to workspace for an empty profile array", () => {
+    expect(buildFlags({ profile: [] })).toEqual(["--profile", "workspace"]);
+  });
+
   it("returns --allow-all without fs/net/profile flags", () => {
     expect(buildFlags({ allowAll: true, allowWrite: ["/tmp"] })).toEqual(["--allow-all"]);
   });
