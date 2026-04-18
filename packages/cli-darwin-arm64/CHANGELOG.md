@@ -1,5 +1,11 @@
 # @zerobox/cli-darwin-arm64
 
+## 0.2.4
+
+### Patch Changes
+
+- [`15bfae7`](https://github.com/afshinm/zerobox/commit/15bfae73239beb48fd5ad1a781626891b6236924) Thanks [@afshinm](https://github.com/afshinm)! - Multi profile support
+
 ## 0.2.3
 
 ### Patch Changes
