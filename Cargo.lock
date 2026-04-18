@@ -1620,24 +1620,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "path-absolutize"
-version = "3.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4af381fe79fa195b4909485d99f73a80792331df0625188e707854f0b3383f5"
-dependencies = [
- "path-dedot",
-]
-
-[[package]]
-name = "path-dedot"
-version = "3.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07ba0ad7e047712414213ff67533e6dd477af0a4e1d14fb52343e53d30ea9397"
-dependencies = [
- "once_cell",
-]
-
-[[package]]
 name = "pem"
 version = "3.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3895,11 +3877,14 @@ dependencies = [
 name = "zerobox-sandboxing"
 version = "0.2.3"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "dunce",
  "libc",
  "pretty_assertions",
  "serde_json",
  "tempfile",
+ "tokio",
  "tracing",
  "url",
  "which",
@@ -3932,7 +3917,7 @@ name = "zerobox-utils-absolute-path"
 version = "0.2.3"
 dependencies = [
  "dirs",
- "path-absolutize",
+ "dunce",
  "pretty_assertions",
  "schemars",
  "serde",

@@ -423,13 +423,16 @@ impl Sandbox {
             None
         };
 
+        let cwd_abs = AbsolutePathBuf::from_absolute_path(&cwd)
+            .context("working directory must be absolute")?;
+
         let manager = SandboxManager::new();
         let exec_request = manager
             .transform(SandboxTransformRequest {
                 command: SandboxCommand {
                     program: program.into(),
                     args,
-                    cwd: cwd.clone(),
+                    cwd: cwd_abs,
                     env: child_env,
                     additional_permissions: None,
                 },
@@ -440,7 +443,7 @@ impl Sandbox {
                 enforce_managed_network: proxy.is_some(),
                 network: proxy.as_ref(),
                 sandbox_policy_cwd: &cwd,
-                zerobox_linux_sandbox_exe: linux_sandbox_exe.as_ref(),
+                zerobox_linux_sandbox_exe: linux_sandbox_exe.as_deref(),
                 use_legacy_landlock,
                 windows_sandbox_level: WindowsSandboxLevel::default(),
                 windows_sandbox_private_desktop: false,

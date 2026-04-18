@@ -399,10 +399,7 @@ fn default_read_only_subpaths_for_writable_root(
     protect_missing_dot_codex: bool,
 ) -> Vec<AbsolutePathBuf> {
     let mut subpaths: Vec<AbsolutePathBuf> = Vec::new();
-    #[allow(clippy::expect_used)]
-    let top_level_git = writable_root
-        .join(".git")
-        .expect(".git is a valid relative path");
+    let top_level_git = writable_root.join(".git");
     let top_level_git_is_file = top_level_git.as_path().is_file();
     let top_level_git_is_dir = top_level_git.as_path().is_dir();
     if top_level_git_is_dir || top_level_git_is_file {
@@ -415,14 +412,12 @@ fn default_read_only_subpaths_for_writable_root(
         subpaths.push(top_level_git);
     }
 
-    #[allow(clippy::expect_used)]
-    let top_level_agents = writable_root.join(".agents").expect("valid relative path");
+    let top_level_agents = writable_root.join(".agents");
     if top_level_agents.as_path().is_dir() {
         subpaths.push(top_level_agents);
     }
 
-    #[allow(clippy::expect_used)]
-    let top_level_codex = writable_root.join(".codex").expect("valid relative path");
+    let top_level_codex = writable_root.join(".codex");
     if protect_missing_dot_codex || top_level_codex.as_path().is_dir() {
         subpaths.push(top_level_codex);
     }
@@ -482,16 +477,7 @@ fn resolve_gitdir_from_file(dot_git: &AbsolutePathBuf) -> Option<AbsolutePathBuf
             return None;
         }
     };
-    let gitdir_path = match AbsolutePathBuf::resolve_path_against_base(gitdir_raw, base) {
-        Ok(path) => path,
-        Err(err) => {
-            error!(
-                "Failed to resolve gitdir path {gitdir_raw} from {path}: {err}",
-                path = dot_git.as_path().display()
-            );
-            return None;
-        }
-    };
+    let gitdir_path = AbsolutePathBuf::resolve_path_against_base(gitdir_raw, base);
     if !gitdir_path.as_path().exists() {
         error!(
             "Resolved gitdir path {path} does not exist.",

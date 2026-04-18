@@ -144,12 +144,19 @@ pub mod error;
 
 find "$UPSTREAM_DIR/linux-sandbox/src" -name '*.rs' -exec "${SED_INPLACE[@]}" \
     -e 's/use codex_core::error::/use crate::error::/g' \
+    -e 's/use codex_protocol::error::/use crate::error::/g' \
     {} +
 
 "${SED_INPLACE[@]}" '/^codex-core = /d' "$UPSTREAM_DIR/linux-sandbox/Cargo.toml"
+"${SED_INPLACE[@]}" '/^codex-config = /d' "$UPSTREAM_DIR/linux-sandbox/Cargo.toml"
 "${SED_INPLACE[@]}" '/^clap = /a\
 thiserror = { workspace = true }
 ' "$UPSTREAM_DIR/linux-sandbox/Cargo.toml"
+
+# We don't expose protocol::error, so drop the upstream From impl that uses it.
+SANDBOXING_LIB="$UPSTREAM_DIR/sandboxing/src/lib.rs"
+"${SED_INPLACE[@]}" '/^use codex_protocol::error::CodexErr;$/d' "$SANDBOXING_LIB"
+"${SED_INPLACE[@]}" '/^impl From<SandboxTransformError> for CodexErr {$/,/^}$/d' "$SANDBOXING_LIB"
 
 # --- Patch windows-sandbox-rs (path dep -> workspace) ---
 

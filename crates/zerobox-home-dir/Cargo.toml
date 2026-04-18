@@ -12,3 +12,4 @@ workspace = true
 
 [dependencies]
 dirs = { workspace = true }
+zerobox-utils-absolute-path = { workspace = true }
