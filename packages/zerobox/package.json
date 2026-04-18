@@ -1,6 +1,6 @@
 {
   "name": "zerobox",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Sandbox any command with file, network, and credential controls.",
   "license": "Apache-2.0",
   "repository": {
