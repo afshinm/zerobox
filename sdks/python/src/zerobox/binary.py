@@ -37,7 +37,7 @@ def resolve_binary() -> str:
 
 
 def verify_binary() -> str:
-    """Resolve and probe the binary. Raises FileNotFoundError if it can't be run."""
+    """Resolve the binary and probe it. Raises FileNotFoundError if unreachable."""
     bin_path = resolve_binary()
     try:
         subprocess.run(

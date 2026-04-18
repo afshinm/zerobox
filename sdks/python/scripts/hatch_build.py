@@ -1,17 +1,5 @@
-"""Custom hatchling build hook for zerobox wheels.
-
-Pattern follows denoland/deno_pypi: env-var-driven platform selection, prebuilt
-binary copied in at wheel-build time, wheel tag set from a target map.
-
-Flow per wheel build:
-  1. Read VERSION from ../zerobox/package.json (shared with npm + cargo).
-  2. If building sdist: no-op, return.
-  3. Read ZEROBOX_WHEEL_TARGET (e.g. "aarch64-apple-darwin") to pick a tag.
-  4. Locate the prebuilt binary at ZEROBOX_ARTIFACTS_DIR/<target>/zerobox.
-  5. Set build_data["tag"] so pip picks the right wheel for the installing host.
-  6. Set build_data["shared_scripts"] so `pip install zerobox` drops the binary
-     straight into the venv's bin/ (same as `pip install deno`).
-"""
+"""Hatchling build hook: stamps each wheel with the right platform tag and
+bundles the prebuilt zerobox binary as a shared_script. Pattern from deno_pypi."""
 
 from __future__ import annotations
 

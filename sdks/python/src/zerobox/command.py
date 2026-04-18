@@ -10,7 +10,7 @@ from .options import CommandOutput
 
 
 class ShellCommand:
-    """Returned by Sandbox.sh / .py / .exec. Chain .text() / .json() / .output()."""
+    """A pending command. Terminate with `.text()`, `.json()`, or `.output()`."""
 
     def __init__(self, bin_path: str, flags: list[str], cmd: str, args: list[str]) -> None:
         self._bin = bin_path
@@ -34,16 +34,16 @@ class ShellCommand:
         )
 
     def text(self, *, timeout: Union[float, None] = None) -> str:
-        """Run and return stdout. Raises SandboxCommandError on non-zero exit."""
+        """stdout on success; raises SandboxCommandError on non-zero exit."""
         result = self._run(timeout=timeout)
         if result.code != 0:
             raise SandboxCommandError(result)
         return result.stdout
 
     def json(self, *, timeout: Union[float, None] = None) -> Any:
-        """Run and parse stdout as JSON. Raises SandboxCommandError on non-zero exit."""
+        """Parsed stdout on success; raises SandboxCommandError on non-zero exit."""
         return json.loads(self.text(timeout=timeout))
 
     def output(self, *, timeout: Union[float, None] = None) -> CommandOutput:
-        """Run and return raw output. Does NOT raise on non-zero exit."""
+        """Raw `{code, stdout, stderr}`. Never raises on non-zero exit."""
         return self._run(timeout=timeout)

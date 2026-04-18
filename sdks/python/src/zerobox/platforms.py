@@ -121,10 +121,7 @@ def detect_musl(env: Union[PlatformEnv, None] = None) -> bool:
 
 
 def platform_package(env: Union[PlatformEnv, None] = None) -> Union[str, None]:
-    """Return the platform-tagged package name for the current system, or None.
-
-    Diagnostic only — wheels handle actual platform selection at install time.
-    """
+    """Platform label for the current system, or None. Diagnostic only."""
     e = env or PlatformEnv()
     key = f"{e.platform}-{e.arch}"
     if e.platform == "linux" and detect_musl(e):

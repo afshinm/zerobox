@@ -28,10 +28,7 @@ def _profile_list(profile: Union[str, list[str], None]) -> list[str]:
 
 
 def build_flags(options: Union[SandboxOptions, dict[str, Any], None]) -> list[str]:
-    """Convert SandboxOptions into the CLI flag list passed to the zerobox binary.
-
-    Port of packages/zerobox/src/flags.ts:buildFlags. Must stay byte-compatible.
-    """
+    """Convert SandboxOptions → CLI flags. Byte-compatible with TS `buildFlags`."""
     o = normalize_options(options)
     flags: list[str] = []
     secret_hosts: list[str] = []
