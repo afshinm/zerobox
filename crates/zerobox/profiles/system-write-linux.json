@@ -1,9 +1,18 @@
 {
   "$schema": "./schema.json",
-  "description": "Linux temp write paths.",
+  "description": "Linux temp and device write paths.",
   "platform": "linux",
   "allow_write": [
     "/tmp",
-    "$TMPDIR"
+    "$TMPDIR",
+    "/dev/null",
+    "/dev/zero",
+    "/dev/full",
+    "/dev/tty",
+    "/dev/stdout",
+    "/dev/stderr",
+    "/dev/fd",
+    "/dev/pts",
+    "/proc/self/fd"
   ]
 }

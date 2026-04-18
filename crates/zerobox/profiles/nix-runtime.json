@@ -7,6 +7,7 @@
     "$HOME/.nix-defexpr",
     "/run/current-system/sw",
     "/etc/profiles/per-user",
-    "/nix/var/nix/profiles"
+    "/nix/var/nix/profiles",
+    "/nix/store"
   ]
 }

@@ -3,20 +3,16 @@
   "description": "OpenClaw messaging gateway.",
   "use": [
     "default",
-    "cache-macos",
-    "cache-linux",
     "node-runtime"
   ],
   "allow_read": [
     "$CWD",
     "$HOME/.openclaw",
-    "$HOME/.config/openclaw",
-    "$HOME/.local"
+    "$HOME/.config/openclaw"
   ],
   "allow_write": [
     "$HOME/.openclaw",
-    "$HOME/.config/openclaw",
-    "$HOME/.local"
+    "$HOME/.config/openclaw"
   ],
   "allow_net": [],
   "allow_env": [

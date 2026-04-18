@@ -1,8 +1,14 @@
 {
   "$schema": "./schema.json",
-  "description": "Claude keychain access on macOS for OAuth.",
+  "description": "Claude macOS keychain and state paths.",
   "platform": "macos",
   "allow_read": [
-    "$HOME/Library/Keychains/login.keychain-db"
+    "$HOME/Library/Keychains/login.keychain-db",
+    "$HOME/Library/Keychains/metadata.keychain-db",
+    "$HOME/.local/share/claude"
+  ],
+  "allow_write": [
+    "$HOME/Library/Keychains/login.keychain-db",
+    "$HOME/Library/Keychains/metadata.keychain-db"
   ]
 }

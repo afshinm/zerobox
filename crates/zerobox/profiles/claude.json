@@ -10,6 +10,7 @@
     "node-runtime",
     "rust-runtime",
     "python-runtime",
+    "go-runtime",
     "linux-sysfs-read",
     "nix-runtime",
     "git-config"
