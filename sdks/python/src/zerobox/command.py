@@ -25,7 +25,7 @@ class ShellCommand:
                 timeout=timeout,
                 check=False,
             )
-        except FileNotFoundError as e:
+        except (FileNotFoundError, PermissionError) as e:
             raise _not_found_error(self._bin) from e
         return CommandOutput(
             code=result.returncode,

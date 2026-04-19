@@ -9,7 +9,8 @@ from pathlib import Path
 
 def _not_found_error(bin_path: str) -> FileNotFoundError:
     return FileNotFoundError(
-        f'zerobox binary not found at "{bin_path}". Run "pip install zerobox" or set ZEROBOX_BIN.'
+        f'zerobox binary at "{bin_path}" not found or not executable. '
+        'Run "pip install zerobox" or set ZEROBOX_BIN.'
     )
 
 
@@ -46,7 +47,7 @@ def verify_binary() -> str:
             check=False,
             timeout=5,
         )
-    except FileNotFoundError as e:
+    except (FileNotFoundError, PermissionError) as e:
         raise _not_found_error(bin_path) from e
     except subprocess.TimeoutExpired:
         pass
