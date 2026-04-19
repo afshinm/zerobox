@@ -1,0 +1,101 @@
+[project]
+name = "zerobox"
+dynamic = ["version"]
+description = "Sandbox any command with file, network, and credential controls."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Afshin Mehrabani", email = "afshin.meh@gmail.com" }]
+keywords = [
+    "security",
+    "sandbox",
+    "mcp",
+    "vault",
+    "secret-management",
+    "ai-agents",
+    "security-tools",
+    "process-isolation",
+    "cli",
+    "credential-injection",
+    "llm",
+    "code-execution",
+    "network-filtering",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Systems Administration",
+]
+
+[project.urls]
+homepage = "https://github.com/afshinm/zerobox"
+repository = "https://github.com/afshinm/zerobox"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "code"
+path = "scripts/hatch_build.py"
+expression = "VERSION"
+
+[tool.hatch.build]
+artifacts = ["scripts/hatch_build.py"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zerobox"]
+
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "scripts/hatch_build.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/zerobox",
+    "scripts/hatch_build.py",
+    "scripts/build.sh",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+# UP007 / UP045: prefer X | Y syntax. We keep typing.Union for 3.9 compat at
+# runtime (isinstance checks rely on concrete tuples; annotation-only sites use
+# the modern syntax via __future__ import). Disabling keeps one style everywhere.
+ignore = ["E501", "UP007", "UP045"]
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
+warn_unused_ignores = true
+disallow_any_generics = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"

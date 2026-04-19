@@ -195,10 +195,62 @@ jobs:
           ZEROBOX_BIN: ${{ github.workspace }}/target/release/zerobox
         run: pnpm --filter zerobox run test
 
+  sdk-py:
+    name: SDK Python (${{ matrix.os }})
+    needs: sync
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+          - os: ubuntu-latest
+            system-deps: libcap-dev
+            enable-userns: true
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: upstream
+          path: upstream/
+      - name: Install system deps
+        if: matrix.system-deps
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.system-deps }}
+      - name: Enable unprivileged user namespaces (required by bubblewrap)
+        if: matrix.enable-userns
+        run: |
+          sudo sysctl -w kernel.unprivileged_userns_clone=1
+          if sudo sysctl -a 2>/dev/null | grep -q '^kernel.apparmor_restrict_unprivileged_userns'; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install 3.9 3.12
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build zerobox binary
+        run: cargo build --release -p zerobox
+      - name: Lint + type-check + test (3.9)
+        working-directory: sdks/python
+        env:
+          ZEROBOX_BIN: ${{ github.workspace }}/target/release/zerobox
+        run: |
+          uv sync --python 3.9
+          uv run ruff check src tests
+          uv run ruff format --check src tests
+          uv run mypy src
+          uv run pytest
+      - name: Test (3.12)
+        working-directory: sdks/python
+        env:
+          ZEROBOX_BIN: ${{ github.workspace }}/target/release/zerobox
+        run: |
+          uv sync --python 3.12
+          uv run pytest
+
   ci:
     name: CI
     if: always()
-    needs: [deny, fmt, clippy, test-macos, test-linux, sdk]
+    needs: [deny, fmt, clippy, test-macos, test-linux, sdk, sdk-py]
     runs-on: ubuntu-latest
     steps:
       - name: Check results

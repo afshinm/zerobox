@@ -333,3 +333,32 @@ jobs:
           done
       - name: Publish main package
         run: pnpm publish packages/zerobox --access public --no-git-checks
+
+  # ── Publish to PyPI ──
+  publish-pypi:
+    name: Publish PyPI
+    needs: [build, github-release]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/zerobox
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install 3.12
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          path: artifacts/
+          merge-multiple: true
+      - name: Extract binaries to per-target dirs
+        run: ./scripts/prepare-python-wheels.sh artifacts/ sdks/python/artifacts/
+      - name: Build wheels (1 sdist + 6 wheels)
+        working-directory: sdks/python
+        run: ./scripts/build.sh artifacts/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: sdks/python/dist/
