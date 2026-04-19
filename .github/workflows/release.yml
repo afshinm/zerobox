@@ -339,6 +339,9 @@ jobs:
     name: Publish PyPI
     needs: [build, github-release]
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/zerobox
     permissions:
       contents: read
       id-token: write

@@ -1,13 +1,21 @@
 """Port of packages/zerobox/src/platforms.test.ts.
 
 The TS tests use JS arch names ("x64", "arm64"). We use Python conventions
-("x86_64", "arm64") so package names differ: "zerobox-linux-x86_64" instead of
-"@zerobox/cli-linux-x64". Semantics are identical.
+("x86_64", "arm64") so package names differ. We emit "zerobox-linux-x86_64"
+instead of "@zerobox/cli-linux-x64". Semantics are identical.
 """
 
 from __future__ import annotations
 
+import sys
+
 from zerobox.platforms import PlatformEnv, detect_musl, platform_package
+
+
+def test_default_platform_uses_sys_platform():
+    # Guards against regressing to platform.system().lower(), which returns
+    # "windows" on Windows. No other test exercises the default factory.
+    assert PlatformEnv().platform == sys.platform
 
 
 def make_env(**overrides) -> PlatformEnv:
@@ -21,9 +29,6 @@ def make_env(**overrides) -> PlatformEnv:
     }
     defaults.update(overrides)
     return PlatformEnv(**defaults)
-
-
-# ── detect_musl ──
 
 
 def test_non_linux_returns_false():
@@ -101,9 +106,6 @@ def test_glibc_version_takes_priority_over_ldd_musl():
     assert detect_musl(env) is False
 
 
-# ── platform_package ──
-
-
 def test_darwin_arm64():
     assert platform_package(make_env(platform="darwin", arch="arm64")) == "zerobox-darwin-arm64"
 
@@ -135,6 +137,6 @@ def test_unsupported_arch_returns_none():
     assert platform_package(make_env(platform="darwin", arch="s390x")) is None
 
 
-def test_falls_back_to_glibc_when_musl_unavailable_for_arch():
+def test_musl_detected_but_arch_unsupported_returns_none():
     env = make_env(arch="s390x", linker_exists=lambda _: True)
     assert platform_package(env) is None

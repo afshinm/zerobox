@@ -1,8 +1,8 @@
-"""Platform detection — diagnostic only.
+"""Platform detection, diagnostic only.
 
-Wheel tags pick the right binary at `pip install` time, so nothing in the runtime
-path needs this. Kept for parity with the TypeScript SDK and as a debugging aid
-(`python -m zerobox.platforms`).
+Wheel tags pick the right binary at `pip install` time, so nothing in the
+runtime path needs this. Kept for parity with the TypeScript SDK and as a
+debugging aid (`python -m zerobox.platforms`).
 
 Port of packages/zerobox/src/platforms.ts.
 """
@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import platform as _platform
 import subprocess
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Union
@@ -80,7 +81,10 @@ def _default_os_release() -> Union[str, None]:
 class PlatformEnv:
     """Dependencies for detection, injectable for testing."""
 
-    platform: str = field(default_factory=lambda: _platform.system().lower())
+    # sys.platform returns "linux" / "darwin" / "win32", matching the TS
+    # SDK's process.platform. platform.system().lower() would produce
+    # "windows" instead of "win32".
+    platform: str = field(default_factory=lambda: sys.platform)
     arch: str = field(default_factory=lambda: _normalize_arch(_platform.machine()))
     linker_exists: Callable[[str], bool] = field(default=_default_linker_exists)
     libc_version: Callable[[], Union[str, None]] = field(default=_default_libc_version)
@@ -91,10 +95,10 @@ class PlatformEnv:
 def detect_musl(env: Union[PlatformEnv, None] = None) -> bool:
     """Detect whether the current Linux system uses musl libc.
 
-    Four-tier ladder (fastest + most reliable first):
+    Four-tier ladder, fastest and most reliable first.
       1. musl dynamic linker file on disk.
-      2. `platform.libc_ver()` reports a glibc version → not musl.
-      3. `ldd --version` output contains "musl" / "gnu".
+      2. `platform.libc_ver()` reports a glibc version, so not musl.
+      3. `ldd` output contains "musl" or "gnu".
       4. /etc/os-release mentions Alpine.
     """
     e = env or PlatformEnv()

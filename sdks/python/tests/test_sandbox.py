@@ -50,9 +50,6 @@ def cleanup_path():
         _rm(path)
 
 
-# ── sh: text / output / json ──
-
-
 def test_sh_text_returns_stdout():
     assert Sandbox.create().sh("echo hello").text().strip() == "hello"
 
@@ -80,14 +77,11 @@ def test_sh_output_captures_stdout_and_stderr():
     assert result.stderr.strip() == "err"
 
 
-# ── py ──
-
-
-def test_py_runs_inline_python():
+def test_exec_python3_runs_inline_code():
     assert Sandbox.create().exec(SYS_PYTHON, ["-c", "print(1 + 1)"]).text().strip() == "2"
 
 
-def test_py_json_parses_output():
+def test_exec_python3_json_parses_output():
     data = (
         Sandbox.create()
         .exec(
@@ -99,14 +93,31 @@ def test_py_json_parses_output():
     assert data["sum"] == 3
 
 
-# ── exec ──
+@pytest.fixture(scope="module")
+def _sandbox_py_available():
+    # Probe whether `python3` on PATH can run inside the sandbox.
+    probe = Sandbox.create().py("pass").output()
+    if probe.code != 0:
+        pytest.skip(f"python3 unavailable inside sandbox: {probe.stderr.strip()[:200]}")
+
+
+def test_sandbox_py_runs_inline_code(_sandbox_py_available):
+    assert Sandbox.create().py("print(1 + 1)").text().strip() == "2"
+
+
+def test_sandbox_py_json_parses_output(_sandbox_py_available):
+    data = Sandbox.create().py("import json; print(json.dumps({'sum': 1 + 2}))").json()
+    assert data["sum"] == 3
+
+
+def test_sandbox_py_raises_on_non_zero(_sandbox_py_available):
+    with pytest.raises(SandboxCommandError) as exc:
+        Sandbox.create().py("import sys; sys.exit(7)").text()
+    assert exc.value.code == 7
 
 
 def test_exec_runs_with_args():
     assert Sandbox.create().exec("echo", ["hello"]).text().strip() == "hello"
-
-
-# ── workspace CWD ──
 
 
 def test_workspace_can_read_cwd():
@@ -120,9 +131,6 @@ def test_workspace_can_write_to_cwd(cleanup_path):
     Sandbox.create().sh(f"echo ok > {name}").output()
     assert Path(name).exists()
     assert Path(name).read_text().strip() == "ok"
-
-
-# ── write enforcement ──
 
 
 def test_blocks_writes_outside_allowed_paths():
@@ -174,9 +182,6 @@ def test_deny_write_overrides_allow_write(cleanup_path, tmp_path):
     assert not Path(workdir, ".git", "evil").exists()
     assert "git:blocked" in output
     assert "git:ok" not in output
-
-
-# ── network enforcement ──
 
 
 def test_network_blocked_by_default():
@@ -236,16 +241,10 @@ def test_allow_net_blocks_unlisted():
     assert result.stdout.strip() != "200"
 
 
-# ── cancellation ──
-
-
 def test_timeout_kills_long_running_child():
     sandbox = Sandbox.create()
     with pytest.raises(subprocess.TimeoutExpired):
         sandbox.sh("sleep 10").text(timeout=0.5)
-
-
-# ── allow-all ──
 
 
 def test_allow_all_enables_everything(cleanup_path):
@@ -253,9 +252,6 @@ def test_allow_all_enables_everything(cleanup_path):
     Sandbox.create({"allow_all": True}).sh(f"echo ok > {target}").output()
     assert Path(target).exists()
     assert Path(target).read_text().strip() == "ok"
-
-
-# ── env vars ──
 
 
 def test_default_env_excludes_custom_parent_vars():
@@ -308,9 +304,6 @@ def test_deny_env_does_not_block_explicit():
 def test_env_value_with_equals_sign():
     sandbox = Sandbox.create({"env": {"DATA": "a=b=c"}})
     assert sandbox.sh("echo $DATA").text().strip() == "a=b=c"
-
-
-# ── secrets ──
 
 
 def test_secret_env_has_placeholder_not_real_value():
@@ -369,15 +362,9 @@ def test_env_and_secrets_together():
     assert sandbox.sh("echo $MY_SECRET").text().strip().startswith("ZEROBOX_SECRET_")
 
 
-# ── profile composition ──
-
-
 def test_multi_profile_merges():
     sandbox = Sandbox.create({"profile": ["workspace"]})
     assert sandbox.sh("ls .").output().code == 0
-
-
-# ── context manager ──
 
 
 def test_context_manager():

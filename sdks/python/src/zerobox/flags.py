@@ -6,13 +6,11 @@ from .options import SandboxOptions, normalize_options
 
 
 def _add_csv(flags: list[str], name: str, values: Union[list[str], None]) -> None:
-    """Emit `--name=v1,v2,...` if values is non-empty. No-op otherwise."""
     if values:
         flags.append(f"--{name}={','.join(values)}")
 
 
 def _add_allow(flags: list[str], name: str, value: Union[bool, list[str], None]) -> None:
-    """Emit `--name` (True), `--name=v1,v2` (list), or nothing."""
     if value is True:
         flags.append(f"--{name}")
     elif isinstance(value, list):
@@ -58,9 +56,9 @@ def build_flags(options: Union[SandboxOptions, dict[str, Any], None]) -> list[st
         _add_csv(flags, "allow-write", o.allow_write)
         _add_csv(flags, "deny-write", o.deny_write)
 
-        # Secret hosts auto-enable network for their domains. Merge into
-        # allow_net if it's already a list; leave True alone; don't force
-        # emission when user didn't set it (the CLI handles --secret-host).
+        # Secret hosts implicitly allow network for their domains. When
+        # allow_net is already a list, append the hosts. When True, leave
+        # alone. When unset, let the CLI gate network via secret-host.
         allow_net = o.allow_net
         if secret_hosts and isinstance(allow_net, list):
             allow_net = [*allow_net, *secret_hosts]

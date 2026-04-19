@@ -174,8 +174,10 @@ describe("platformPackage", () => {
     expect(platformPackage(makeEnv({ platform: "darwin", arch: "s390x" }))).toBeUndefined();
   });
 
-  it("falls back to glibc when musl package unavailable for arch", () => {
-    // s390x has no musl variant, should fall back to glibc (also undefined for s390x)
+  it("returns undefined when musl is detected but arch is unsupported", () => {
+    // Exercises the musl → glibc fallback (`MUSL_PLATFORMS[key] ?? GLIBC_PLATFORMS[key]`).
+    // With today's dicts the fallback can never produce a value because no linux
+    // arch is glibc-only, but this guards the branch if they ever diverge.
     expect(
       platformPackage(
         makeEnv({

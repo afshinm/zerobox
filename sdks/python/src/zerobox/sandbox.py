@@ -27,6 +27,11 @@ class Sandbox:
         return ShellCommand(self._bin, self._flags, "sh", ["-c", command])
 
     def py(self, code: str) -> ShellCommand:
+        """Run `python3 -c <code>` using whichever `python3` is on PATH
+        inside the sandbox. If that interpreter lives outside the readable
+        roots (e.g. uv-managed Pythons), fall back to
+        `.exec(sys.executable, ["-c", code])` with `allow_read=[sys.prefix]`.
+        """
         return ShellCommand(self._bin, self._flags, "python3", ["-c", code])
 
     def exec(self, cmd: str, args: Union[list[str], None] = None) -> ShellCommand:

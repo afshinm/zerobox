@@ -1,4 +1,4 @@
-"""Hatchling build hook: stamps each wheel with the right platform tag and
+"""Hatchling build hook. Stamps each wheel with the right platform tag and
 bundles the prebuilt zerobox binary as a shared_script. Pattern from deno_pypi."""
 
 from __future__ import annotations
@@ -50,8 +50,9 @@ class ZeroboxBuildHook(BuildHookInterface):
     PLUGIN_NAME = "custom"
 
     def initialize(self, version: str, build_data: dict) -> None:
-        # Editable installs (uv sync, pip install -e .) skip binary bundling —
-        # developers use ZEROBOX_BIN or a local cargo build.
+        # `version` is hatchling's wheel variant ("standard" or "editable"),
+        # not our semver. Skip sdist and editable installs; only standard
+        # wheels need the prebuilt binary bundled in.
         if self.target_name != "wheel" or version == "editable":
             return
 

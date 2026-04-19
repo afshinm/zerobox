@@ -17,12 +17,14 @@ def _not_found_error(bin_path: str) -> FileNotFoundError:
 def resolve_binary() -> str:
     """Resolve the path to the zerobox binary.
 
-    Order:
+    Order.
       1. ZEROBOX_BIN env var (explicit override).
-      2. sysconfig scripts dir — where `pip install zerobox` put the binary via
-         the wheel's shared_scripts entry. Works even when bin/ isn't on PATH.
-      3. `shutil.which("zerobox")` — PATH lookup.
-      4. Literal "zerobox" — final fallback; subprocess will raise if unresolved.
+      2. sysconfig scripts dir, where `pip install zerobox` puts the binary
+         via the wheel's shared_scripts entry. Works even when bin/ isn't on
+         PATH.
+      3. `shutil.which("zerobox")` as a PATH lookup.
+      4. Literal "zerobox" as a final fallback; subprocess will raise if
+         unresolved.
     """
     override = os.environ.get("ZEROBOX_BIN")
     if override:
