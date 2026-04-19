@@ -1,5 +1,11 @@
 # @zerobox/cli-darwin-arm64
 
+## 0.2.6
+
+### Patch Changes
+
+- [`e645c27`](https://github.com/afshinm/zerobox/commit/e645c27b97f9a60c4e099c3d36d727628f83297c) Thanks [@afshinm](https://github.com/afshinm)! - Python SDK
+
 ## 0.2.5
 
 ### Patch Changes

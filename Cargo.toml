@@ -18,7 +18,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.2.5"
+version = "0.2.6"
 edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/afshinm/zerobox"
@@ -28,18 +28,18 @@ keywords = ["security", "sandbox", "secret-management", "ai-agents", "process-is
 categories = ["command-line-utilities", "os"]
 
 [workspace.dependencies]
-zerobox-linux-sandbox = { version = "=0.2.5", path = "upstream/linux-sandbox" }
-zerobox-process-hardening = { version = "=0.2.5", path = "upstream/process-hardening" }
-zerobox-protocol = { version = "=0.2.5", path = "crates/zerobox-protocol" }
-zerobox-sandboxing = { version = "=0.2.5", path = "upstream/sandboxing" }
-zerobox-windows-sandbox = { version = "=0.2.5", path = "upstream/windows-sandbox-rs" }
-zerobox-utils-absolute-path = { version = "=0.2.5", path = "upstream/utils/absolute-path" }
-zerobox-utils-pty = { version = "=0.2.5", path = "upstream/utils/pty" }
-zerobox-utils-string = { version = "=0.2.5", path = "upstream/utils/string" }
-zerobox-utils-home-dir = { version = "=0.2.5", path = "crates/zerobox-home-dir" }
-zerobox-network-proxy = { version = "=0.2.5", path = "upstream/network-proxy" }
-zerobox-snapshot = { version = "=0.2.5", path = "crates/zerobox-snapshot" }
-zerobox-utils-rustls-provider = { version = "=0.2.5", path = "upstream/utils/rustls-provider" }
+zerobox-linux-sandbox = { version = "=0.2.6", path = "upstream/linux-sandbox" }
+zerobox-process-hardening = { version = "=0.2.6", path = "upstream/process-hardening" }
+zerobox-protocol = { version = "=0.2.6", path = "crates/zerobox-protocol" }
+zerobox-sandboxing = { version = "=0.2.6", path = "upstream/sandboxing" }
+zerobox-windows-sandbox = { version = "=0.2.6", path = "upstream/windows-sandbox-rs" }
+zerobox-utils-absolute-path = { version = "=0.2.6", path = "upstream/utils/absolute-path" }
+zerobox-utils-pty = { version = "=0.2.6", path = "upstream/utils/pty" }
+zerobox-utils-string = { version = "=0.2.6", path = "upstream/utils/string" }
+zerobox-utils-home-dir = { version = "=0.2.6", path = "crates/zerobox-home-dir" }
+zerobox-network-proxy = { version = "=0.2.6", path = "upstream/network-proxy" }
+zerobox-snapshot = { version = "=0.2.6", path = "crates/zerobox-snapshot" }
+zerobox-utils-rustls-provider = { version = "=0.2.6", path = "upstream/utils/rustls-provider" }
 
 anyhow = "1"
 async-trait = "0.1.89"

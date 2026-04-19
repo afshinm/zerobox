@@ -1,6 +1,6 @@
 {
   "name": "@zerobox/cli-darwin-arm64",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "zerobox binary for darwin arm64",
   "license": "Apache-2.0",
   "repository": {
