@@ -3771,7 +3771,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3798,7 +3798,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox-linux-sandbox"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "cc",
  "clap",
@@ -3820,7 +3820,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox-network-proxy"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3851,7 +3851,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox-process-hardening"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "libc",
  "pretty_assertions",
@@ -3859,7 +3859,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox-protocol"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "pretty_assertions",
  "schemars",
@@ -3875,7 +3875,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox-sandboxing"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3895,7 +3895,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox-snapshot"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "anyhow",
  "blake3",
@@ -3914,7 +3914,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox-utils-absolute-path"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "dirs",
  "dunce",
@@ -3928,14 +3928,15 @@ dependencies = [
 
 [[package]]
 name = "zerobox-utils-home-dir"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "dirs",
+ "zerobox-utils-absolute-path",
 ]
 
 [[package]]
 name = "zerobox-utils-pty"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "anyhow",
  "filedescriptor",
@@ -3951,14 +3952,14 @@ dependencies = [
 
 [[package]]
 name = "zerobox-utils-rustls-provider"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "rustls",
 ]
 
 [[package]]
 name = "zerobox-utils-string"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "pretty_assertions",
  "regex-lite",
@@ -3966,7 +3967,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox-windows-sandbox"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "anyhow",
  "base64",
