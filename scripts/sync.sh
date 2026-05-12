@@ -81,6 +81,11 @@ done
 if [ -d "$SRC/vendor" ]; then
     echo "    vendor/"
     cp -r "$SRC/vendor" "$UPSTREAM_DIR/vendor"
+
+    # Keep bubblewrap inside the linux-sandbox crate too so the published
+    # zerobox-linux-sandbox tarball includes the vendored sources docs.rs needs.
+    mkdir -p "$UPSTREAM_DIR/linux-sandbox/vendor"
+    cp -r "$UPSTREAM_DIR/vendor/bubblewrap" "$UPSTREAM_DIR/linux-sandbox/vendor/"
 fi
 
 # --- Inline error types into linux-sandbox (replace codex-core dep) ---
@@ -204,6 +209,8 @@ find "$UPSTREAM_DIR" \( -name '*.rs' -o -name '*.toml' \) \
 
 find "$UPSTREAM_DIR" -name '*.rs' -exec "${SED_INPLACE[@]}" \
     -e 's/CODEX_LINUX_SANDBOX_ARG0/ZEROBOX_LINUX_SANDBOX_ARG0/g' \
+    -e 's|codex-rs/vendor/bubblewrap|zerobox-linux-sandbox/vendor/bubblewrap|g' \
+    -e 's|\.\./vendor/bubblewrap|vendor/bubblewrap|g' \
     {} +
 
 # Add workspace metadata inheritance for crates.io publishing.
