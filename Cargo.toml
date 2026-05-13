@@ -14,6 +14,7 @@ members = [
     "crates/zerobox",
     "crates/zerobox-snapshot",
     "crates/zerobox-protocol",
+    "crates/zerobox-otel",
 ]
 resolver = "2"
 
@@ -29,6 +30,7 @@ categories = ["command-line-utilities", "os"]
 
 [workspace.dependencies]
 zerobox-linux-sandbox = { version = "=0.2.6", path = "upstream/linux-sandbox" }
+zerobox-otel = { version = "=0.2.6", path = "crates/zerobox-otel" }
 zerobox-process-hardening = { version = "=0.2.6", path = "upstream/process-hardening" }
 zerobox-protocol = { version = "=0.2.6", path = "crates/zerobox-protocol" }
 zerobox-sandboxing = { version = "=0.2.6", path = "upstream/sandboxing" }
@@ -48,6 +50,7 @@ chrono = "0.4.43"
 clap = "4"
 dirs = "6"
 dunce = "1.0.4"
+glob = "0.3"
 globset = "0.4"
 landlock = "0.4.4"
 lazy_static = "1"
@@ -63,6 +66,7 @@ seccompiler = "0.5.0"
 serde = "1"
 serde_json = "1"
 sha1 = "0.10.6"
+sha2 = "0.10"
 strum = "0.27.2"
 strum_macros = "0.28.0"
 tempfile = "3.23.0"

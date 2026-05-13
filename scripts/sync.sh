@@ -120,6 +120,9 @@ pub enum CodexErr {
     #[error("unsupported operation: {0}")]
     UnsupportedOperation(String),
 
+    #[error("Fatal error: {0}")]
+    Fatal(String),
+
     #[error(transparent)]
     Io(#[from] io::Error),
 
@@ -145,6 +148,8 @@ pub mod error;
 find "$UPSTREAM_DIR/linux-sandbox/src" -name '*.rs' -exec "${SED_INPLACE[@]}" \
     -e 's/use codex_core::error::/use crate::error::/g' \
     -e 's/use codex_protocol::error::/use crate::error::/g' \
+    -e 's/codex_core::error::/crate::error::/g' \
+    -e 's/codex_protocol::error::/crate::error::/g' \
     {} +
 
 "${SED_INPLACE[@]}" '/^codex-core = /d' "$UPSTREAM_DIR/linux-sandbox/Cargo.toml"
@@ -175,6 +180,7 @@ echo "==> Renaming codex-* → zerobox-*..."
 RENAME_PAIRS=(
     "codex-linux-sandbox:zerobox-linux-sandbox"
     "codex-network-proxy:zerobox-network-proxy"
+    "codex-otel:zerobox-otel"
     "codex-process-hardening:zerobox-process-hardening"
     "codex-protocol:zerobox-protocol"
     "codex-sandboxing:zerobox-sandboxing"

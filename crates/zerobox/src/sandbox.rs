@@ -6,10 +6,12 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use tokio::process::Child;
 use zerobox_protocol::config_types::WindowsSandboxLevel;
+use zerobox_protocol::models::PermissionProfile;
 use zerobox_protocol::permissions::{
     FileSystemAccessMode, FileSystemPath, FileSystemSandboxEntry, FileSystemSandboxPolicy,
     FileSystemSpecialPath, NetworkSandboxPolicy,
 };
+#[cfg(test)]
 use zerobox_protocol::protocol::SandboxPolicy;
 use zerobox_sandboxing::{
     SandboxCommand, SandboxManager, SandboxTransformRequest, SandboxType, get_platform_sandbox,
@@ -401,8 +403,6 @@ impl Sandbox {
         } else {
             NetworkSandboxPolicy::Restricted
         };
-        let legacy_policy =
-            build_legacy_policy(&allow_write, full_access, full_write, net_enabled, &cwd);
 
         zerobox_utils_rustls_provider::ensure_rustls_crypto_provider();
         let deny_slice = if deny_net.is_empty() {
@@ -426,6 +426,7 @@ impl Sandbox {
         let cwd_abs = AbsolutePathBuf::from_absolute_path(&cwd)
             .context("working directory must be absolute")?;
 
+        let permissions = PermissionProfile::from_runtime_permissions(&fs_policy, net_policy);
         let manager = SandboxManager::new();
         let exec_request = manager
             .transform(SandboxTransformRequest {
@@ -436,9 +437,7 @@ impl Sandbox {
                     env: child_env,
                     additional_permissions: None,
                 },
-                policy: &legacy_policy,
-                file_system_policy: &fs_policy,
-                network_policy: net_policy,
+                permissions: &permissions,
                 sandbox: sandbox_type,
                 enforce_managed_network: proxy.is_some(),
                 network: proxy.as_ref(),
@@ -617,6 +616,7 @@ fn build_fs_policy(
     FileSystemSandboxPolicy::restricted(entries)
 }
 
+#[cfg(test)]
 fn build_legacy_policy(
     allow_write: &[PathBuf],
     full_access: bool,
@@ -634,14 +634,12 @@ fn build_legacy_policy(
             .collect();
         SandboxPolicy::WorkspaceWrite {
             writable_roots,
-            read_only_access: Default::default(),
             network_access: net_enabled,
             exclude_tmpdir_env_var: false,
             exclude_slash_tmp: false,
         }
     } else {
         SandboxPolicy::ReadOnly {
-            access: Default::default(),
             network_access: net_enabled,
         }
     }

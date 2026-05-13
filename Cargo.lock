@@ -921,6 +921,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "glob"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
+
+[[package]]
 name = "globset"
 version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1646,12 +1652,6 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
-
-[[package]]
-name = "pkg-config"
-version = "0.3.32"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 
 [[package]]
 name = "plain"
@@ -3771,7 +3771,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3798,21 +3798,22 @@ dependencies = [
 
 [[package]]
 name = "zerobox-linux-sandbox"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
- "cc",
  "clap",
+ "globset",
  "landlock",
  "libc",
- "pkg-config",
  "pretty_assertions",
  "seccompiler",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "url",
+ "zerobox-process-hardening",
  "zerobox-protocol",
  "zerobox-sandboxing",
  "zerobox-utils-absolute-path",
@@ -3820,7 +3821,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox-network-proxy"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3850,8 +3851,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "zerobox-otel"
+version = "0.2.6"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "zerobox-process-hardening"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "libc",
  "pretty_assertions",
@@ -3859,8 +3867,9 @@ dependencies = [
 
 [[package]]
 name = "zerobox-protocol"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
+ "globset",
  "pretty_assertions",
  "schemars",
  "serde",
@@ -3875,13 +3884,14 @@ dependencies = [
 
 [[package]]
 name = "zerobox-sandboxing"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "anyhow",
  "async-trait",
  "dunce",
  "libc",
  "pretty_assertions",
+ "regex-lite",
  "serde_json",
  "tempfile",
  "tokio",
@@ -3895,7 +3905,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox-snapshot"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "anyhow",
  "blake3",
@@ -3914,7 +3924,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox-utils-absolute-path"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "dirs",
  "dunce",
@@ -3928,7 +3938,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox-utils-home-dir"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "dirs",
  "zerobox-utils-absolute-path",
@@ -3936,7 +3946,7 @@ dependencies = [
 
 [[package]]
 name = "zerobox-utils-pty"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "anyhow",
  "filedescriptor",
@@ -3952,28 +3962,31 @@ dependencies = [
 
 [[package]]
 name = "zerobox-utils-rustls-provider"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "rustls",
 ]
 
 [[package]]
 name = "zerobox-utils-string"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "pretty_assertions",
  "regex-lite",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
 name = "zerobox-windows-sandbox"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "anyhow",
  "base64",
  "chrono",
  "dirs-next",
  "dunce",
+ "glob",
  "pretty_assertions",
  "rand 0.8.5",
  "serde",
@@ -3983,6 +3996,7 @@ dependencies = [
  "windows",
  "windows-sys 0.52.0",
  "winres",
+ "zerobox-otel",
  "zerobox-protocol",
  "zerobox-utils-absolute-path",
  "zerobox-utils-pty",
