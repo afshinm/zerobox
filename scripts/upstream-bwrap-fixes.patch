@@ -1,0 +1,39 @@
+--- upstream/linux-sandbox/src/bwrap.rs
++++ upstream/linux-sandbox/src/bwrap.rs
+@@ -474,6 +474,20 @@
+             );
+         }
+ 
++        // Skip subpaths covered by another entry. `--ro-bind` is
++        // recursive, so the extra bind is redundant, and a subpath
++        // symlink like /etc/os-release can resolve into a path whose
++        // prefix is not yet bound, making bwrap fail with ENOENT.
++        let readable_roots: BTreeSet<PathBuf> = readable_roots
++            .iter()
++            .filter(|path| {
++                !readable_roots.iter().any(|parent| {
++                    parent.as_path() != path.as_path() && path.starts_with(parent)
++                })
++            })
++            .cloned()
++            .collect();
++
+         // A restricted policy can still explicitly request `/`, which is
+         // the broad read baseline. Explicit unreadable carveouts are
+         // re-applied later.
+@@ -1072,10 +1086,11 @@
+ }
+ 
+ fn append_empty_file_bind_data_args(bwrap_args: &mut BwrapArgs, path: &Path) -> Result<()> {
+-    if bwrap_args.preserved_files.is_empty() {
+-        bwrap_args.preserved_files.push(File::open("/dev/null")?);
+-    }
+-    let null_fd = bwrap_args.preserved_files[0].as_raw_fd().to_string();
++    // Each `--ro-bind-data` consumes its fd when `--perms` precedes it,
++    // so a shared /dev/null handle would EBADF on the second call.
++    let null_file = File::open("/dev/null")?;
++    let null_fd = null_file.as_raw_fd().to_string();
++    bwrap_args.preserved_files.push(null_file);
+     bwrap_args.args.push("--ro-bind-data".to_string());
+     bwrap_args.args.push(null_fd);
+     bwrap_args.args.push(path_to_string(path));

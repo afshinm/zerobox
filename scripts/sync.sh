@@ -277,6 +277,12 @@ if [ -f "$NODE_PROXY_PATCH" ]; then
     patch -p0 < "$NODE_PROXY_PATCH"
 fi
 
+BWRAP_FIXES_PATCH="$SCRIPT_DIR/upstream-bwrap-fixes.patch"
+if [ -f "$BWRAP_FIXES_PATCH" ]; then
+    echo "    bwrap-fixes"
+    patch -p0 < "$BWRAP_FIXES_PATCH"
+fi
+
 cd -
 
 {
