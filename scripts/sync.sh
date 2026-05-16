@@ -277,6 +277,12 @@ if [ -f "$NODE_PROXY_PATCH" ]; then
     patch -p0 < "$NODE_PROXY_PATCH"
 fi
 
+PROXY_ZOMBIE_PATCH="$SCRIPT_DIR/upstream-proxy-zombie-cleanup.patch"
+if [ -f "$PROXY_ZOMBIE_PATCH" ]; then
+    echo "    proxy-zombie-cleanup"
+    patch -p0 < "$PROXY_ZOMBIE_PATCH"
+fi
+
 BWRAP_FIXES_PATCH="$SCRIPT_DIR/upstream-bwrap-fixes.patch"
 if [ -f "$BWRAP_FIXES_PATCH" ]; then
     echo "    bwrap-fixes"
