@@ -1,5 +1,11 @@
 # @zerobox/cli-linux-x64
 
+## 0.3.1
+
+### Patch Changes
+
+- [`d800f72`](https://github.com/afshinm/zerobox/commit/d800f727b92e3987bd5711910ba429e3ca7e02f7) Thanks [@afshinm](https://github.com/afshinm)! - Fix Cargo release pipeline
+
 ## 0.3.0
 
 ### Minor Changes
