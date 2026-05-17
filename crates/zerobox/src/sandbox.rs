@@ -408,6 +408,12 @@ impl Sandbox {
             select_sandbox_type(strict)?
         };
 
+        let linux_sandbox_exe: Option<PathBuf> = if cfg!(target_os = "linux") {
+            linux_sandbox_exe.or_else(|| std::env::current_exe().ok())
+        } else {
+            None
+        };
+
         let fs_policy = build_fs_policy(
             &allow_read,
             &deny_read,
@@ -418,6 +424,8 @@ impl Sandbox {
             net_enabled,
             &cwd,
         );
+        let fs_policy = with_linux_helper_read_root(fs_policy, linux_sandbox_exe.as_deref(), &cwd);
+
         let net_policy = if net_enabled {
             NetworkSandboxPolicy::Enabled
         } else {
@@ -435,12 +443,6 @@ impl Sandbox {
         let _proxy_handle = match proxy {
             Some(ref p) => Some(p.run().await.context("failed to start network proxy")?),
             None => None,
-        };
-
-        let linux_sandbox_exe: Option<PathBuf> = if cfg!(target_os = "linux") {
-            linux_sandbox_exe.or_else(|| std::env::current_exe().ok())
-        } else {
-            None
         };
 
         let cwd_abs = AbsolutePathBuf::from_absolute_path(&cwd)
@@ -634,6 +636,21 @@ fn build_fs_policy(
     }
 
     FileSystemSandboxPolicy::restricted(entries)
+}
+
+fn with_linux_helper_read_root(
+    fs_policy: FileSystemSandboxPolicy,
+    linux_sandbox_exe: Option<&Path>,
+    cwd: &Path,
+) -> FileSystemSandboxPolicy {
+    let Some(helper_parent) = linux_sandbox_exe.and_then(Path::parent) else {
+        return fs_policy;
+    };
+    let Ok(helper_root) = resolve_path(cwd, helper_parent) else {
+        return fs_policy;
+    };
+
+    fs_policy.with_additional_readable_roots(cwd, &[helper_root])
 }
 
 #[cfg(test)]
@@ -1099,6 +1116,54 @@ mod tests {
         assert!(pol.can_read_path_with_cwd(Path::new("/other"), cwd));
         assert!(pol.can_write_path_with_cwd(Path::new("/out/file"), cwd));
         assert!(!pol.can_write_path_with_cwd(Path::new("/out/.git/hooks"), cwd));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_helper_read_root_is_added_to_restricted_policy() {
+        let cwd = Path::new("/work");
+        let pol = fs(&["/usr/bin"], &[], &[], &[], false, false, false);
+        let helper = Path::new("/home/me/.zerobox/tmp/arg0/zerobox-arg0abc/zerobox-linux-sandbox");
+
+        let pol = with_linux_helper_read_root(pol, Some(helper), cwd);
+
+        assert!(pol.can_read_path_with_cwd(helper, cwd));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_helper_read_root_resolves_relative_helper_against_cwd() {
+        let cwd = Path::new("/work");
+        let pol = fs(&["/usr/bin"], &[], &[], &[], false, false, false);
+        let helper = Path::new(".zerobox/tmp/arg0/zerobox-arg0abc/zerobox-linux-sandbox");
+
+        let pol = with_linux_helper_read_root(pol, Some(helper), cwd);
+
+        assert!(pol.can_read_path_with_cwd(
+            Path::new("/work/.zerobox/tmp/arg0/zerobox-arg0abc/zerobox-linux-sandbox"),
+            cwd
+        ));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_helper_read_root_does_not_duplicate_existing_read_root() {
+        let cwd = Path::new("/work");
+        let pol = fs(
+            &["/home/me/.zerobox/tmp/arg0"],
+            &[],
+            &[],
+            &[],
+            false,
+            false,
+            false,
+        );
+        let helper = Path::new("/home/me/.zerobox/tmp/arg0/zerobox-arg0abc/zerobox-linux-sandbox");
+        let before = pol.entries.len();
+
+        let pol = with_linux_helper_read_root(pol, Some(helper), cwd);
+
+        assert_eq!(pol.entries.len(), before);
     }
 
     // legacy policy
