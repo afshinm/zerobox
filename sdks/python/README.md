@@ -65,6 +65,33 @@ result = sandbox.sh("exit 42").output()
 # CommandOutput(code=42, stdout='', stderr='')
 ```
 
+## Async API
+
+Use `AsyncSandbox` in async applications so waiting for the sandboxed subprocess
+does not block the event loop. The command shape is the same as `Sandbox`, but
+creation and terminators are awaited.
+
+```python
+from zerobox import AsyncSandbox
+
+sandbox = await AsyncSandbox.create({"allow_write": ["/tmp"]})
+
+text = await sandbox.sh("echo hello").text()
+data = await sandbox.sh("printf '{\"ok\": true}'").json()
+result = await sandbox.exec("python3", ["-c", "print('hi')"]).output()
+```
+
+Async commands accept the same `timeout` option:
+
+```python
+import subprocess
+
+try:
+    await sandbox.sh("sleep 60").text(timeout=1.0)
+except subprocess.TimeoutExpired:
+    print("cancelled")
+```
+
 ## Error handling
 
 Non-zero exit raises `SandboxCommandError`:

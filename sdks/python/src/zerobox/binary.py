@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import os
 import shutil
 import subprocess
@@ -12,6 +14,11 @@ def _not_found_error(bin_path: str) -> FileNotFoundError:
         f'zerobox binary at "{bin_path}" not found or not executable. '
         'Run "pip install zerobox" or set ZEROBOX_BIN.'
     )
+
+
+def _kill_process(proc: asyncio.subprocess.Process) -> None:
+    with contextlib.suppress(ProcessLookupError):
+        proc.kill()
 
 
 def resolve_binary() -> str:
@@ -53,4 +60,32 @@ def verify_binary() -> str:
         raise _not_found_error(bin_path) from e
     except subprocess.TimeoutExpired:
         pass
+    return bin_path
+
+
+async def async_verify_binary() -> str:
+    """Async version of `verify_binary`.
+
+    This avoids blocking the current event loop when async applications create a
+    sandbox.
+    """
+    bin_path = resolve_binary()
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            bin_path,
+            "--help",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=5)
+        except asyncio.CancelledError:
+            _kill_process(proc)
+            await proc.wait()
+            raise
+        except asyncio.TimeoutError:
+            _kill_process(proc)
+            await proc.wait()
+    except (FileNotFoundError, PermissionError) as e:
+        raise _not_found_error(bin_path) from e
     return bin_path
