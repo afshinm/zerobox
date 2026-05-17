@@ -1,5 +1,11 @@
 # zerobox
 
+## 0.3.2
+
+### Patch Changes
+
+- [`5c419c9`](https://github.com/afshinm/zerobox/commit/5c419c9d8153b6873e3120551ab62c4db0ec1a9f) Thanks [@afshinm](https://github.com/afshinm)! - Fix separate bwrap entrypoint
+
 ## 0.3.1
 
 ### Patch Changes
