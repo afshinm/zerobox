@@ -3,11 +3,20 @@ from __future__ import annotations
 import asyncio
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
 
-from zerobox import AsyncSandbox, SandboxCommandError
+from zerobox import AsyncSandbox, Sandbox, SandboxCommandError
+
+
+def _write_marker_after(marker: Path, seconds: float) -> str:
+    return (
+        "import pathlib, time; "
+        f"time.sleep({seconds}); "
+        f"pathlib.Path({str(marker)!r}).write_text('done')"
+    )
 
 
 @pytest.fixture
@@ -28,16 +37,6 @@ def fake_zerobox(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> str:
         "    raise SystemExit(2)\n"
         "\n"
         "cmd = sys.argv[sep + 1:]\n"
-        "if cmd[:2] == ['__fake__', 'sleep']:\n"
-        "    import time\n"
-        "    time.sleep(float(cmd[2]))\n"
-        "    raise SystemExit(0)\n"
-        "if cmd[:2] == ['__fake__', 'write-after']:\n"
-        "    import pathlib\n"
-        "    import time\n"
-        "    time.sleep(float(cmd[2]))\n"
-        "    pathlib.Path(cmd[3]).write_text('done')\n"
-        "    raise SystemExit(0)\n"
         "result = subprocess.run(cmd, check=False)\n"
         "raise SystemExit(result.returncode)\n"
     )
@@ -96,16 +95,31 @@ def test_async_exec_captures_stdout_and_stderr(fake_zerobox: str) -> None:
     asyncio.run(run())
 
 
-def test_async_timeout_kills_long_running_child(fake_zerobox: str, tmp_path: Path) -> None:
+def test_async_timeout_kills_command_spawned_by_wrapper(fake_zerobox: str, tmp_path: Path) -> None:
     async def run() -> None:
         sandbox = await AsyncSandbox.create()
-        marker = tmp_path / "timeout-marker"
+        marker = tmp_path / "timeout-child-marker"
         with pytest.raises(subprocess.TimeoutExpired):
-            await sandbox.exec("__fake__", ["write-after", "0.4", str(marker)]).text(timeout=0.1)
+            await sandbox.exec(
+                sys.executable,
+                ["-c", _write_marker_after(marker, 0.4)],
+            ).text(timeout=0.1)
         await asyncio.sleep(0.5)
         assert not marker.exists()
 
     asyncio.run(run())
+
+
+def test_sync_timeout_kills_command_spawned_by_wrapper(fake_zerobox: str, tmp_path: Path) -> None:
+    sandbox = Sandbox.create()
+    marker = tmp_path / "sync-timeout-child-marker"
+    with pytest.raises(subprocess.TimeoutExpired):
+        sandbox.exec(
+            sys.executable,
+            ["-c", _write_marker_after(marker, 0.4)],
+        ).text(timeout=0.1)
+    time.sleep(0.5)
+    assert not marker.exists()
 
 
 def test_async_timeout_preserves_partial_output(fake_zerobox: str) -> None:
@@ -122,12 +136,28 @@ def test_async_timeout_preserves_partial_output(fake_zerobox: str) -> None:
     asyncio.run(run())
 
 
-def test_async_cancellation_kills_long_running_child(fake_zerobox: str, tmp_path: Path) -> None:
+def test_sync_timeout_preserves_partial_output(fake_zerobox: str) -> None:
+    sandbox = Sandbox.create()
+    with pytest.raises(subprocess.TimeoutExpired) as exc:
+        sandbox.exec(
+            sys.executable,
+            ["-c", "import sys, time; print('before'); sys.stdout.flush(); time.sleep(10)"],
+        ).text(timeout=0.1)
+    assert exc.value.output is not None
+    assert b"before" in exc.value.output
+
+
+def test_async_cancellation_kills_command_spawned_by_wrapper(
+    fake_zerobox: str, tmp_path: Path
+) -> None:
     async def run() -> None:
         sandbox = await AsyncSandbox.create()
-        marker = tmp_path / "cancel-marker"
+        marker = tmp_path / "cancel-child-marker"
         task = asyncio.create_task(
-            sandbox.exec("__fake__", ["write-after", "0.4", str(marker)]).text()
+            sandbox.exec(
+                sys.executable,
+                ["-c", _write_marker_after(marker, 0.4)],
+            ).text()
         )
         await asyncio.sleep(0.1)
         task.cancel()

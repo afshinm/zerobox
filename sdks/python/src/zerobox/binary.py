@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import os
 import shutil
 import subprocess
 import sysconfig
 from pathlib import Path
+
+from ._process import kill_process
 
 
 def _not_found_error(bin_path: str) -> FileNotFoundError:
@@ -14,11 +15,6 @@ def _not_found_error(bin_path: str) -> FileNotFoundError:
         f'zerobox binary at "{bin_path}" not found or not executable. '
         'Run "pip install zerobox" or set ZEROBOX_BIN.'
     )
-
-
-def _kill_process(proc: asyncio.subprocess.Process) -> None:
-    with contextlib.suppress(ProcessLookupError):
-        proc.kill()
 
 
 def resolve_binary() -> str:
@@ -80,11 +76,11 @@ async def async_verify_binary() -> str:
         try:
             await asyncio.wait_for(proc.wait(), timeout=5)
         except asyncio.CancelledError:
-            _kill_process(proc)
+            kill_process(proc)
             await proc.wait()
             raise
         except asyncio.TimeoutError:
-            _kill_process(proc)
+            kill_process(proc)
             await proc.wait()
     except (FileNotFoundError, PermissionError) as e:
         raise _not_found_error(bin_path) from e
