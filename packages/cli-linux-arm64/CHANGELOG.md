@@ -1,5 +1,11 @@
 # @zerobox/cli-linux-arm64
 
+## 0.3.0
+
+### Minor Changes
+
+- [`6382483`](https://github.com/afshinm/zerobox/commit/638248370d389ddf707c9ce4d24dff9dfedf6f90) Thanks [@afshinm](https://github.com/afshinm)! - Upgrade Codex to 0.130.0 + Python AsyncSandbox
+
 ## 0.2.6
 
 ### Patch Changes

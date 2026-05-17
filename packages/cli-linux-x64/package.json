@@ -1,6 +1,6 @@
 {
   "name": "@zerobox/cli-linux-x64",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "description": "zerobox binary for Linux x64 (glibc)",
   "license": "Apache-2.0",
   "repository": {
