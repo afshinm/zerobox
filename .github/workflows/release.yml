@@ -279,6 +279,7 @@ jobs:
             zerobox-utils-pty \
             zerobox-utils-rustls-provider \
             zerobox-utils-home-dir \
+            zerobox-otel \
             zerobox-process-hardening \
             zerobox-snapshot \
             zerobox-protocol \
