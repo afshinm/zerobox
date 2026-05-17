@@ -10,6 +10,8 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 use zerobox::Sandbox;
+#[cfg(target_os = "linux")]
+use zerobox::arg0;
 
 #[derive(Parser, Debug)]
 #[command(name = "zerobox", version, about, long_about = None)]
@@ -134,30 +136,50 @@ fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
 
 fn main() -> ExitCode {
     #[cfg(target_os = "linux")]
-    if invoked_as_linux_sandbox_helper() {
-        zerobox_linux_sandbox::run_main();
-    }
+    arg0::dispatch_linux_sandbox_helper();
 
-    tokio_main()
+    let cli = Cli::parse();
+
+    #[cfg(target_os = "linux")]
+    let arg0_guard = prepare_arg0_aliases(&cli);
+    #[cfg(target_os = "linux")]
+    let linux_sandbox_exe = arg0_guard
+        .as_ref()
+        .map(|guard| guard.zerobox_linux_sandbox_exe().to_path_buf());
+
+    #[cfg(not(target_os = "linux"))]
+    let linux_sandbox_exe = None;
+
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            eprintln!("error: failed to start async runtime: {e}");
+            return ExitCode::from(1);
+        }
+    };
+
+    runtime.block_on(tokio_main(cli, linux_sandbox_exe))
 }
 
 #[cfg(target_os = "linux")]
-fn invoked_as_linux_sandbox_helper() -> bool {
-    use zerobox_sandboxing::landlock::ZEROBOX_LINUX_SANDBOX_ARG0;
+fn prepare_arg0_aliases(cli: &Cli) -> Option<arg0::Arg0PathEntryGuard> {
+    if cli.subcommand.is_some() || cli.command.is_empty() || cli.no_sandbox || cli.allow_all {
+        return None;
+    }
 
-    let Some(argv0) = std::env::args_os().next() else {
-        return false;
-    };
-
-    std::path::Path::new(&argv0)
-        .file_name()
-        .is_some_and(|name| name == std::ffi::OsStr::new(ZEROBOX_LINUX_SANDBOX_ARG0))
+    match arg0::prepend_path_entry_for_zerobox_aliases() {
+        Ok(guard) => Some(guard),
+        Err(e) => {
+            eprintln!("warning: proceeding without Linux sandbox helper alias: {e}");
+            None
+        }
+    }
 }
 
-#[tokio::main]
-async fn tokio_main() -> ExitCode {
-    let cli = Cli::parse();
-
+async fn tokio_main(cli: Cli, linux_sandbox_exe: Option<PathBuf>) -> ExitCode {
     if let Some(CliSubcommand::Snapshot { action }) = &cli.subcommand {
         return snapshot::handle_subcommand(action);
     }
@@ -180,7 +202,9 @@ async fn tokio_main() -> ExitCode {
         debug::init_tracing();
     }
 
-    let mut sandbox = Sandbox::command(&cli.command[0]).args(&cli.command[1..]);
+    let mut sandbox = Sandbox::command(&cli.command[0])
+        .args(&cli.command[1..])
+        .linux_sandbox_exe_opt(linux_sandbox_exe);
 
     if let Some(ref cwd) = cli.cwd {
         sandbox = sandbox.cwd(cwd);

@@ -23,6 +23,8 @@
 //! The crate also ships the `zerobox` CLI. See the package README for the CLI
 //! flag reference, profile behavior, and platform notes.
 
+#[cfg(target_os = "linux")]
+pub mod arg0;
 pub mod profile_core;
 pub mod proxy;
 mod sandbox;
