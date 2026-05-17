@@ -226,6 +226,38 @@ pub struct ReadDenyMatcher {
 }
 
 impl ReadDenyMatcher {
+    /// Fallible constructor for callers that need to reject malformed deny
+    /// glob patterns before using the matcher.
+    pub fn try_new(
+        file_system_sandbox_policy: &FileSystemSandboxPolicy,
+        cwd: &Path,
+    ) -> Result<Option<Self>, String> {
+        if !file_system_sandbox_policy.has_denied_read_restrictions() {
+            return Ok(None);
+        }
+
+        let denied_candidates = file_system_sandbox_policy
+            .get_unreadable_roots_with_cwd(cwd)
+            .into_iter()
+            .map(|path| normalized_and_canonical_candidates(path.as_path()))
+            .collect();
+
+        let deny_read_matchers = file_system_sandbox_policy
+            .get_unreadable_globs_with_cwd(cwd)
+            .into_iter()
+            .map(|pattern| {
+                build_glob_matcher_result(&pattern)
+                    .map_err(|err| format!("invalid deny-read glob pattern {pattern:?}: {err}"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(Some(Self {
+            denied_candidates,
+            deny_read_matchers,
+            invalid_pattern: false,
+        }))
+    }
+
     /// Builds a matcher from exact deny-read roots and deny-read glob entries.
     ///
     /// Returns `None` when the policy has no deny-read restrictions, so callers
@@ -1292,13 +1324,16 @@ fn push_unique(candidates: &mut Vec<PathBuf>, candidate: PathBuf) {
 }
 
 fn build_glob_matcher(pattern: &str) -> Option<GlobMatcher> {
+    build_glob_matcher_result(pattern).ok()
+}
+
+fn build_glob_matcher_result(pattern: &str) -> Result<GlobMatcher, globset::Error> {
     // Keep `*` and `?` within a single path component and preserve an unclosed
     // `[` as a literal so matcher behavior stays aligned with config parsing.
     GlobBuilder::new(pattern)
         .literal_separator(true)
         .allow_unclosed_class(true)
         .build()
-        .ok()
         .map(|glob| glob.compile_matcher())
 }
 
