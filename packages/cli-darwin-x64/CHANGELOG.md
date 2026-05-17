@@ -1,5 +1,11 @@
 # @zerobox/cli-darwin-x64
 
+## 0.3.3
+
+### Patch Changes
+
+- [`2038276`](https://github.com/afshinm/zerobox/commit/2038276c4ba2be708dc20818d95d00a9c57b577f) Thanks [@afshinm](https://github.com/afshinm)! - Add the bwrap entrypoint to default policies
+
 ## 0.3.2
 
 ### Patch Changes
