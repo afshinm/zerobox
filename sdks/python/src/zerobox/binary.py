@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import shutil
 import subprocess
 import sysconfig
 from pathlib import Path
+
+from ._process import kill_process
 
 
 def _not_found_error(bin_path: str) -> FileNotFoundError:
@@ -53,4 +56,32 @@ def verify_binary() -> str:
         raise _not_found_error(bin_path) from e
     except subprocess.TimeoutExpired:
         pass
+    return bin_path
+
+
+async def async_verify_binary() -> str:
+    """Async version of `verify_binary`.
+
+    This avoids blocking the current event loop when async applications create a
+    sandbox.
+    """
+    bin_path = resolve_binary()
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            bin_path,
+            "--help",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=5)
+        except asyncio.CancelledError:
+            kill_process(proc)
+            await proc.wait()
+            raise
+        except asyncio.TimeoutError:
+            kill_process(proc)
+            await proc.wait()
+    except (FileNotFoundError, PermissionError) as e:
+        raise _not_found_error(bin_path) from e
     return bin_path
