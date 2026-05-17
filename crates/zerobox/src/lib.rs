@@ -1,3 +1,28 @@
+//! Rust SDK for running commands with zerobox sandbox policies.
+//!
+//! [`Sandbox`] is a builder for a command plus the filesystem, network,
+//! environment, profile, and secret rules that should apply to it.
+//!
+//! # Example
+//!
+//! ```no_run
+//! # async fn example() -> anyhow::Result<()> {
+//! use zerobox::Sandbox;
+//!
+//! let output = Sandbox::command("echo")
+//!     .arg("hello")
+//!     .allow_write("/tmp")
+//!     .run()
+//!     .await?;
+//!
+//! assert!(output.status.success());
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! The crate also ships the `zerobox` CLI. See the package README for the CLI
+//! flag reference, profile behavior, and platform notes.
+
 pub mod profile_core;
 pub mod proxy;
 mod sandbox;

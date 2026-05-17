@@ -220,6 +220,34 @@ repository.workspace = true\
 homepage.workspace = true
 ' {} +
 
+set_docs_url() {
+    local manifest="$1"
+    local url="$2"
+    if [ -f "$manifest" ]; then
+        "${SED_INPLACE[@]}" "/^homepage.workspace = true/a\\
+documentation = \"$url\"
+" "$manifest"
+    fi
+}
+
+# Crates.io only auto-links docs.rs after a successful docs.rs build. Keep the
+# links explicit so each published crate has a stable Documentation URL.
+set_docs_url "$UPSTREAM_DIR/linux-sandbox/Cargo.toml" "https://docs.rs/zerobox-linux-sandbox"
+set_docs_url "$UPSTREAM_DIR/network-proxy/Cargo.toml" "https://docs.rs/zerobox-network-proxy"
+set_docs_url "$UPSTREAM_DIR/process-hardening/Cargo.toml" "https://docs.rs/zerobox-process-hardening"
+set_docs_url "$UPSTREAM_DIR/sandboxing/Cargo.toml" "https://docs.rs/zerobox-sandboxing"
+set_docs_url "$UPSTREAM_DIR/windows-sandbox-rs/Cargo.toml" "https://docs.rs/zerobox-windows-sandbox"
+set_docs_url "$UPSTREAM_DIR/utils/absolute-path/Cargo.toml" "https://docs.rs/zerobox-utils-absolute-path"
+set_docs_url "$UPSTREAM_DIR/utils/pty/Cargo.toml" "https://docs.rs/zerobox-utils-pty"
+set_docs_url "$UPSTREAM_DIR/utils/rustls-provider/Cargo.toml" "https://docs.rs/zerobox-utils-rustls-provider"
+set_docs_url "$UPSTREAM_DIR/utils/string/Cargo.toml" "https://docs.rs/zerobox-utils-string"
+
+cat >> "$UPSTREAM_DIR/linux-sandbox/Cargo.toml" <<'TOML'
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+TOML
+
 # --- Apply patches ---
 
 echo "==> Applying patches..."

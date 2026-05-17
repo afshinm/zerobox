@@ -6,6 +6,7 @@ license.workspace = true
 description = "Filesystem snapshot and restore for zerobox sandboxes"
 repository.workspace = true
 homepage.workspace = true
+documentation = "https://docs.rs/zerobox-snapshot"
 
 [dependencies]
 anyhow = { workspace = true }
