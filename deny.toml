@@ -6,7 +6,14 @@ db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "warn"
 ignore = [
-    "RUSTSEC-2026-0097", # rand 0.8 unsound with custom logger + thread_rng reseeding; windows-sandbox-rs transitive dep
+    # hickory-proto 0.25.2 advisories. Pinned by rama-dns 0.3.0-alpha.4 ->
+    # rama-tcp -> rama-http-backend/rama-socks5 -> zerobox-network-proxy. The
+    # zerobox proxy uses hickory for DNS resolution; risk is bounded to DoS-via-
+    # malicious-upstream-DNS-response (unbounded NSEC3 loop) and CPU exhaustion
+    # during name compression. Remove both entries once rama bumps hickory to
+    # >=0.26.1.
+    "RUSTSEC-2026-0118", # NSEC3 closest-encloser proof validation unbounded loop
+    "RUSTSEC-2026-0119", # O(n^2) name compression in BinEncoder
 ]
 
 [licenses]

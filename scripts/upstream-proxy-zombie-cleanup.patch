@@ -1,0 +1,59 @@
+--- upstream/linux-sandbox/src/proxy_routing.rs
++++ upstream/linux-sandbox/src/proxy_routing.rs
+@@ -366,12 +366,27 @@
+ fn is_pid_alive_raw(pid: libc::pid_t) -> bool {
+     let status = unsafe { libc::kill(pid, 0) };
+     if status == 0 {
+-        return true;
++        return !is_pid_zombie(pid);
+     }
+     let err = io::Error::last_os_error();
+     !matches!(err.raw_os_error(), Some(libc::ESRCH))
+ }
+ 
++fn is_pid_zombie(pid: libc::pid_t) -> bool {
++    let Ok(status) = std::fs::read_to_string(format!("/proc/{pid}/status")) else {
++        return false;
++    };
++    proc_status_is_zombie(&status)
++}
++
++fn proc_status_is_zombie(status: &str) -> bool {
++    status
++        .lines()
++        .find_map(|line| line.strip_prefix("State:"))
++        .and_then(|state| state.split_whitespace().next())
++        == Some("Z")
++}
++
+ fn spawn_proxy_socket_dir_cleanup_worker(
+     socket_dir: PathBuf,
+     host_bridge_pids: Vec<libc::pid_t>,
+@@ -675,6 +690,7 @@
+     use super::parse_loopback_proxy_endpoint;
+     use super::parse_proxy_socket_dir_owner_pid;
+     use super::plan_proxy_routes;
++    use super::proc_status_is_zombie;
+     use super::rewrite_proxy_env_value;
+     use pretty_assertions::assert_eq;
+     use std::collections::HashMap;
+@@ -765,6 +781,19 @@
+         assert_eq!(socket_dir.exists(), false);
+     }
+ 
++    #[test]
++    fn proc_status_zombie_detection() {
++        assert_eq!(
++            proc_status_is_zombie("Name:\tbwrap\nState:\tZ (zombie)\n"),
++            true
++        );
++        assert_eq!(
++            proc_status_is_zombie("Name:\tbwrap\nState:\tS (sleeping)\n"),
++            false
++        );
++        assert_eq!(proc_status_is_zombie("Name:\tbwrap\n"), false);
++    }
++
+     #[test]
+     fn proxy_route_spec_serialization_omits_proxy_urls() {
+         let spec = ProxyRouteSpec {

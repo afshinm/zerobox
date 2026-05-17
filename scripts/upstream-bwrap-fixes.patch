@@ -1,0 +1,286 @@
+--- upstream/linux-sandbox/src/bwrap.rs
++++ upstream/linux-sandbox/src/bwrap.rs
+@@ -485,6 +485,20 @@
+                     .filter(|path| path.exists()),
+             );
+         }
++
++        // Skip subpaths covered by another entry. `--ro-bind` is
++        // recursive, so the extra bind is redundant, and a subpath
++        // symlink like /etc/os-release can resolve into a path whose
++        // prefix is not yet bound, making bwrap fail with ENOENT.
++        let readable_roots: BTreeSet<PathBuf> = readable_roots
++            .iter()
++            .filter(|path| {
++                !readable_roots
++                    .iter()
++                    .any(|parent| parent.as_path() != path.as_path() && path.starts_with(parent))
++            })
++            .cloned()
++            .collect();
+
+         // A restricted policy can still explicitly request `/`, which is
+         // the broad read baseline. Explicit unreadable carveouts are
+@@ -1071,7 +1085,7 @@
+         if let Some(first_missing_component) = find_first_non_existent_component(subpath)
+             && is_within_allowed_write_paths(&first_missing_component, allowed_write_paths)
+         {
+-            append_missing_read_only_subpath_args(bwrap_args, &first_missing_component)?;
++            append_missing_read_only_subpath_args(bwrap_args, subpath, &first_missing_component)?;
+         }
+         return Ok(());
+     }
+@@ -1085,10 +1099,11 @@
+ }
+
+ fn append_empty_file_bind_data_args(bwrap_args: &mut BwrapArgs, path: &Path) -> Result<()> {
+-    if bwrap_args.preserved_files.is_empty() {
+-        bwrap_args.preserved_files.push(File::open("/dev/null")?);
+-    }
+-    let null_fd = bwrap_args.preserved_files[0].as_raw_fd().to_string();
++    // Each `--ro-bind-data` consumes its fd when `--perms` precedes it,
++    // so a shared /dev/null handle would EBADF on the second call.
++    let null_file = File::open("/dev/null")?;
++    let null_fd = null_file.as_raw_fd().to_string();
++    bwrap_args.preserved_files.push(null_file);
+     bwrap_args.args.push("--ro-bind-data".to_string());
+     bwrap_args.args.push(null_fd);
+     bwrap_args.args.push(path_to_string(path));
+@@ -1104,8 +1119,12 @@
+     bwrap_args.args.push(path_to_string(path));
+ }
+
+-fn append_missing_read_only_subpath_args(bwrap_args: &mut BwrapArgs, path: &Path) -> Result<()> {
+-    if path.file_name().is_some_and(is_protected_metadata_name) {
++fn append_missing_read_only_subpath_args(
++    bwrap_args: &mut BwrapArgs,
++    path: &Path,
++    first_missing_component: &Path,
++) -> Result<()> {
++    if path == first_missing_component && path.file_name().is_some_and(is_protected_metadata_name) {
+         append_empty_directory_args(bwrap_args, path);
+         bwrap_args
+             .synthetic_mount_targets
+@@ -1113,6 +1132,7 @@
+         return Ok(());
+     }
+
++    append_missing_mount_parent_dir_args(bwrap_args, path, first_missing_component);
+     append_missing_empty_file_bind_data_args(bwrap_args, path)
+ }
+
+@@ -1175,12 +1195,64 @@
+         if let Some(first_missing_component) = find_first_non_existent_component(unreadable_root)
+             && is_within_allowed_write_paths(&first_missing_component, allowed_write_paths)
+         {
+-            append_missing_empty_file_bind_data_args(bwrap_args, &first_missing_component)?;
++            append_missing_unreadable_root_args(
++                bwrap_args,
++                unreadable_root,
++                &first_missing_component,
++            )?;
+         }
+         return Ok(());
+     }
+
+     append_existing_unreadable_path_args(bwrap_args, unreadable_root, allowed_write_paths)
++}
++
++fn append_missing_unreadable_root_args(
++    bwrap_args: &mut BwrapArgs,
++    unreadable_root: &Path,
++    first_missing_component: &Path,
++) -> Result<()> {
++    append_missing_mount_parent_dir_args(bwrap_args, unreadable_root, first_missing_component);
++    append_missing_empty_file_bind_data_args(bwrap_args, unreadable_root)
++}
++
++fn append_missing_mount_parent_dir_args(
++    bwrap_args: &mut BwrapArgs,
++    mount_target: &Path,
++    first_missing_component: &Path,
++) {
++    let Some(parent) = mount_target.parent() else {
++        return;
++    };
++    if !parent.starts_with(first_missing_component) {
++        return;
++    }
++
++    let mut dir = first_missing_component.to_path_buf();
++    append_missing_mount_parent_dir(bwrap_args, &dir);
++
++    let Ok(relative_parent) = parent.strip_prefix(first_missing_component) else {
++        return;
++    };
++    for component in relative_parent.components() {
++        use std::path::Component;
++        match component {
++            Component::Normal(part) => {
++                dir.push(part);
++                append_missing_mount_parent_dir(bwrap_args, &dir);
++            }
++            Component::CurDir => {}
++            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return,
++        }
++    }
++}
++
++fn append_missing_mount_parent_dir(bwrap_args: &mut BwrapArgs, path: &Path) {
++    bwrap_args.args.push("--dir".to_string());
++    bwrap_args.args.push(path_to_string(path));
++    bwrap_args
++        .synthetic_mount_targets
++        .push(SyntheticMountTarget::missing_empty_directory(path));
+ }
+
+ fn append_existing_unreadable_path_args(
+@@ -1749,6 +1821,78 @@
+     }
+
+     #[test]
++    fn missing_nested_read_only_subpath_masks_leaf_not_first_missing_ancestor() {
++        let temp_dir = TempDir::new().expect("temp dir");
++        let home = temp_dir.path().join("home");
++        let first_missing = home.join(".local");
++        let missing_parent = first_missing.join("share");
++        let blocked = missing_parent.join("keyrings");
++        std::fs::create_dir_all(&home).expect("create home");
++
++        let home_root = AbsolutePathBuf::from_absolute_path(&home).expect("absolute home");
++        let blocked_root = AbsolutePathBuf::from_absolute_path(&blocked).expect("absolute blocked");
++        let policy = FileSystemSandboxPolicy::restricted(vec![
++            FileSystemSandboxEntry {
++                path: FileSystemPath::Path { path: home_root },
++                access: FileSystemAccessMode::Write,
++            },
++            FileSystemSandboxEntry {
++                path: FileSystemPath::Path { path: blocked_root },
++                access: FileSystemAccessMode::Read,
++            },
++        ]);
++
++        let args =
++            create_filesystem_args(&policy, temp_dir.path(), NO_UNREADABLE_GLOB_SCAN_MAX_DEPTH)
++                .expect("filesystem args");
++
++        assert_dir_created(&args.args, &first_missing);
++        assert_dir_created(&args.args, &missing_parent);
++        assert_empty_file_bound_without_perms(&args.args, &blocked);
++        assert_no_empty_file_bind(&args.args, &first_missing);
++        let synthetic_targets = synthetic_mount_target_paths(&args);
++        assert!(synthetic_targets.contains(&first_missing));
++        assert!(synthetic_targets.contains(&missing_parent));
++        assert!(synthetic_targets.contains(&blocked));
++    }
++
++    #[test]
++    fn missing_nested_unreadable_root_masks_leaf_not_first_missing_ancestor() {
++        let temp_dir = TempDir::new().expect("temp dir");
++        let home = temp_dir.path().join("home");
++        let first_missing = home.join(".local");
++        let missing_parent = first_missing.join("share");
++        let blocked = missing_parent.join("keyrings");
++        std::fs::create_dir_all(&home).expect("create home");
++
++        let home_root = AbsolutePathBuf::from_absolute_path(&home).expect("absolute home");
++        let blocked_root = AbsolutePathBuf::from_absolute_path(&blocked).expect("absolute blocked");
++        let policy = FileSystemSandboxPolicy::restricted(vec![
++            FileSystemSandboxEntry {
++                path: FileSystemPath::Path { path: home_root },
++                access: FileSystemAccessMode::Write,
++            },
++            FileSystemSandboxEntry {
++                path: FileSystemPath::Path { path: blocked_root },
++                access: FileSystemAccessMode::None,
++            },
++        ]);
++
++        let args =
++            create_filesystem_args(&policy, temp_dir.path(), NO_UNREADABLE_GLOB_SCAN_MAX_DEPTH)
++                .expect("filesystem args");
++
++        assert_dir_created(&args.args, &first_missing);
++        assert_dir_created(&args.args, &missing_parent);
++        assert_empty_file_bound_without_perms(&args.args, &blocked);
++        assert_no_empty_file_bind(&args.args, &first_missing);
++        let synthetic_targets = synthetic_mount_target_paths(&args);
++        assert!(synthetic_targets.contains(&first_missing));
++        assert!(synthetic_targets.contains(&missing_parent));
++        assert!(synthetic_targets.contains(&blocked));
++    }
++
++    #[test]
+     fn transient_empty_preserved_file_uses_empty_file_bind_data() {
+         let temp_dir = TempDir::new().expect("temp dir");
+         let workspace = temp_dir.path().join("workspace");
+@@ -1796,6 +1940,40 @@
+     }
+
+     #[test]
++    fn multiple_existing_empty_file_masks_use_distinct_preserved_fds() {
++        let temp_dir = TempDir::new().expect("temp dir");
++        let azure = temp_dir.path().join(".azure");
++        let gcloud = temp_dir.path().join(".gcloud");
++        File::create(&azure).expect("create empty azure file");
++        File::create(&gcloud).expect("create empty gcloud file");
++
++        let azure_root = AbsolutePathBuf::from_absolute_path(&azure).expect("absolute azure");
++        let gcloud_root = AbsolutePathBuf::from_absolute_path(&gcloud).expect("absolute gcloud");
++        let policy = FileSystemSandboxPolicy::restricted(vec![
++            FileSystemSandboxEntry {
++                path: FileSystemPath::Path { path: azure_root },
++                access: FileSystemAccessMode::None,
++            },
++            FileSystemSandboxEntry {
++                path: FileSystemPath::Path { path: gcloud_root },
++                access: FileSystemAccessMode::None,
++            },
++        ]);
++
++        let args =
++            create_filesystem_args(&policy, temp_dir.path(), NO_UNREADABLE_GLOB_SCAN_MAX_DEPTH)
++                .expect("filesystem args");
++
++        assert_file_masked(&args.args, &azure);
++        assert_file_masked(&args.args, &gcloud);
++        assert_eq!(
++            args.preserved_files.len(),
++            2,
++            "each ro-bind-data mount needs its own fd"
++        );
++    }
++
++    #[test]
+     fn missing_child_git_under_parent_repo_uses_protected_create_target() {
+         let temp_dir = TempDir::new().expect("temp dir");
+         let repo = temp_dir.path().join("repo");
+@@ -2687,9 +2865,28 @@
+                     && window[4] == path
+             }),
+             "missing path bind should not set explicit file perms for {path}: {args:#?}"
++        );
++    }
++
++    fn assert_no_empty_file_bind(args: &[String], path: &Path) {
++        let path = path_to_string(path);
++        assert!(
++            !args
++                .windows(3)
++                .any(|window| { window[0] == "--ro-bind-data" && window[2] == path }),
++            "did not expect empty file bind for {path}: {args:#?}"
+         );
+     }
+
++    fn assert_dir_created(args: &[String], path: &Path) {
++        let path = path_to_string(path);
++        assert!(
++            args.windows(2)
++                .any(|window| window == ["--dir", path.as_str()]),
++            "expected synthetic directory creation for {path}: {args:#?}"
++        );
++    }
++
+     fn assert_empty_directory_mounted_read_only(args: &[String], path: &Path) {
+         let path = path_to_string(path);
+         assert!(

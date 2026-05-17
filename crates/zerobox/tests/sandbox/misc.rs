@@ -75,6 +75,57 @@ fn allow_read_and_write_combined() {
     assert_eq!(content.trim(), "input");
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn default_profile_starts_with_empty_credential_files_in_writable_home() {
+    let tmp = temp_dir();
+    let home = tmp.path().join("home");
+    std::fs::create_dir_all(&home).expect("create home");
+    for name in [".azure", ".gcloud", ".kube", ".git-credentials"] {
+        std::fs::File::create(home.join(name)).expect("create empty credential file");
+    }
+
+    let out = Command::new(zerobox_exec())
+        .current_dir(&home)
+        .env("HOME", &home)
+        .env("ZEROBOX_HOME", tmp.path().join("zerobox-home"))
+        .args(["--allow-write=.", "--allow-write=/tmp", "--", "ls"])
+        .output()
+        .expect("failed to spawn zerobox");
+
+    assert!(
+        out.status.success(),
+        "default profile should mask empty credential files without breaking startup, stderr: {}",
+        stderr(&out)
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn default_profile_starts_with_tmp_home_and_missing_nested_keyring_path() {
+    let tmp = temp_dir();
+    let home = tmp.path().join("home");
+    std::fs::create_dir_all(&home).expect("create home");
+
+    let out = Command::new(zerobox_exec())
+        .current_dir(&home)
+        .env("HOME", &home)
+        .env("ZEROBOX_HOME", tmp.path().join("zerobox-home"))
+        .args(["--allow-write=.", "--allow-write=/tmp", "--", "ls"])
+        .output()
+        .expect("failed to spawn zerobox");
+
+    assert!(
+        out.status.success(),
+        "default profile should mask ~/.local/share/keyrings without replacing ~/.local, stderr: {}",
+        stderr(&out)
+    );
+    assert!(
+        !home.join(".local").exists(),
+        "synthetic missing parents should be cleaned up after bwrap exits"
+    );
+}
+
 #[test]
 fn allow_read_and_net_combined() {
     let (code, ok) = curl_status(

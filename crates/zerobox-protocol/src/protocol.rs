@@ -36,76 +36,6 @@ impl NetworkAccess {
         matches!(self, NetworkAccess::Enabled)
     }
 }
-fn default_include_platform_defaults() -> bool {
-    true
-}
-
-/// Determines how read-only file access is granted inside a restricted
-/// sandbox.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Display, Default, JsonSchema, TS)]
-#[strum(serialize_all = "kebab-case")]
-#[serde(tag = "type", rename_all = "kebab-case")]
-#[ts(tag = "type")]
-pub enum ReadOnlyAccess {
-    /// Restrict reads to an explicit set of roots.
-    ///
-    /// When `include_platform_defaults` is `true`, platform defaults required
-    /// for basic execution are included in addition to `readable_roots`.
-    Restricted {
-        /// Include built-in platform read roots required for basic process
-        /// execution.
-        #[serde(default = "default_include_platform_defaults")]
-        include_platform_defaults: bool,
-        /// Additional absolute roots that should be readable.
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        readable_roots: Vec<AbsolutePathBuf>,
-    },
-
-    /// Allow unrestricted file reads.
-    #[default]
-    FullAccess,
-}
-
-impl ReadOnlyAccess {
-    pub fn has_full_disk_read_access(&self) -> bool {
-        matches!(self, ReadOnlyAccess::FullAccess)
-    }
-
-    /// Returns true if platform defaults should be included for restricted read access.
-    pub fn include_platform_defaults(&self) -> bool {
-        matches!(
-            self,
-            ReadOnlyAccess::Restricted {
-                include_platform_defaults: true,
-                ..
-            }
-        )
-    }
-
-    /// Returns the readable roots for restricted read access.
-    ///
-    /// For [`ReadOnlyAccess::FullAccess`], returns an empty list because
-    /// callers should grant blanket read access instead.
-    pub fn get_readable_roots_with_cwd(&self, cwd: &Path) -> Vec<AbsolutePathBuf> {
-        let mut roots: Vec<AbsolutePathBuf> = match self {
-            ReadOnlyAccess::FullAccess => return Vec::new(),
-            ReadOnlyAccess::Restricted { readable_roots, .. } => {
-                let mut roots = readable_roots.clone();
-                match AbsolutePathBuf::from_absolute_path(cwd) {
-                    Ok(cwd_root) => roots.push(cwd_root),
-                    Err(err) => {
-                        error!("Ignoring invalid cwd {cwd:?} for sandbox readable root: {err}");
-                    }
-                }
-                roots
-            }
-        };
-
-        let mut seen = HashSet::new();
-        roots.retain(|root| seen.insert(root.to_path_buf()));
-        roots
-    }
-}
 
 /// Execution restrictions for sandboxed commands.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Display, JsonSchema, TS)]
@@ -119,13 +49,6 @@ pub enum SandboxPolicy {
     /// Read-only access configuration.
     #[serde(rename = "read-only")]
     ReadOnly {
-        /// Read access granted while running under this policy.
-        #[serde(
-            default,
-            skip_serializing_if = "ReadOnlyAccess::has_full_disk_read_access"
-        )]
-        access: ReadOnlyAccess,
-
         /// When set to `true`, outbound network access is allowed. `false` by
         /// default.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -149,13 +72,6 @@ pub enum SandboxPolicy {
         /// writable from within the sandbox.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         writable_roots: Vec<AbsolutePathBuf>,
-
-        /// Read access granted while running under this policy.
-        #[serde(
-            default,
-            skip_serializing_if = "ReadOnlyAccess::has_full_disk_read_access"
-        )]
-        read_only_access: ReadOnlyAccess,
 
         /// When set to `true`, outbound network access is allowed. `false` by
         /// default.
@@ -183,6 +99,11 @@ pub struct WritableRoot {
 
     /// By construction, these subpaths are all under `root`.
     pub read_only_subpaths: Vec<AbsolutePathBuf>,
+
+    /// Workspace metadata path names that must not be created or replaced under
+    /// `root` unless the policy grants an explicit write rule for that metadata
+    /// path.
+    pub protected_metadata_names: Vec<String>,
 }
 
 impl WritableRoot {
@@ -199,7 +120,23 @@ impl WritableRoot {
             }
         }
 
+        if self.path_contains_protected_metadata_name(path) {
+            return false;
+        }
+
         true
+    }
+
+    fn path_contains_protected_metadata_name(&self, path: &Path) -> bool {
+        let Ok(relative_path) = path.strip_prefix(&self.root) else {
+            return false;
+        };
+        let Some(first_component) = relative_path.components().next() else {
+            return false;
+        };
+        self.protected_metadata_names
+            .iter()
+            .any(|name| first_component.as_os_str() == std::ffi::OsStr::new(name))
     }
 }
 
@@ -231,7 +168,6 @@ impl SandboxPolicy {
     /// Returns a policy with read-only disk access and no network.
     pub fn new_read_only_policy() -> Self {
         SandboxPolicy::ReadOnly {
-            access: ReadOnlyAccess::FullAccess,
             network_access: false,
         }
     }
@@ -242,7 +178,6 @@ impl SandboxPolicy {
     pub fn new_workspace_write_policy() -> Self {
         SandboxPolicy::WorkspaceWrite {
             writable_roots: vec![],
-            read_only_access: ReadOnlyAccess::FullAccess,
             network_access: false,
             exclude_tmpdir_env_var: false,
             exclude_slash_tmp: false,
@@ -250,14 +185,7 @@ impl SandboxPolicy {
     }
 
     pub fn has_full_disk_read_access(&self) -> bool {
-        match self {
-            SandboxPolicy::DangerFullAccess => true,
-            SandboxPolicy::ExternalSandbox { .. } => true,
-            SandboxPolicy::ReadOnly { access, .. } => access.has_full_disk_read_access(),
-            SandboxPolicy::WorkspaceWrite {
-                read_only_access, ..
-            } => read_only_access.has_full_disk_read_access(),
-        }
+        true
     }
 
     pub fn has_full_disk_write_access(&self) -> bool {
@@ -280,16 +208,7 @@ impl SandboxPolicy {
 
     /// Returns true if platform defaults should be included for restricted read access.
     pub fn include_platform_defaults(&self) -> bool {
-        if self.has_full_disk_read_access() {
-            return false;
-        }
-        match self {
-            SandboxPolicy::ReadOnly { access, .. } => access.include_platform_defaults(),
-            SandboxPolicy::WorkspaceWrite {
-                read_only_access, ..
-            } => read_only_access.include_platform_defaults(),
-            SandboxPolicy::DangerFullAccess | SandboxPolicy::ExternalSandbox { .. } => false,
-        }
+        false
     }
 
     /// Returns the list of readable roots (tailored to the current working
@@ -299,19 +218,14 @@ impl SandboxPolicy {
     /// callers should grant blanket reads.
     pub fn get_readable_roots_with_cwd(&self, cwd: &Path) -> Vec<AbsolutePathBuf> {
         let mut roots = match self {
-            SandboxPolicy::DangerFullAccess | SandboxPolicy::ExternalSandbox { .. } => Vec::new(),
-            SandboxPolicy::ReadOnly { access, .. } => access.get_readable_roots_with_cwd(cwd),
-            SandboxPolicy::WorkspaceWrite {
-                read_only_access, ..
-            } => {
-                let mut roots = read_only_access.get_readable_roots_with_cwd(cwd);
-                roots.extend(
-                    self.get_writable_roots_with_cwd(cwd)
-                        .into_iter()
-                        .map(|root| root.root),
-                );
-                roots
-            }
+            SandboxPolicy::DangerFullAccess
+            | SandboxPolicy::ExternalSandbox { .. }
+            | SandboxPolicy::ReadOnly { .. } => Vec::new(),
+            SandboxPolicy::WorkspaceWrite { .. } => self
+                .get_writable_roots_with_cwd(cwd)
+                .into_iter()
+                .map(|root| root.root)
+                .collect(),
         };
         let mut seen = HashSet::new();
         roots.retain(|root| seen.insert(root.to_path_buf()));
@@ -328,7 +242,6 @@ impl SandboxPolicy {
             SandboxPolicy::ReadOnly { .. } => Vec::new(),
             SandboxPolicy::WorkspaceWrite {
                 writable_roots,
-                read_only_access: _,
                 exclude_tmpdir_env_var,
                 exclude_slash_tmp,
                 network_access: _,
@@ -386,6 +299,7 @@ impl SandboxPolicy {
                                 protect_missing_dot_codex,
                             ),
                             root: writable_root,
+                            protected_metadata_names: Vec::new(),
                         }
                     })
                     .collect()

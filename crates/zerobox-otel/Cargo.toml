@@ -1,0 +1,18 @@
+[package]
+name = "zerobox-otel"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "zerobox_otel"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+
+[lints]
+workspace = true
