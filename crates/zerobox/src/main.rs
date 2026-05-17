@@ -133,23 +133,29 @@ fn exit_code_from_status(status: std::process::ExitStatus) -> ExitCode {
 }
 
 fn main() -> ExitCode {
+    #[cfg(target_os = "linux")]
+    if invoked_as_linux_sandbox_helper() {
+        zerobox_linux_sandbox::run_main();
+    }
+
     tokio_main()
+}
+
+#[cfg(target_os = "linux")]
+fn invoked_as_linux_sandbox_helper() -> bool {
+    use zerobox_sandboxing::landlock::ZEROBOX_LINUX_SANDBOX_ARG0;
+
+    let Some(argv0) = std::env::args_os().next() else {
+        return false;
+    };
+
+    std::path::Path::new(&argv0)
+        .file_name()
+        .is_some_and(|name| name == std::ffi::OsStr::new(ZEROBOX_LINUX_SANDBOX_ARG0))
 }
 
 #[tokio::main]
 async fn tokio_main() -> ExitCode {
-    #[cfg(target_os = "linux")]
-    {
-        use zerobox_sandboxing::landlock::ZEROBOX_LINUX_SANDBOX_ARG0;
-        let exe_name = std::env::args_os()
-            .next()
-            .as_ref()
-            .and_then(|s| Path::new(s).file_name().map(|f| f.to_os_string()));
-        if exe_name.as_deref() == Some(std::ffi::OsStr::new(ZEROBOX_LINUX_SANDBOX_ARG0)) {
-            zerobox_linux_sandbox::run_main();
-        }
-    }
-
     let cli = Cli::parse();
 
     if let Some(CliSubcommand::Snapshot { action }) = &cli.subcommand {

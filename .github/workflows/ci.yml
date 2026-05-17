@@ -121,7 +121,7 @@ jobs:
           name: upstream
           path: upstream/
       - name: Install system deps
-        run: sudo apt-get update && sudo apt-get install -y libcap-dev
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap libcap-dev
       - name: Enable unprivileged user namespaces (required by bubblewrap)
         run: |
           # Required for bubblewrap to work on Linux CI runners.
@@ -151,7 +151,7 @@ jobs:
         include:
           - os: macos-latest
           - os: ubuntu-latest
-            system-deps: libcap-dev
+            system-deps: bubblewrap libcap-dev
             enable-userns: true
     runs-on: ${{ matrix.os }}
     steps:
@@ -204,7 +204,7 @@ jobs:
         include:
           - os: macos-latest
           - os: ubuntu-latest
-            system-deps: libcap-dev
+            system-deps: bubblewrap libcap-dev
             enable-userns: true
     runs-on: ${{ matrix.os }}
     steps:
