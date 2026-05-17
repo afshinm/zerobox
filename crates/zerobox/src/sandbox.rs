@@ -71,6 +71,7 @@ pub struct Sandbox {
     strict: bool,
     profile_names: Vec<String>,
     use_profile: bool,
+    linux_sandbox_exe: Option<PathBuf>,
 }
 
 impl Sandbox {
@@ -97,6 +98,7 @@ impl Sandbox {
             strict: false,
             profile_names: Vec::new(),
             use_profile: true,
+            linux_sandbox_exe: None,
         }
     }
 
@@ -233,6 +235,23 @@ impl Sandbox {
         self
     }
 
+    /// Set the Linux sandbox helper executable.
+    ///
+    /// This is only used on Linux. Embedders that call zerobox from their own
+    /// Rust binary can create this path with
+    /// `zerobox::arg0::prepend_path_entry_for_zerobox_aliases` after calling
+    /// `zerobox::arg0::dispatch_linux_sandbox_helper` near process startup.
+    pub fn linux_sandbox_exe(mut self, path: impl Into<PathBuf>) -> Self {
+        self.linux_sandbox_exe = Some(path.into());
+        self
+    }
+
+    #[doc(hidden)]
+    pub fn linux_sandbox_exe_opt(mut self, path: Option<PathBuf>) -> Self {
+        self.linux_sandbox_exe = path;
+        self
+    }
+
     pub async fn run(self) -> Result<SandboxOutput> {
         let mut prepared = self.prepare().await?;
         let output = prepared
@@ -320,6 +339,7 @@ impl Sandbox {
             strict,
             profile_names,
             use_profile,
+            linux_sandbox_exe,
         } = self;
 
         let cwd = match cwd {
@@ -418,7 +438,7 @@ impl Sandbox {
         };
 
         let linux_sandbox_exe: Option<PathBuf> = if cfg!(target_os = "linux") {
-            std::env::current_exe().ok()
+            linux_sandbox_exe.or_else(|| std::env::current_exe().ok())
         } else {
             None
         };
@@ -1283,6 +1303,7 @@ mod tests {
         assert!(s.full_access);
         assert_eq!(s.profile_names, vec!["workspace".to_string()]);
         assert!(!s.use_profile);
+        assert_eq!(s.linux_sandbox_exe, None);
     }
 
     #[test]
@@ -1341,24 +1362,16 @@ mod tests {
         );
     }
 
+    #[test]
+    fn builder_can_set_linux_sandbox_exe_override() {
+        let s = Sandbox::command("x").linux_sandbox_exe(p("/tmp/zerobox-linux-sandbox"));
+
+        assert_eq!(s.linux_sandbox_exe, Some(p("/tmp/zerobox-linux-sandbox")));
+    }
+
     // apply_profile
 
-    fn apply_default_profile() -> (
-        Vec<PathBuf>,
-        Vec<PathBuf>,
-        Vec<PathBuf>,
-        Vec<PathBuf>,
-        bool,
-        Option<Vec<String>>,
-        Vec<String>,
-        HashMap<String, String>,
-        Option<Vec<String>>,
-        Vec<String>,
-        Vec<(String, String)>,
-        Vec<(String, String)>,
-        bool,
-        bool,
-    ) {
+    fn apply_default_profile() -> (Vec<PathBuf>, Vec<PathBuf>) {
         let cwd = std::env::current_dir().unwrap();
         let profile = crate::profile_core::load_profile("default", &cwd).unwrap();
         let mut ar = Vec::new();
@@ -1379,12 +1392,12 @@ mod tests {
             &profile, &mut ar, &mut dr, &mut aw, &mut dw, &mut fw, &mut an, &mut dn, &mut env,
             &mut ae, &mut de, &mut sec, &mut sh, &mut dis, &mut fa,
         );
-        (ar, dr, aw, dw, fw, an, dn, env, ae, de, sec, sh, dis, fa)
+        (ar, dr)
     }
 
     #[test]
     fn profile_default_adds_deny_rules() {
-        let (allow_read, deny_read, ..) = apply_default_profile();
+        let (allow_read, deny_read) = apply_default_profile();
         assert!(!deny_read.is_empty());
         assert!(!allow_read.is_empty());
         let home = dirs::home_dir().unwrap();
