@@ -72,6 +72,11 @@ def build_flags(options: Union[SandboxOptions, dict[str, Any], None]) -> list[st
         for key, value in o.env.items():
             flags.extend(["--env", f"{key}={value}"])
 
+    if o.bind_mounts:
+        for m in o.bind_mounts:
+            spec = f"{m.host}:{m.sandbox}:ro" if m.read_only else f"{m.host}:{m.sandbox}"
+            flags.extend(["--bind-mount", spec])
+
     if o.cwd:
         flags.extend(["-C", o.cwd])
 

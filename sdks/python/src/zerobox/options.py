@@ -11,6 +11,20 @@ class SecretConfig:
 
 
 @dataclass(frozen=True)
+class BindMount:
+    """A single host→sandbox path remapping.
+
+    On Linux (and WSL2) the CLI performs a real bind mount; on macOS,
+    Windows, and WSL1 the CLI emits a one-line warning to stderr and runs
+    the command without remapping.
+    """
+
+    host: str
+    sandbox: str
+    read_only: bool = False
+
+
+@dataclass(frozen=True)
 class CommandOutput:
     code: int
     stdout: str
@@ -38,6 +52,7 @@ class SandboxOptions:
     snapshot_paths: Union[list[str], None] = None
     snapshot_exclude: Union[list[str], None] = None
     secrets: Union[dict[str, SecretConfig], None] = None
+    bind_mounts: Union[list[BindMount], None] = None
     debug: bool = False
 
 
@@ -45,6 +60,16 @@ def _coerce_secret(cfg: Union[SecretConfig, dict[str, Any]]) -> SecretConfig:
     if isinstance(cfg, SecretConfig):
         return cfg
     return SecretConfig(value=cfg["value"], hosts=list(cfg.get("hosts") or []))
+
+
+def _coerce_bind_mount(mount: Union[BindMount, dict[str, Any]]) -> BindMount:
+    if isinstance(mount, BindMount):
+        return mount
+    return BindMount(
+        host=mount["host"],
+        sandbox=mount["sandbox"],
+        read_only=bool(mount.get("read_only", False)),
+    )
 
 
 def normalize_options(
@@ -63,4 +88,6 @@ def normalize_options(
     kwargs = dict(options)
     if kwargs.get("secrets"):
         kwargs["secrets"] = {k: _coerce_secret(v) for k, v in kwargs["secrets"].items()}
+    if kwargs.get("bind_mounts"):
+        kwargs["bind_mounts"] = [_coerce_bind_mount(m) for m in kwargs["bind_mounts"]]
     return SandboxOptions(**kwargs)

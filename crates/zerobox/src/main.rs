@@ -82,8 +82,44 @@ pub struct Cli {
     #[arg(long = "snapshot-exclude", value_delimiter = ',', num_args = 1..)]
     pub snapshot_exclude: Option<Vec<String>>,
 
+    /// Remap a host directory to a path inside the sandbox.
+    ///
+    /// Format: `HOST:SANDBOX[:ro]`. Repeatable; mounts apply in argv order.
+    /// macOS, Windows, and WSL1 emit a warning and run without remapping.
+    #[arg(long = "bind-mount", value_name = "HOST:SANDBOX[:ro]")]
+    pub bind_mount: Vec<String>,
+
     #[arg(trailing_var_arg = true)]
     pub command: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ParsedBindMount {
+    pub host: PathBuf,
+    pub sandbox: PathBuf,
+    pub read_only: bool,
+}
+
+/// Parse a `--bind-mount HOST:SANDBOX[:ro]` value.
+pub fn parse_bind_mount_arg(value: &str) -> Result<ParsedBindMount, String> {
+    let (host, rest) = value
+        .split_once(':')
+        .ok_or_else(|| "expected HOST:SANDBOX[:ro]".to_string())?;
+    if host.is_empty() {
+        return Err("HOST is empty".to_string());
+    }
+    let (sandbox, read_only) = match rest.rsplit_once(':') {
+        Some((sandbox, "ro")) => (sandbox, true),
+        _ => (rest, false),
+    };
+    if sandbox.is_empty() {
+        return Err("SANDBOX is empty".to_string());
+    }
+    Ok(ParsedBindMount {
+        host: PathBuf::from(host),
+        sandbox: PathBuf::from(sandbox),
+        read_only,
+    })
 }
 
 #[derive(Subcommand, Debug)]
@@ -300,6 +336,22 @@ async fn tokio_main(cli: Cli, linux_sandbox_exe: Option<PathBuf>) -> ExitCode {
         }
     }
 
+    for raw in &cli.bind_mount {
+        match parse_bind_mount_arg(raw) {
+            Ok(mount) => {
+                sandbox = if mount.read_only {
+                    sandbox.bind_mount_ro(mount.host, mount.sandbox)
+                } else {
+                    sandbox.bind_mount(mount.host, mount.sandbox)
+                };
+            }
+            Err(err) => {
+                eprintln!("error: invalid --bind-mount value '{raw}': {err}");
+                return ExitCode::from(1);
+            }
+        }
+    }
+
     debug_log!(
         dbg,
         "cwd: {:?}",
@@ -404,4 +456,64 @@ async fn tokio_main(cli: Cli, linux_sandbox_exe: Option<PathBuf>) -> ExitCode {
     }
 
     exit
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn parse_bind_mount_arg_without_ro() {
+        let parsed = parse_bind_mount_arg("/host/a:/sandbox/a").unwrap();
+        assert_eq!(parsed.host, PathBuf::from("/host/a"));
+        assert_eq!(parsed.sandbox, PathBuf::from("/sandbox/a"));
+        assert!(!parsed.read_only);
+    }
+
+    #[test]
+    fn parse_bind_mount_arg_with_ro() {
+        let parsed = parse_bind_mount_arg("/host/a:/sandbox/a:ro").unwrap();
+        assert_eq!(parsed.host, PathBuf::from("/host/a"));
+        assert_eq!(parsed.sandbox, PathBuf::from("/sandbox/a"));
+        assert!(parsed.read_only);
+    }
+
+    #[test]
+    fn parse_bind_mount_arg_empty_host_is_error() {
+        assert!(parse_bind_mount_arg(":/sandbox").is_err());
+    }
+
+    #[test]
+    fn parse_bind_mount_arg_empty_sandbox_is_error() {
+        assert!(parse_bind_mount_arg("/host:").is_err());
+    }
+
+    #[test]
+    fn parse_bind_mount_arg_without_separator_is_error() {
+        assert!(parse_bind_mount_arg("just-a-path").is_err());
+    }
+
+    #[test]
+    fn cli_repeated_bind_mount_preserves_order() {
+        let cli = Cli::parse_from([
+            "zerobox",
+            "--bind-mount",
+            "/host/a:/sandbox/a",
+            "--bind-mount",
+            "/host/b:/sandbox/b:ro",
+            "--bind-mount",
+            "/host/c:/sandbox/c",
+            "--",
+            "true",
+        ]);
+        assert_eq!(
+            cli.bind_mount,
+            vec![
+                "/host/a:/sandbox/a".to_string(),
+                "/host/b:/sandbox/b:ro".to_string(),
+                "/host/c:/sandbox/c".to_string(),
+            ]
+        );
+    }
 }

@@ -106,6 +106,26 @@ except SandboxCommandError as e:
     print(e.code, e.stderr)
 ```
 
+## Bind mounts
+
+Give the sandboxed process a private view of a directory by remapping a host
+path to a different path inside the sandbox. Useful for per-project tmpdirs:
+
+```python
+sandbox = Sandbox.create({
+    "bind_mounts": [
+        {"host": "/tmp/projects/abc123", "sandbox": "/tmp"},
+        {"host": "/var/cache/pkg", "sandbox": "/var/cache/pkg", "read_only": True},
+    ],
+})
+
+sandbox.sh("node app.js").text()
+```
+
+Mounts apply in the order declared, so list parents before children. On Linux
+(and WSL2) the CLI performs a real bind mount; on macOS, Windows, and WSL1 it
+emits a one-line warning to stderr and runs the command without remapping.
+
 ## Secrets
 
 Pass API keys that the sandboxed process never sees. The proxy substitutes the real value only for approved hosts.
@@ -201,6 +221,7 @@ See the [main README](https://github.com/afshinm/zerobox#environment-variables) 
 | `restore` | `bool` | Record and roll back after exit. Implies `snapshot`. |
 | `snapshot_paths` / `snapshot_exclude` | `list[str]` | Tracked paths / excluded patterns. |
 | `secrets` | `dict[str, SecretConfig]` | Secrets with per-host scopes. |
+| `bind_mounts` | `list[BindMount]` | Remap host directories onto sandbox paths. Linux/WSL2 real mount; macOS/Windows/WSL1 warn and no-op. |
 | `debug` | `bool` | Print sandbox config to stderr. |
 
 Unknown dict keys (e.g. accidental `allowWrite` instead of `allow_write`) raise `TypeError` at construction time.

@@ -1,3 +1,4 @@
+mod bind_mount;
 mod env;
 mod misc;
 mod net;

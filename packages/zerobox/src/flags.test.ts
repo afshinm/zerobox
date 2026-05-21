@@ -253,4 +253,81 @@ describe("buildFlags", () => {
     const flags = buildFlags({ allowEnv: [] });
     expect(flags).not.toContain("--allow-env");
   });
+
+  // bind mounts
+
+  it("emits a single --bind-mount entry", () => {
+    const flags = buildFlags({
+      bindMounts: [{ host: "/tmp/proj-abc", sandbox: "/tmp" }],
+    });
+    expect(flags).toContain("--bind-mount");
+    expect(flags).toContain("/tmp/proj-abc:/tmp");
+  });
+
+  it("appends :ro for read-only mounts", () => {
+    const flags = buildFlags({
+      bindMounts: [{ host: "/var/cache/pkg", sandbox: "/var/cache/pkg", readOnly: true }],
+    });
+    expect(flags).toContain("--bind-mount");
+    expect(flags).toContain("/var/cache/pkg:/var/cache/pkg:ro");
+  });
+
+  it("preserves Windows drive-letter paths", () => {
+    const flags = buildFlags({
+      bindMounts: [
+        {
+          host: String.raw`C:\host\a`,
+          sandbox: String.raw`D:\sandbox\a`,
+          readOnly: true,
+        },
+      ],
+    });
+    expect(flags).toContain(String.raw`C:\host\a:D:\sandbox\a:ro`);
+  });
+
+  it("preserves argv order across multiple mounts", () => {
+    const flags = buildFlags({
+      bindMounts: [
+        { host: "/host/a", sandbox: "/a" },
+        { host: "/host/b", sandbox: "/a/b", readOnly: true },
+        { host: "/host/c", sandbox: "/c" },
+      ],
+    });
+    // Collect the spec values that follow each --bind-mount flag.
+    const specs: string[] = [];
+    for (let i = 0; i < flags.length; i++) {
+      if (flags[i] === "--bind-mount") {
+        const next = flags[i + 1];
+        if (next !== undefined) {
+          specs.push(next);
+        }
+      }
+    }
+    expect(specs).toEqual(["/host/a:/a", "/host/b:/a/b:ro", "/host/c:/c"]);
+  });
+
+  it("omits --bind-mount when bindMounts is missing or empty", () => {
+    expect(buildFlags({}).filter((f) => f === "--bind-mount").length).toBe(0);
+    expect(buildFlags({ bindMounts: [] }).filter((f) => f === "--bind-mount").length).toBe(0);
+  });
+
+  it("bind mounts coexist with allowAll", () => {
+    const flags = buildFlags({
+      allowAll: true,
+      bindMounts: [{ host: "/host", sandbox: "/sandbox" }],
+    });
+    expect(flags).toContain("--allow-all");
+    expect(flags).toContain("--bind-mount");
+    expect(flags).toContain("/host:/sandbox");
+  });
+
+  it("bind mounts coexist with noSandbox", () => {
+    const flags = buildFlags({
+      noSandbox: true,
+      bindMounts: [{ host: "/host", sandbox: "/sandbox", readOnly: true }],
+    });
+    expect(flags).toContain("--no-sandbox");
+    expect(flags).toContain("--bind-mount");
+    expect(flags).toContain("/host:/sandbox:ro");
+  });
 });
