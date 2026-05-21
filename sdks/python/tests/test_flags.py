@@ -275,3 +275,90 @@ def test_accepts_dataclass_and_dict_identically():
     dc = SandboxOptions(allow_write=["/tmp"], allow_net=["example.com"])
     dt = {"allow_write": ["/tmp"], "allow_net": ["example.com"]}
     assert build_flags(dc) == build_flags(dt)
+
+
+# bind mounts
+
+
+def test_bind_mount_single_entry():
+    flags = build_flags({"bind_mounts": [{"host": "/tmp/proj-abc", "sandbox": "/tmp"}]})
+    assert "--bind-mount" in flags
+    assert "/tmp/proj-abc:/tmp" in flags
+
+
+def test_bind_mount_read_only_appends_ro():
+    flags = build_flags(
+        {
+            "bind_mounts": [
+                {"host": "/var/cache/pkg", "sandbox": "/var/cache/pkg", "read_only": True}
+            ]
+        }
+    )
+    assert "--bind-mount" in flags
+    assert "/var/cache/pkg:/var/cache/pkg:ro" in flags
+
+
+def test_bind_mount_preserves_windows_drive_letter_paths():
+    flags = build_flags(
+        {
+            "bind_mounts": [
+                {
+                    "host": r"C:\host\a",
+                    "sandbox": r"D:\sandbox\a",
+                    "read_only": True,
+                }
+            ]
+        }
+    )
+    assert r"C:\host\a:D:\sandbox\a:ro" in flags
+
+
+def test_bind_mount_preserves_argv_order():
+    flags = build_flags(
+        {
+            "bind_mounts": [
+                {"host": "/host/a", "sandbox": "/a"},
+                {"host": "/host/b", "sandbox": "/a/b", "read_only": True},
+                {"host": "/host/c", "sandbox": "/c"},
+            ]
+        }
+    )
+    specs = [flags[i + 1] for i, f in enumerate(flags) if f == "--bind-mount"]
+    assert specs == ["/host/a:/a", "/host/b:/a/b:ro", "/host/c:/c"]
+
+
+def test_bind_mount_missing_or_empty_omits_flag():
+    assert "--bind-mount" not in build_flags({})
+    assert "--bind-mount" not in build_flags({"bind_mounts": []})
+
+
+def test_bind_mount_coexists_with_allow_all():
+    flags = build_flags(
+        {
+            "allow_all": True,
+            "bind_mounts": [{"host": "/host", "sandbox": "/sandbox"}],
+        }
+    )
+    assert "--allow-all" in flags
+    assert "--bind-mount" in flags
+    assert "/host:/sandbox" in flags
+
+
+def test_bind_mount_coexists_with_no_sandbox():
+    flags = build_flags(
+        {
+            "no_sandbox": True,
+            "bind_mounts": [{"host": "/host", "sandbox": "/sandbox", "read_only": True}],
+        }
+    )
+    assert "--no-sandbox" in flags
+    assert "--bind-mount" in flags
+    assert "/host:/sandbox:ro" in flags
+
+
+def test_bind_mount_accepts_dataclass():
+    from zerobox import BindMount, SandboxOptions
+
+    dc = SandboxOptions(bind_mounts=[BindMount(host="/h", sandbox="/s", read_only=True)])
+    dt = {"bind_mounts": [{"host": "/h", "sandbox": "/s", "read_only": True}]}
+    assert build_flags(dc) == build_flags(dt)

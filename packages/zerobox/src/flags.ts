@@ -90,6 +90,13 @@ export function buildFlags(options: SandboxOptions): string[] {
     }
   }
 
+  if (options.bindMounts?.length) {
+    for (const m of options.bindMounts) {
+      const spec = m.readOnly ? `${m.host}:${m.sandbox}:ro` : `${m.host}:${m.sandbox}`;
+      flags.push("--bind-mount", spec);
+    }
+  }
+
   if (options.cwd) {
     flags.push("-C", options.cwd);
   }

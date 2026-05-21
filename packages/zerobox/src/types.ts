@@ -47,6 +47,13 @@ export interface SandboxOptions {
    * in the sandbox. The hosts are merged into network permissions.
    */
   secrets?: Record<string, SecretConfig>;
+  /**
+   * Remap host directories onto sandbox paths. Entries apply in argv order,
+   * so declare parents before children. On Linux (and WSL2) the CLI performs
+   * a real bind mount; on macOS, Windows, and WSL1 the CLI emits a one-line
+   * warning to stderr and runs the command without remapping.
+   */
+  bindMounts?: BindMount[];
 }
 
 /** Configuration for a secret passed to the sandbox. */
@@ -55,6 +62,16 @@ export interface SecretConfig {
   value: string;
   /** Domains where this secret is needed. Merged into allowNet. */
   hosts: string[];
+}
+
+/** A single host→sandbox path remapping. */
+export interface BindMount {
+  /** Source path on the host. */
+  host: string;
+  /** Destination path inside the sandbox. The original contents are hidden. */
+  sandbox: string;
+  /** Mount read-only inside the sandbox. */
+  readOnly?: boolean;
 }
 
 /** Raw output from a sandboxed command. */

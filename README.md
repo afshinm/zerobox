@@ -241,6 +241,7 @@ Sandbox overhead is minimal, typically ~10ms and ~7MB:
 | `--deny-env <keys>`             | `--deny-env=SECRET`                    | Drop these parent env vars. Takes precedence over `--allow-env`.                                             |
 | `--secret <KEY=VALUE>`          | `--secret API_KEY=sk-123`              | Pass a secret. The process sees a placeholder. The real value is injected at the proxy for approved hosts.   |
 | `--secret-host <KEY=HOSTS>`     | `--secret-host API_KEY=api.openai.com` | Restrict a secret to specific hosts. Without this, the secret is substituted for all hosts.                  |
+| `--bind-mount <HOST:SANDBOX[:ro]>` | `--bind-mount /tmp/proj-abc:/tmp` | Remap a host directory onto a path inside the sandbox. Repeatable; mounts apply in argv order. Read-only with the `:ro` suffix. macOS, Windows, and WSL1 warn once per flag and run without remapping. |
 | `-A`, `--allow-all`             | `-A`                                   | Grant all filesystem and network permissions. Env and secrets still apply.                                   |
 | `--no-sandbox`                  | `--no-sandbox`                         | Disable the sandbox entirely.                                                                                |
 | `--strict-sandbox`              | `--strict-sandbox`                     | Require full sandbox (bubblewrap). Fail instead of falling back to weaker isolation.                         |

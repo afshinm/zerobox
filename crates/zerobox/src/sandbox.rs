@@ -14,7 +14,8 @@ use zerobox_protocol::permissions::{
 #[cfg(test)]
 use zerobox_protocol::protocol::SandboxPolicy;
 use zerobox_sandboxing::{
-    SandboxCommand, SandboxManager, SandboxTransformRequest, SandboxType, get_platform_sandbox,
+    BindMount, SandboxCommand, SandboxManager, SandboxTransformRequest, SandboxType,
+    get_platform_sandbox, validate_bind_mount,
 };
 use zerobox_utils_absolute_path::AbsolutePathBuf;
 
@@ -72,6 +73,7 @@ pub struct Sandbox {
     profile_names: Vec<String>,
     use_profile: bool,
     linux_sandbox_exe: Option<PathBuf>,
+    bind_mounts: Vec<BindMount>,
 }
 
 impl Sandbox {
@@ -99,6 +101,7 @@ impl Sandbox {
             profile_names: Vec::new(),
             use_profile: true,
             linux_sandbox_exe: None,
+            bind_mounts: Vec::new(),
         }
     }
 
@@ -235,6 +238,31 @@ impl Sandbox {
         self
     }
 
+    /// Remap a host directory to a path inside the sandbox.
+    ///
+    /// The host directory's contents become visible at the sandbox path; the
+    /// original sandbox path is hidden from the sandboxed process. The bind
+    /// mount is implicitly readable and writable — you do not also need to
+    /// pass `allow_read` / `allow_write` for the sandbox path.
+    ///
+    /// `sandbox` must be an absolute path and may not target `/`, `/proc`,
+    /// `/sys`, or `/dev`. Multiple bind mounts are applied in the order they
+    /// are declared so parents can be mounted before children.
+    ///
+    /// Only Linux/WSL2 honor bind mounts. macOS, Windows, and WSL1 emit a
+    /// one-line warning to stderr and run the command without remapping.
+    pub fn bind_mount(mut self, host: impl Into<PathBuf>, sandbox: impl Into<PathBuf>) -> Self {
+        self.bind_mounts.push(BindMount::new(host, sandbox));
+        self
+    }
+
+    /// Same as [`Sandbox::bind_mount`] but the mount is read-only inside the
+    /// sandbox.
+    pub fn bind_mount_ro(mut self, host: impl Into<PathBuf>, sandbox: impl Into<PathBuf>) -> Self {
+        self.bind_mounts.push(BindMount::new_ro(host, sandbox));
+        self
+    }
+
     /// Set the Linux sandbox helper executable.
     ///
     /// This is only used on Linux. Embedders that call zerobox from their own
@@ -340,6 +368,7 @@ impl Sandbox {
             profile_names,
             use_profile,
             linux_sandbox_exe,
+            bind_mounts,
         } = self;
 
         let cwd = match cwd {
@@ -385,6 +414,25 @@ impl Sandbox {
         if !full_access {
             validate_paths(&allow_read, &deny_read, &allow_write, &deny_write, &cwd)?;
         }
+
+        let bind_mounts = if bind_mounts.is_empty() {
+            bind_mounts
+        } else if disabled || full_access {
+            warn_bind_mounts_ignored(&bind_mounts, "because the sandbox is disabled");
+            Vec::new()
+        } else if !bind_mounts_supported_on_platform() {
+            warn_bind_mounts_ignored(
+                &bind_mounts,
+                &format!("on {}", bind_mount_unsupported_platform_label()),
+            );
+            Vec::new()
+        } else {
+            for mount in &bind_mounts {
+                validate_bind_mount(mount)
+                    .map_err(|e| anyhow::anyhow!("invalid --bind-mount: {e}"))?;
+            }
+            bind_mounts
+        };
 
         let secret_store = Arc::new(
             secret::build_secret_store(&secrets, &secret_hosts).map_err(|e| anyhow::anyhow!(e))?,
@@ -468,6 +516,7 @@ impl Sandbox {
                 use_legacy_landlock,
                 windows_sandbox_level: WindowsSandboxLevel::default(),
                 windows_sandbox_private_desktop: false,
+                bind_mounts,
             })
             .map_err(|e| anyhow::anyhow!("sandbox transform failed: {e}"))?;
 
@@ -977,6 +1026,81 @@ fn select_sandbox_type(strict: bool) -> Result<(SandboxType, bool)> {
     }
 }
 
+fn program_name_for_warning() -> String {
+    std::env::args_os()
+        .next()
+        .and_then(|os| {
+            std::path::PathBuf::from(os)
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+        })
+        .unwrap_or_else(|| "zerobox".to_string())
+}
+
+fn warn_bind_mounts_ignored(bind_mounts: &[BindMount], reason: &str) {
+    for mount in bind_mounts {
+        eprintln!(
+            "{}: --bind-mount is a no-op {reason}; {} not remapped",
+            program_name_for_warning(),
+            mount.host.display(),
+        );
+    }
+}
+
+fn bind_mount_unsupported_platform_label() -> &'static str {
+    #[cfg(target_os = "macos")]
+    {
+        "macOS"
+    }
+    #[cfg(target_os = "windows")]
+    {
+        "Windows"
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if is_wsl1() { "WSL1" } else { "this platform" }
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    {
+        "this platform"
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn bind_mounts_supported_on_platform() -> bool {
+    !is_wsl1()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn bind_mounts_supported_on_platform() -> bool {
+    false
+}
+
+#[cfg(target_os = "linux")]
+fn is_wsl1() -> bool {
+    std::fs::read_to_string("/proc/version")
+        .map(|contents| proc_version_indicates_wsl1(&contents))
+        .unwrap_or(false)
+}
+
+#[cfg(target_os = "linux")]
+fn proc_version_indicates_wsl1(proc_version: &str) -> bool {
+    let lower = proc_version.to_ascii_lowercase();
+    let mut remaining = lower.as_str();
+    while let Some(marker) = remaining.find("wsl") {
+        let version_start = marker + "wsl".len();
+        let digits: String = remaining[version_start..]
+            .chars()
+            .take_while(char::is_ascii_digit)
+            .collect();
+        if let Ok(version) = digits.parse::<u32>() {
+            return version == 1;
+        }
+        remaining = &remaining[version_start..];
+    }
+    lower.contains("microsoft") && !lower.contains("microsoft-standard")
+}
+
 #[cfg(target_os = "linux")]
 fn can_create_user_namespace() -> bool {
     use std::process::Command;
@@ -1432,6 +1556,39 @@ mod tests {
         let s = Sandbox::command("x").linux_sandbox_exe(p("/tmp/zerobox-linux-sandbox"));
 
         assert_eq!(s.linux_sandbox_exe, Some(p("/tmp/zerobox-linux-sandbox")));
+    }
+
+    #[test]
+    fn builder_bind_mount_accumulates_in_order() {
+        let s = Sandbox::command("x")
+            .bind_mount("/host/a", "/sandbox/a")
+            .bind_mount_ro("/host/b", "/sandbox/b")
+            .bind_mount("/host/c", "/sandbox/c");
+
+        let hosts: Vec<_> = s.bind_mounts.iter().map(|m| m.host.clone()).collect();
+        let sandboxes: Vec<_> = s.bind_mounts.iter().map(|m| m.sandbox.clone()).collect();
+        let ro: Vec<bool> = s.bind_mounts.iter().map(|m| m.read_only).collect();
+        assert_eq!(hosts, vec![p("/host/a"), p("/host/b"), p("/host/c")]);
+        assert_eq!(
+            sandboxes,
+            vec![p("/sandbox/a"), p("/sandbox/b"), p("/sandbox/c")]
+        );
+        assert_eq!(ro, vec![false, true, false]);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn proc_version_wsl1_detection() {
+        assert!(proc_version_indicates_wsl1(
+            "Linux version 4.4.0-19041-Microsoft (Microsoft@Microsoft.com) (gcc..."
+        ));
+        assert!(!proc_version_indicates_wsl1(
+            "Linux version 5.15.0-microsoft-standard-WSL2"
+        ));
+        assert!(!proc_version_indicates_wsl1("Linux version 6.5.0-generic"));
+        assert!(proc_version_indicates_wsl1(
+            "Linux version 4.4.0-WSL1-Microsoft"
+        ));
     }
 
     // apply_profile

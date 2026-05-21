@@ -85,6 +85,26 @@ try {
 }
 ```
 
+## Bind mounts
+
+Give the sandboxed process a private view of a directory by remapping a host
+path to a different path inside the sandbox. Useful for per-project tmpdirs:
+
+```ts
+const sandbox = Sandbox.create({
+  bindMounts: [
+    { host: "/tmp/projects/abc123", sandbox: "/tmp" },
+    { host: "/var/cache/pkg", sandbox: "/var/cache/pkg", readOnly: true },
+  ],
+});
+
+await sandbox.sh`node app.js`.text();
+```
+
+Mounts apply in the order declared, so list parents before children. On Linux
+(and WSL2) the CLI performs a real bind mount; on macOS, Windows, and WSL1 it
+emits a one-line warning to stderr and runs the command without remapping.
+
 ## Secrets
 
 Pass API keys that the sandboxed process never sees. The proxy substitutes the real value only for approved hosts.
@@ -177,6 +197,7 @@ See the [main README](https://github.com/afshinm/zerobox#environment-variables) 
 | `restore` | `boolean` | Record and roll back after exit. Implies `snapshot`. |
 | `snapshotPaths` / `snapshotExclude` | `string[]` | Tracked paths / excluded patterns. |
 | `secrets` | `Record<string, SecretConfig>` | Secrets with per-host scopes. |
+| `bindMounts` | `BindMount[]` | Remap host directories onto sandbox paths. Linux/WSL2 real mount; macOS/Windows/WSL1 warn and no-op. |
 | `debug` | `boolean` | Print sandbox config to stderr. |
 
 ## Caveats

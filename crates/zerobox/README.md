@@ -35,6 +35,23 @@ println!("{}", String::from_utf8_lossy(&output.stdout));
 println!("exit: {}", output.status);
 ```
 
+## Bind mounts
+
+Give the sandboxed process a private view of a directory by remapping a host
+path to a different path inside the sandbox. Useful for per-project tmpdirs:
+
+```rust
+let output = Sandbox::command("node")
+    .arg("app.js")
+    .bind_mount("/tmp/projects/abc123", "/tmp")     // writable
+    .bind_mount_ro("/var/cache/pkg", "/var/cache/pkg") // read-only
+    .run()
+    .await?;
+```
+
+Mounts apply in the order declared. macOS, Windows, and WSL1 emit a one-line
+warning and run without remapping.
+
 ## Execution modes
 
 ### Collect output
@@ -152,6 +169,7 @@ let output = Sandbox::command("ls")
 | `env(k, v)` | Set an env var. |
 | `allow_env(keys)` / `deny_env(keys)` | Inherit / block parent env vars. |
 | `secret(k, v)` / `secret_host(k, hosts)` | Secret and its allowed hosts. |
+| `bind_mount(host, sandbox)` / `bind_mount_ro(host, sandbox)` | Remap a host directory to a sandbox path. Linux-only; macOS/Windows/WSL1 warn and no-op. |
 | `profile(name)` / `profiles(names)` / `no_profile()` | Select or skip profiles. |
 | `full_access()` / `no_sandbox()` / `strict_sandbox()` | Coarse policy switches. |
 | `snapshot()` / `restore()` | Record / roll back filesystem changes. |
