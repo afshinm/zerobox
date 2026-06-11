@@ -1,0 +1,48 @@
+--- upstream/sandboxing/src/seatbelt.rs
++++ upstream/sandboxing/src/seatbelt.rs
+@@ -17,6 +17,7 @@
+ use zerobox_protocol::protocol::SandboxPolicy;
+ use zerobox_protocol::protocol::WritableRoot;
+ use zerobox_utils_absolute_path::AbsolutePathBuf;
++use zerobox_utils_absolute_path::canonicalize_preserving_symlinks;
+ 
+ const MACOS_SEATBELT_BASE_POLICY: &str = include_str!("seatbelt_base_policy.sbpl");
+ const MACOS_SEATBELT_NETWORK_POLICY: &str = include_str!("seatbelt_network_policy.sbpl");
+@@ -160,9 +161,7 @@
+     }
+ 
+     let absolute_path = AbsolutePathBuf::from_absolute_path(path).ok()?;
+-    let normalized_path = absolute_path
+-        .as_path()
+-        .canonicalize()
++    let normalized_path = canonicalize_preserving_symlinks(absolute_path.as_path())
+         .ok()
+         .and_then(|canonical_path| AbsolutePathBuf::from_absolute_path(canonical_path).ok());
+     normalized_path.or(Some(absolute_path))
+@@ -458,9 +457,14 @@
+ fn canonicalize_glob_static_prefix_for_sandbox(pattern: &str) -> Option<String> {
+     let first_glob_index = pattern
+         .char_indices()
+         .find_map(|(index, ch)| matches!(ch, '*' | '?' | '[' | ']').then_some(index));
+     let Some(first_glob_index) = first_glob_index else {
+-        return normalize_path_for_sandbox(Path::new(pattern))
++        // For deny rules we always need the fully canonical path so the
++        // regex matches the resolved target regardless of how the user
++        // refers to it.
++        return Path::new(pattern)
++            .canonicalize()
++            .ok()
+             .map(|path| path.to_string_lossy().to_string());
+     };
+ 
+@@ -474,7 +479,9 @@
+         return None;
+     }
+ 
+-    let root = normalize_path_for_sandbox(Path::new(&pattern[..prefix_end]))?;
++    // For deny rules, always use the fully canonical path so the regex
++    // matches the resolved target behind any symlinks.
++    let root = AbsolutePathBuf::from_absolute_path(Path::new(&pattern[..prefix_end]).canonicalize().ok()?).ok()?;
+     let root = root.to_string_lossy();
+     let suffix = &pattern[prefix_end..];
+     let normalized_pattern = format!("{root}{suffix}");

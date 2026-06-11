@@ -630,7 +630,7 @@ fn build_fs_policy(
         if let Ok(abs) = resolve_path(cwd, path) {
             entries.push(FileSystemSandboxEntry {
                 path: FileSystemPath::Path { path: abs },
-                access: FileSystemAccessMode::Read,
+                access: FileSystemAccessMode::None,
             });
         }
     }
