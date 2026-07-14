@@ -317,6 +317,12 @@ if [ -f "$BWRAP_FIXES_PATCH" ]; then
     patch -p0 < "$BWRAP_FIXES_PATCH"
 fi
 
+SEATBELT_SYMLINK_PATCH="$SCRIPT_DIR/upstream-seatbelt-symlink.patch"
+if [ -f "$SEATBELT_SYMLINK_PATCH" ]; then
+    echo "    seatbelt-symlink"
+    patch -p0 < "$SEATBELT_SYMLINK_PATCH"
+fi
+
 cd -
 
 {
